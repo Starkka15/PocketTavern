@@ -249,4 +249,4 @@ Generate character avatars using your local Stable Diffusion Forge server.
 ## Credits
 
 - **[Starkka15](https://github.com/Starkka15)** - Lead Developer
-- **[Kuma3D](https://github.com/Kuma3D)** - Contributor
+- **[Kuma3D](https://github.com/Kuma3D)** - UI/Graphical Layout
