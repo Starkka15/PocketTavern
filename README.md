@@ -1,4 +1,6 @@
-# PocketTavern Setup Guide
+# PocketTavern
+
+**⚠️ NOT FOR COMMERCIAL USE - See [LICENSE](LICENSE) for details**
 
 PocketTavern is an Android companion app for SillyTavern that lets you chat with your AI characters on the go.
 
