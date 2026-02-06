@@ -8,6 +8,23 @@ PocketTavern is an Android companion app for SillyTavern that lets you chat with
 
 > **Content Disclaimer:** PocketTavern does not host, store, or provide any character content. All characters and data come from your own self-hosted SillyTavern server and any optional services you configure.
 
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/01_home.png" width="180" alt="Home Screen"/>
+  <img src="screenshots/02_characters.png" width="180" alt="Characters"/>
+  <img src="screenshots/04_chat.png" width="180" alt="Chat"/>
+  <img src="screenshots/05_settings.png" width="180" alt="Settings"/>
+</p>
+
+<p align="center">
+  <img src="screenshots/03_character_options.png" width="180" alt="Character Options"/>
+  <img src="screenshots/06_cardvault_cards.png" width="180" alt="CardVault Cards"/>
+  <img src="screenshots/07_cardvault_lorebooks.png" width="180" alt="CardVault Lorebooks"/>
+</p>
+
+---
+
 ## Prerequisites
 
 ### 1. SillyTavern Server
