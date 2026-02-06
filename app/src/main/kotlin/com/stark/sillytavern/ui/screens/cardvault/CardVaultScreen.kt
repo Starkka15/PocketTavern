@@ -296,54 +296,70 @@ fun CardVaultScreen(
                         )
                     }
                 } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 160.dp),
-                        state = gridState,
-                        contentPadding = PaddingValues(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        when (uiState.contentType) {
-                            CardVaultContentType.CHARACTERS -> {
-                                items(
-                                    count = uiState.characterResults.size,
-                                    key = { index -> "char_${index}_${uiState.characterResults[index].id}" }
-                                ) { index ->
-                                    val character = uiState.characterResults[index]
-                                    CardVaultCharacterCard(
-                                        character = character,
-                                        imageUrl = viewModel.buildImageUrl(character),
-                                        onClick = { viewModel.selectCharacter(character) }
-                                    )
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Results grid
+                        LazyVerticalGrid(
+                            columns = GridCells.Adaptive(minSize = 160.dp),
+                            state = gridState,
+                            contentPadding = PaddingValues(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            when (uiState.contentType) {
+                                CardVaultContentType.CHARACTERS -> {
+                                    items(
+                                        count = uiState.characterResults.size,
+                                        key = { index -> "char_${index}_${uiState.characterResults[index].id}" }
+                                    ) { index ->
+                                        val character = uiState.characterResults[index]
+                                        CardVaultCharacterCard(
+                                            character = character,
+                                            imageUrl = viewModel.buildImageUrl(character),
+                                            onClick = { viewModel.selectCharacter(character) }
+                                        )
+                                    }
+                                }
+                                CardVaultContentType.LOREBOOKS -> {
+                                    items(
+                                        count = uiState.lorebookResults.size,
+                                        key = { index -> "lb_${index}_${uiState.lorebookResults[index].id}" }
+                                    ) { index ->
+                                        val lorebook = uiState.lorebookResults[index]
+                                        CardVaultLorebookCard(
+                                            lorebook = lorebook,
+                                            onClick = { viewModel.selectLorebook(lorebook) }
+                                        )
+                                    }
                                 }
                             }
-                            CardVaultContentType.LOREBOOKS -> {
-                                items(
-                                    count = uiState.lorebookResults.size,
-                                    key = { index -> "lb_${index}_${uiState.lorebookResults[index].id}" }
-                                ) { index ->
-                                    val lorebook = uiState.lorebookResults[index]
-                                    CardVaultLorebookCard(
-                                        lorebook = lorebook,
-                                        onClick = { viewModel.selectLorebook(lorebook) }
-                                    )
+
+                            // Loading indicator
+                            if (uiState.isLoading) {
+                                item(span = { GridItemSpan(maxLineSpan) }) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator()
+                                    }
                                 }
                             }
                         }
 
-                        // Loading more indicator
-                        if (uiState.isLoadingMore) {
-                            item(span = { GridItemSpan(maxLineSpan) }) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator()
-                                }
-                            }
+                        // Pagination controls
+                        if (uiState.totalPages > 1) {
+                            PaginationBar(
+                                currentPage = uiState.currentPage,
+                                totalPages = uiState.totalPages,
+                                totalCount = uiState.totalCount,
+                                isLoading = uiState.isLoading,
+                                onPreviousPage = { viewModel.previousPage() },
+                                onNextPage = { viewModel.nextPage() },
+                                onGoToPage = { page -> viewModel.goToPage(page) }
+                            )
                         }
                     }
                 }
@@ -439,6 +455,134 @@ private fun SearchBar(
         supportingText = {
             if (totalCount > 0) {
                 Text("$totalCount results")
+            }
+        }
+    )
+}
+
+@Composable
+private fun PaginationBar(
+    currentPage: Int,
+    totalPages: Int,
+    totalCount: Int,
+    isLoading: Boolean,
+    onPreviousPage: () -> Unit,
+    onNextPage: () -> Unit,
+    onGoToPage: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showPageJumpDialog by remember { mutableStateOf(false) }
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        tonalElevation = 3.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Previous button
+            IconButton(
+                onClick = onPreviousPage,
+                enabled = currentPage > 1 && !isLoading
+            ) {
+                Icon(
+                    Icons.Default.ChevronLeft,
+                    contentDescription = "Previous page"
+                )
+            }
+
+            // Page info (clickable to jump to page)
+            TextButton(
+                onClick = { showPageJumpDialog = true },
+                enabled = !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(
+                    "Page $currentPage of $totalPages",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            // Next button
+            IconButton(
+                onClick = onNextPage,
+                enabled = currentPage < totalPages && !isLoading
+            ) {
+                Icon(
+                    Icons.Default.ChevronRight,
+                    contentDescription = "Next page"
+                )
+            }
+        }
+    }
+
+    // Page jump dialog
+    if (showPageJumpDialog) {
+        PageJumpDialog(
+            currentPage = currentPage,
+            totalPages = totalPages,
+            onDismiss = { showPageJumpDialog = false },
+            onGoToPage = { page ->
+                onGoToPage(page)
+                showPageJumpDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun PageJumpDialog(
+    currentPage: Int,
+    totalPages: Int,
+    onDismiss: () -> Unit,
+    onGoToPage: (Int) -> Unit
+) {
+    var pageText by remember { mutableStateOf(currentPage.toString()) }
+    val isValid = pageText.toIntOrNull()?.let { it in 1..totalPages } ?: false
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Go to Page") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = pageText,
+                    onValueChange = { pageText = it.filter { c -> c.isDigit() } },
+                    label = { Text("Page number (1-$totalPages)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+                    keyboardActions = KeyboardActions(
+                        onGo = {
+                            if (isValid) {
+                                onGoToPage(pageText.toInt())
+                            }
+                        }
+                    ),
+                    isError = pageText.isNotEmpty() && !isValid
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onGoToPage(pageText.toInt()) },
+                enabled = isValid
+            ) {
+                Text("Go")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
             }
         }
     )

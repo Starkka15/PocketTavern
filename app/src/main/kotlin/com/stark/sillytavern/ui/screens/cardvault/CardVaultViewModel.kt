@@ -530,6 +530,95 @@ class CardVaultViewModel @Inject constructor(
         _uiState.update { it.copy(error = null) }
     }
 
+    fun goToPage(page: Int) {
+        val state = _uiState.value
+        if (page < 1 || page > state.totalPages || page == state.currentPage) return
+
+        if (state.contentType == CardVaultContentType.CHARACTERS) {
+            goToCharacterPage(page)
+        } else {
+            goToLorebookPage(page)
+        }
+    }
+
+    private fun goToCharacterPage(page: Int) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+
+            val state = _uiState.value
+            when (val result = repository.search(
+                query = state.searchQuery.takeIf { it.isNotBlank() },
+                nsfwFilter = state.nsfwFilter,
+                tags = state.selectedTags.takeIf { it.isNotEmpty() },
+                page = page,
+                limit = PAGE_SIZE
+            )) {
+                is Result.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            characterResults = result.data.characters,
+                            currentPage = result.data.currentPage,
+                            totalPages = result.data.totalPages,
+                            totalCount = result.data.totalCount,
+                            isLoading = false
+                        )
+                    }
+                }
+                is Result.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            error = result.exception.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun goToLorebookPage(page: Int) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+
+            val state = _uiState.value
+            when (val result = repository.searchLorebooks(
+                query = state.searchQuery.takeIf { it.isNotBlank() },
+                nsfwFilter = state.nsfwFilter,
+                topics = state.selectedTags.takeIf { it.isNotEmpty() },
+                page = page,
+                limit = PAGE_SIZE
+            )) {
+                is Result.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            lorebookResults = result.data.lorebooks,
+                            currentPage = result.data.currentPage,
+                            totalPages = result.data.totalPages,
+                            totalCount = result.data.totalCount,
+                            isLoading = false
+                        )
+                    }
+                }
+                is Result.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            error = result.exception.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun nextPage() {
+        goToPage(_uiState.value.currentPage + 1)
+    }
+
+    fun previousPage() {
+        goToPage(_uiState.value.currentPage - 1)
+    }
+
     fun buildImageUrl(character: CardVaultCharacter): String {
         return try {
             val url = repository.buildImageUrl(_uiState.value.serverUrl, character)
