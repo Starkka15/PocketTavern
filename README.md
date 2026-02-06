@@ -243,3 +243,10 @@ Generate character avatars using your local Stable Diffusion Forge server.
 3. **Keep SillyTavern updated** - Some features require recent versions
 4. **Use local network** - PocketTavern works best on your home WiFi
 5. **Backup characters** - Use CardVault to backup your favorite characters
+
+---
+
+## Credits
+
+- **[Starkka15](https://github.com/Starkka15)** - Lead Developer
+- **[Kuma3D](https://github.com/Kuma3D)** - Contributor
