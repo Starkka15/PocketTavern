@@ -63,4 +63,13 @@ sealed class Route {
 
     @Serializable
     data object SetupGuide : Route()
+
+    @Serializable
+    data object Groups : Route()
+
+    @Serializable
+    data class GroupChat(val groupId: String) : Route()
+
+    @Serializable
+    data object CreateGroup : Route()
 }

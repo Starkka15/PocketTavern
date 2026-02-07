@@ -2764,6 +2764,95 @@ class SillyTavernRepository @Inject constructor(
         }
     }
 
+    /**
+     * Get group chat messages
+     */
+    suspend fun getGroupChat(groupId: String): Result<List<GroupChatMessage>> {
+        return try {
+            val request = com.stark.sillytavern.data.remote.dto.st.GetGroupChatRequest(id = groupId)
+            val messages = api.getGroupChat(request)
+            Result.Success(messages.map { dto ->
+                GroupChatMessage(
+                    content = dto.mes ?: "",
+                    isUser = dto.isUser,
+                    isSystem = dto.isSystem,
+                    senderName = dto.name,
+                    senderAvatar = dto.originalAvatar ?: dto.forceAvatar
+                )
+            })
+        } catch (e: Exception) {
+            Log.e("STRepo", "Failed to get group chat", e)
+            Result.Error(Exception("Failed to get group chat: ${e.message}", e))
+        }
+    }
+
+    /**
+     * Save group chat messages
+     */
+    suspend fun saveGroupChat(groupId: String, messages: List<GroupChatMessage>): Result<Unit> {
+        return try {
+            val dtos = messages.map { msg ->
+                com.stark.sillytavern.data.remote.dto.st.GroupChatMessageDto(
+                    name = msg.senderName,
+                    isUser = msg.isUser,
+                    isSystem = msg.isSystem,
+                    mes = msg.content,
+                    originalAvatar = msg.senderAvatar
+                )
+            }
+            val request = com.stark.sillytavern.data.remote.dto.st.SaveGroupChatRequest(
+                id = groupId,
+                chat = dtos
+            )
+            val response = api.saveGroupChat(request)
+            if (response.isSuccessful) {
+                Result.Success(Unit)
+            } else {
+                Result.Error(Exception("Failed to save group chat: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e("STRepo", "Failed to save group chat", e)
+            Result.Error(Exception("Failed to save group chat: ${e.message}", e))
+        }
+    }
+
+    /**
+     * Create a new group
+     */
+    suspend fun createGroup(name: String, members: List<String>): Result<Group> {
+        return try {
+            val request = com.stark.sillytavern.data.remote.dto.st.CreateGroupRequest(
+                name = name,
+                members = members
+            )
+            val response = api.createGroup(request)
+            if (response.isSuccessful) {
+                val dto = response.body()!!
+                Result.Success(Group(
+                    id = dto.id,
+                    name = dto.name,
+                    members = dto.members,
+                    chatId = dto.chatId,
+                    avatar = dto.avatar,
+                    description = dto.description,
+                    favorite = dto.favorite
+                ))
+            } else {
+                Result.Error(Exception("Failed to create group: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e("STRepo", "Failed to create group", e)
+            Result.Error(Exception("Failed to create group: ${e.message}", e))
+        }
+    }
+
+    /**
+     * Build avatar URL for a group member
+     */
+    suspend fun buildGroupMemberAvatarUrl(memberAvatar: String?): String? {
+        return buildAvatarUrl(memberAvatar)
+    }
+
     // ========== Personas (User Avatars) ==========
 
     /**

@@ -29,6 +29,8 @@ import com.stark.sillytavern.ui.screens.context.ContextSettingsScreen
 import com.stark.sillytavern.ui.screens.charactersettings.CharacterSettingsScreen
 import com.stark.sillytavern.ui.screens.persona.PersonaScreen
 import com.stark.sillytavern.ui.screens.help.SetupGuideScreen
+import com.stark.sillytavern.ui.screens.groups.GroupsScreen
+import com.stark.sillytavern.ui.screens.groups.GroupChatScreen
 
 @Composable
 fun SillyTavernNavGraph(
@@ -57,6 +59,9 @@ fun SillyTavernNavGraph(
                 },
                 onNavigateToCardVault = {
                     navController.navigate(Route.CardVault)
+                },
+                onNavigateToGroups = {
+                    navController.navigate(Route.Groups)
                 },
                 onNavigateToSettings = {
                     navController.navigate(Route.SettingsHub)
@@ -239,6 +244,23 @@ fun SillyTavernNavGraph(
         composable<Route.SetupGuide> {
             SetupGuideScreen(
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable<Route.Groups> {
+            GroupsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToGroupChat = { groupId ->
+                    navController.navigate(Route.GroupChat(groupId))
+                }
+            )
+        }
+
+        composable<Route.GroupChat> { backStackEntry ->
+            val route: Route.GroupChat = backStackEntry.toRoute()
+            GroupChatScreen(
+                groupId = route.groupId,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
     }

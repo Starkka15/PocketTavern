@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Update
 import android.content.Intent
 import android.net.Uri
@@ -46,6 +47,7 @@ fun MainScreen(
     onNavigateToCreateCharacter: () -> Unit,
     onNavigateToChub: () -> Unit,
     onNavigateToCardVault: () -> Unit,
+    onNavigateToGroups: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToProfile: () -> Unit,
     viewModel: MainViewModel = hiltViewModel()
@@ -184,6 +186,17 @@ fun MainScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
                 }
+
+                // Groups - for group chats with multiple characters
+                NavigationCard(
+                    icon = Icons.Default.Groups,
+                    title = "Groups",
+                    description = "Chat with multiple characters at once",
+                    iconColor = IceCyan,
+                    onClick = onNavigateToGroups
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
 
                 NavigationCard(
                     icon = Icons.Default.Settings,

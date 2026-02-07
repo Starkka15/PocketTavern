@@ -22,3 +22,14 @@ data class ChatMessageMetadata(
     val notePosition: Int? = null,
     val noteRole: Int? = null
 )
+
+// Group chat message - includes sender information
+data class GroupChatMessage(
+    val id: String = UUID.randomUUID().toString(),
+    val content: String,
+    val isUser: Boolean,
+    val isSystem: Boolean = false,
+    val senderName: String? = null,  // Character name for AI messages
+    val senderAvatar: String? = null,  // Character avatar URL
+    val timestamp: Instant = Instant.now()
+)
