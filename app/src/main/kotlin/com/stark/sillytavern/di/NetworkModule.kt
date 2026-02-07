@@ -6,6 +6,7 @@ import com.stark.sillytavern.data.remote.api.CardVaultApi
 import com.stark.sillytavern.data.remote.api.ChubApi
 import com.stark.sillytavern.data.remote.api.ChubAvatarApi
 import com.stark.sillytavern.data.remote.api.ForgeApi
+import com.stark.sillytavern.data.remote.api.GitHubApi
 import com.stark.sillytavern.data.remote.api.SillyTavernApi
 import com.stark.sillytavern.data.remote.interceptor.AuthInterceptor
 import com.stark.sillytavern.data.remote.interceptor.CsrfInterceptor
@@ -273,6 +274,24 @@ object NetworkModule {
         cardVaultApiProvider: javax.inject.Provider<CardVaultApi>,
         sillyTavernApiProvider: javax.inject.Provider<SillyTavernApi>
     ): CardVaultRepository = CardVaultRepository(cardVaultApiProvider, sillyTavernApiProvider)
+
+    @Provides
+    @Singleton
+    @Named("GitHub")
+    fun provideGitHubOkHttpClient(): OkHttpClient {
+        return OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideGitHubApi(
+        @Named("GitHub") okHttpClient: OkHttpClient
+    ): GitHubApi {
+        return createRetrofit(okHttpClient, "https://api.github.com/").create(GitHubApi::class.java)
+    }
 
     @Provides
     @Singleton

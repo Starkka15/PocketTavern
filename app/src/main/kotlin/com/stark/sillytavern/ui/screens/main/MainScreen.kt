@@ -14,6 +14,10 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Update
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -190,6 +194,64 @@ fun MainScreen(
                 )
             }
         }
+    }
+
+    // Update available dialog
+    val updateInfo = uiState.updateAvailable
+    if (uiState.showUpdateDialog && updateInfo != null) {
+        val context = LocalContext.current
+
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissUpdateDialog() },
+            icon = {
+                Icon(
+                    Icons.Default.Update,
+                    contentDescription = null,
+                    tint = IceBlue
+                )
+            },
+            title = {
+                Text("Update Available")
+            },
+            text = {
+                Column {
+                    Text(
+                        "A new version of PocketTavern is available!",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Current: v${updateInfo.currentVersion}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                    Text(
+                        "Latest: v${updateInfo.latestVersion}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = IceBlue
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo.releaseUrl))
+                        context.startActivity(intent)
+                        viewModel.dismissUpdateDialog()
+                    }
+                ) {
+                    Text("Download", color = IceBlue)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissUpdateDialog() }) {
+                    Text("Later", color = TextSecondary)
+                }
+            },
+            containerColor = Color.Black.copy(alpha = 0.95f),
+            titleContentColor = TextPrimary,
+            textContentColor = TextPrimary
+        )
     }
 }
 
