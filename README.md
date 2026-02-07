@@ -10,6 +10,8 @@ PocketTavern is an Android companion app for SillyTavern that lets you chat with
 
 > **Compatibility Notice:** PocketTavern is designed for the official [SillyTavern](https://github.com/SillyTavern/SillyTavern) repository only. Forked versions of SillyTavern are not supported. This app is strictly for personal use. Any issues filed regarding connection problems to a server not fully operated by the issue creator will be ignored.
 
+[![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/zeVUWke2xy)
+
 ## Screenshots
 
 <p align="center">
