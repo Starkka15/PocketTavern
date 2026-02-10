@@ -7,6 +7,7 @@ data class ServerSettings(
     val proxyUrl: String = "",
     val forgeUrl: String = "",
     val cardVaultUrl: String = "",
+    val charavaultMode: String = "local", // "local" or "charavault"
     val chubEnabled: Boolean = false
 ) {
     val hasCredentials: Boolean

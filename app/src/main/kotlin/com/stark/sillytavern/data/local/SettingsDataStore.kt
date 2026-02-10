@@ -37,6 +37,10 @@ class SettingsDataStore @Inject constructor(
         val CHUB_ENABLED = booleanPreferencesKey("chub_enabled")
         // CardVault server
         val CARDVAULT_URL = stringPreferencesKey("cardvault_url")
+        // CharaVault.net session
+        val CHARAVAULT_TOKEN = stringPreferencesKey("charavault_token")
+        val CHARAVAULT_EMAIL = stringPreferencesKey("charavault_email")
+        val CHARAVAULT_MODE = stringPreferencesKey("charavault_mode") // "local" or "charavault"
     }
 
     val settingsFlow: Flow<ServerSettings> = context.dataStore.data.map { prefs ->
@@ -47,6 +51,7 @@ class SettingsDataStore @Inject constructor(
             proxyUrl = prefs[Keys.PROXY_URL] ?: "",
             forgeUrl = prefs[Keys.FORGE_URL] ?: "",
             cardVaultUrl = prefs[Keys.CARDVAULT_URL] ?: "",
+            charavaultMode = prefs[Keys.CHARAVAULT_MODE] ?: "local",
             chubEnabled = prefs[Keys.CHUB_ENABLED] ?: false
         )
     }
@@ -59,6 +64,7 @@ class SettingsDataStore @Inject constructor(
             prefs[Keys.PROXY_URL] = settings.proxyUrl.trimEnd('/')
             prefs[Keys.FORGE_URL] = settings.forgeUrl.trimEnd('/')
             prefs[Keys.CARDVAULT_URL] = settings.cardVaultUrl.trimEnd('/')
+            prefs[Keys.CHARAVAULT_MODE] = settings.charavaultMode
             prefs[Keys.CHUB_ENABLED] = settings.chubEnabled
         }
     }
@@ -165,9 +171,57 @@ class SettingsDataStore @Inject constructor(
     suspend fun getCardVaultUrl(): String {
         return cardVaultUrlFlow.first()
     }
+
+    // CharaVault.net session management
+    val charavaultSessionFlow: Flow<CharaVaultSession?> = context.dataStore.data.map { prefs ->
+        val token = prefs[Keys.CHARAVAULT_TOKEN]
+        val email = prefs[Keys.CHARAVAULT_EMAIL]
+        if (token != null && email != null) {
+            CharaVaultSession(token = token, email = email)
+        } else {
+            null
+        }
+    }
+
+    val charavaultModeFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[Keys.CHARAVAULT_MODE] ?: "local"
+    }
+
+    suspend fun saveCharaVaultSession(token: String, email: String) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.CHARAVAULT_TOKEN] = token
+            prefs[Keys.CHARAVAULT_EMAIL] = email
+        }
+    }
+
+    suspend fun clearCharaVaultSession() {
+        context.dataStore.edit { prefs ->
+            prefs.remove(Keys.CHARAVAULT_TOKEN)
+            prefs.remove(Keys.CHARAVAULT_EMAIL)
+        }
+    }
+
+    suspend fun getCharaVaultSession(): CharaVaultSession? {
+        return charavaultSessionFlow.first()
+    }
+
+    suspend fun saveCharaVaultMode(mode: String) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.CHARAVAULT_MODE] = mode
+        }
+    }
+
+    suspend fun getCharaVaultMode(): String {
+        return charavaultModeFlow.first()
+    }
 }
 
 data class ChubSession(
     val cookie: String,
     val username: String? = null
+)
+
+data class CharaVaultSession(
+    val token: String,
+    val email: String
 )

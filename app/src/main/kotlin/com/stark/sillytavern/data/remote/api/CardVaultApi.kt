@@ -9,10 +9,13 @@ import com.stark.sillytavern.data.remote.dto.cardvault.CardVaultLorebookSearchRe
 import com.stark.sillytavern.data.remote.dto.cardvault.CardVaultLorebookDetailResponse
 import com.stark.sillytavern.data.remote.dto.cardvault.CardVaultLorebookStatsResponse
 import com.stark.sillytavern.data.remote.dto.cardvault.CardVaultLorebookTopicsResponse
+import com.stark.sillytavern.data.remote.dto.cardvault.CharaVaultLoginResponse
+import com.stark.sillytavern.data.remote.dto.cardvault.CharaVaultUserResponse
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import okhttp3.ResponseBody
 import retrofit2.Response
+import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.POST
@@ -90,6 +93,33 @@ interface CardVaultApi {
         @Part file: MultipartBody.Part,
         @Part("folder") folder: RequestBody
     ): Response<CardVaultUploadResponse>
+
+    // ===== CHARAVAULT.NET AUTH ENDPOINTS =====
+
+    /**
+     * Login to CharaVault.net with email and password.
+     * Returns token on success, or requires_2fa if 2FA is enabled.
+     */
+    @POST("api/auth/login")
+    suspend fun login(@Body body: Map<String, String>): Response<CharaVaultLoginResponse>
+
+    /**
+     * Verify 2FA code to complete login.
+     */
+    @POST("api/auth/verify-2fa")
+    suspend fun verify2fa(@Body body: Map<String, String>): Response<CharaVaultLoginResponse>
+
+    /**
+     * Get current authenticated user info.
+     */
+    @GET("api/auth/me")
+    suspend fun getMe(): Response<CharaVaultUserResponse>
+
+    /**
+     * Verify age (18+) to unlock NSFW content.
+     */
+    @POST("api/auth/verify-age")
+    suspend fun verifyAge(): Response<Map<String, @JvmSuppressWildcards Any>>
 
     // ===== LOREBOOK ENDPOINTS =====
 

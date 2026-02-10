@@ -318,3 +318,31 @@ data class TopicCount(
     val name: String,
     val count: Int
 )
+
+// ===== CHARAVAULT.NET AUTH DTOs =====
+
+/**
+ * Response from /api/auth/login and /api/auth/verify-2fa.
+ */
+@Serializable
+data class CharaVaultLoginResponse(
+    val success: Boolean = false,
+    val token: String? = null,
+    val user: CharaVaultUserResponse? = null,
+    @SerialName("requires_2fa") val requires2fa: Boolean = false,
+    @SerialName("challenge_token") val challengeToken: String? = null
+)
+
+/**
+ * User info from CharaVault.net.
+ */
+@Serializable
+data class CharaVaultUserResponse(
+    val id: Int = 0,
+    val email: String = "",
+    @SerialName("display_name") val displayName: String = "",
+    val role: String = "user",
+    @SerialName("nsfw_verified") val nsfwVerified: Boolean = false,
+    @SerialName("totp_enabled") val totpEnabled: Boolean = false,
+    @SerialName("created_at") val createdAt: String = ""
+)

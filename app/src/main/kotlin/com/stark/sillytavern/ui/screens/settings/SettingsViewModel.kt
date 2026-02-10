@@ -21,6 +21,7 @@ data class SettingsUiState(
     val proxyUrl: String = "",
     val forgeUrl: String = "",
     val cardVaultUrl: String = "",
+    val charavaultMode: String = "local",
     val chubEnabled: Boolean = false,
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
@@ -56,6 +57,7 @@ class SettingsViewModel @Inject constructor(
                     proxyUrl = settings.proxyUrl,
                     forgeUrl = settings.forgeUrl,
                     cardVaultUrl = settings.cardVaultUrl,
+                    charavaultMode = settings.charavaultMode,
                     chubEnabled = settings.chubEnabled,
                     isLoading = false
                 )
@@ -145,6 +147,7 @@ class SettingsViewModel @Inject constructor(
             proxyUrl = _uiState.value.proxyUrl.trim(),
             forgeUrl = _uiState.value.forgeUrl.trim(),
             cardVaultUrl = _uiState.value.cardVaultUrl.trim(),
+            charavaultMode = _uiState.value.charavaultMode,
             chubEnabled = _uiState.value.chubEnabled
         )
         settingsRepository.saveSettings(settings)

@@ -20,6 +20,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -135,6 +138,18 @@ fun CardVaultScreen(
                     }
                 },
                 actions = {
+                    // Login/account button when in CharaVault.net mode
+                    if (uiState.charavaultMode == "charavault") {
+                        if (uiState.isLoggedIn) {
+                            IconButton(onClick = { showSettingsDialog = true }) {
+                                Icon(Icons.Default.AccountCircle, contentDescription = "Account", tint = Color(0xFF4CAF50))
+                            }
+                        } else {
+                            TextButton(onClick = { viewModel.showLogin() }) {
+                                Text("Login", color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
                     IconButton(onClick = { showFilterMenu = true }) {
                         Icon(Icons.Default.FilterList, contentDescription = "Filter")
                     }
@@ -398,11 +413,46 @@ fun CardVaultScreen(
     if (showSettingsDialog) {
         ServerSettingsDialog(
             currentUrl = uiState.serverUrl,
+            currentMode = uiState.charavaultMode,
+            isLoggedIn = uiState.isLoggedIn,
+            charavaultEmail = uiState.charavaultEmail,
+            nsfwVerified = uiState.nsfwVerified,
             onDismiss = { showSettingsDialog = false },
-            onSave = { url ->
+            onSaveUrl = { url ->
                 viewModel.setServerUrl(url)
                 showSettingsDialog = false
-            }
+            },
+            onSetMode = { mode ->
+                viewModel.setMode(mode)
+                if (mode == "charavault" && !uiState.isLoggedIn) {
+                    showSettingsDialog = false
+                    viewModel.showLogin()
+                } else {
+                    showSettingsDialog = false
+                }
+            },
+            onLogout = {
+                viewModel.logout()
+                showSettingsDialog = false
+            },
+            onLogin = {
+                viewModel.setMode("charavault")
+                showSettingsDialog = false
+                viewModel.showLogin()
+            },
+            onVerifyAge = { viewModel.verifyAge() }
+        )
+    }
+
+    // Login dialog
+    if (uiState.showLoginDialog) {
+        CharaVaultLoginDialog(
+            isLoggingIn = uiState.isLoggingIn,
+            loginError = uiState.loginError,
+            requires2fa = uiState.requires2fa,
+            onDismiss = { viewModel.hideLogin() },
+            onLogin = { email, password -> viewModel.login(email, password) },
+            onVerify2fa = { code -> viewModel.verify2fa(code) }
         )
     }
 
@@ -863,41 +913,255 @@ private fun CharacterPreviewSheet(
 @Composable
 private fun ServerSettingsDialog(
     currentUrl: String,
+    currentMode: String,
+    isLoggedIn: Boolean,
+    charavaultEmail: String?,
+    nsfwVerified: Boolean,
     onDismiss: () -> Unit,
-    onSave: (String) -> Unit
+    onSaveUrl: (String) -> Unit,
+    onSetMode: (String) -> Unit,
+    onLogout: () -> Unit,
+    onLogin: () -> Unit,
+    onVerifyAge: () -> Unit
 ) {
     var url by remember { mutableStateOf(currentUrl) }
+    var selectedMode by remember { mutableStateOf(currentMode) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("CardVault Server") },
+        title = { Text("Card Server") },
         text = {
-            Column {
-                Text(
-                    "Enter the URL of your CardVault index server",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = url,
-                    onValueChange = { url = it },
-                    label = { Text("Server URL") },
-                    placeholder = { Text("http://192.168.1.100:8787") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Mode selector
+                Text("Source", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Local CardVault button
+                    FilterChip(
+                        selected = selectedMode == "local",
+                        onClick = { selectedMode = "local" },
+                        label = { Text("CardVault (Local)") },
+                        leadingIcon = {
+                            if (selectedMode == "local") Icon(Icons.Default.Check, null, Modifier.size(16.dp))
+                            else Icon(Icons.Default.Storage, null, Modifier.size(16.dp))
+                        }
+                    )
+
+                    // CharaVault.net button
+                    FilterChip(
+                        selected = selectedMode == "charavault",
+                        onClick = { selectedMode = "charavault" },
+                        label = { Text("CharaVault.net") },
+                        leadingIcon = {
+                            if (selectedMode == "charavault") Icon(Icons.Default.Check, null, Modifier.size(16.dp))
+                            else Icon(Icons.Default.Cloud, null, Modifier.size(16.dp))
+                        }
+                    )
+                }
+
+                HorizontalDivider()
+
+                if (selectedMode == "local") {
+                    // Local server URL input
+                    Text(
+                        "Enter your local CardVault server URL",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = url,
+                        onValueChange = { url = it },
+                        label = { Text("Server URL") },
+                        placeholder = { Text("http://192.168.1.100:8787") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    // CharaVault.net status
+                    if (isLoggedIn) {
+                        // Logged in state
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Default.AccountCircle, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(32.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    charavaultEmail ?: "Logged in",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    if (nsfwVerified) "NSFW Enabled" else "SFW Only",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (nsfwVerified) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        if (!nsfwVerified) {
+                            OutlinedButton(
+                                onClick = onVerifyAge,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Verify Age (18+) for NSFW")
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = onLogout,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Logout, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Logout")
+                        }
+                    } else {
+                        // Not logged in
+                        Text(
+                            "Login to CharaVault.net to access the full card library including NSFW content.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(
+                            onClick = onLogin,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Login, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Login to CharaVault.net")
+                        }
+                        Text(
+                            "Browsing without login shows SFW cards only.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
-                onClick = { onSave(url.trim()) },
-                enabled = url.isNotBlank()
+                onClick = {
+                    if (selectedMode == "local") {
+                        onSaveUrl(url.trim())
+                        if (currentMode != "local") onSetMode("local")
+                    } else {
+                        onSetMode("charavault")
+                    }
+                },
+                enabled = selectedMode == "charavault" || url.isNotBlank()
             ) {
                 Text("Save")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun CharaVaultLoginDialog(
+    isLoggingIn: Boolean,
+    loginError: String?,
+    requires2fa: Boolean,
+    onDismiss: () -> Unit,
+    onLogin: (String, String) -> Unit,
+    onVerify2fa: (String) -> Unit
+) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var showPassword by remember { mutableStateOf(false) }
+    var tfaCode by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = { if (!isLoggingIn) onDismiss() },
+        title = { Text(if (requires2fa) "Two-Factor Authentication" else "Login to CharaVault.net") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (requires2fa) {
+                    Text(
+                        "Enter the 6-digit code from your authenticator app.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    OutlinedTextField(
+                        value = tfaCode,
+                        onValueChange = { tfaCode = it.filter { c -> c.isDigit() }.take(6) },
+                        label = { Text("2FA Code") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardActions = KeyboardActions(
+                            onDone = { if (tfaCode.length == 6) onVerify2fa(tfaCode) }
+                        )
+                    )
+                } else {
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        label = { Text("Email") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                    )
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("Password") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { showPassword = !showPassword }) {
+                                Icon(
+                                    if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = null
+                                )
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        keyboardActions = KeyboardActions(
+                            onDone = { if (email.isNotBlank() && password.isNotBlank()) onLogin(email, password) }
+                        )
+                    )
+                }
+
+                if (loginError != null) {
+                    Text(
+                        loginError,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                if (isLoggingIn) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (requires2fa) {
+                        onVerify2fa(tfaCode)
+                    } else {
+                        onLogin(email.trim(), password)
+                    }
+                },
+                enabled = !isLoggingIn && if (requires2fa) tfaCode.length == 6 else (email.isNotBlank() && password.isNotBlank())
+            ) {
+                Text(if (requires2fa) "Verify" else "Login")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isLoggingIn) {
                 Text("Cancel")
             }
         }

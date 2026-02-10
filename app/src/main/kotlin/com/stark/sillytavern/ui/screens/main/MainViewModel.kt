@@ -70,7 +70,7 @@ class MainViewModel @Inject constructor(
             try {
                 val release = gitHubApi.getLatestRelease()
                 val latestVersion = release.tagName.removePrefix("v")
-                val currentVersion = BuildConfig.VERSION_NAME
+                val currentVersion = BuildConfig.VERSION_NAME.replace(Regex("-.*"), "")
 
                 Log.d("MainViewModel", "Current version: $currentVersion, Latest: $latestVersion")
 
