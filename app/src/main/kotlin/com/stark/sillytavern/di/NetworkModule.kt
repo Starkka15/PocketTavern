@@ -40,6 +40,8 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Named
 import javax.inject.Singleton
 
+private const val CHARAVAULT_NET_URL = "https://charavault.net"
+
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
@@ -166,9 +168,27 @@ object NetworkModule {
     @Singleton
     @Named("CardVault")
     fun provideCardVaultOkHttpClient(
-        loggingInterceptor: HttpLoggingInterceptor
+        loggingInterceptor: HttpLoggingInterceptor,
+        settingsDataStore: SettingsDataStore
     ): OkHttpClient {
+        // Conditionally add Bearer token when in CharaVault.net mode
+        val charavaultAuthInterceptor = Interceptor { chain ->
+            val mode = runBlocking { settingsDataStore.getCharaVaultMode() }
+            val session = if (mode == "charavault") {
+                runBlocking { settingsDataStore.getCharaVaultSession() }
+            } else null
+            val request = if (session != null) {
+                chain.request().newBuilder()
+                    .addHeader("Authorization", "Bearer ${session.token}")
+                    .build()
+            } else {
+                chain.request()
+            }
+            chain.proceed(request)
+        }
+
         return OkHttpClient.Builder()
+            .addInterceptor(charavaultAuthInterceptor)
             .addInterceptor(loggingInterceptor)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
@@ -263,8 +283,13 @@ object NetworkModule {
         @Named("CardVault") okHttpClient: OkHttpClient,
         settingsDataStore: SettingsDataStore
     ): CardVaultApi {
-        val url = runBlocking { settingsDataStore.getCardVaultUrl() }
-        val baseUrl = url.ifBlank { "http://localhost" }
+        val mode = runBlocking { settingsDataStore.getCharaVaultMode() }
+        val baseUrl = if (mode == "charavault") {
+            CHARAVAULT_NET_URL
+        } else {
+            val url = runBlocking { settingsDataStore.getCardVaultUrl() }
+            url.ifBlank { "http://localhost" }
+        }
         return createRetrofit(okHttpClient, "$baseUrl/").create(CardVaultApi::class.java)
     }
 

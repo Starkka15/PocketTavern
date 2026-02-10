@@ -183,27 +183,41 @@ fun SettingsScreen(
 
                 // CardVault Server Section
                 Text(
-                    text = "CardVault Server (optional)",
+                    text = "Card Server (optional)",
                     style = MaterialTheme.typography.titleMedium,
                     color = AccentGreen
                 )
 
-                OutlinedTextField(
-                    value = uiState.cardVaultUrl,
-                    onValueChange = { viewModel.updateCardVaultUrl(it) },
-                    label = { Text("CardVault URL") },
-                    placeholder = { Text("http://192.168.1.100:8787") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                    colors = settingsTextFieldColors()
-                )
-
                 Text(
-                    text = "Your local character card index server",
+                    text = if (uiState.charavaultMode == "charavault") "Mode: CharaVault.net" else "Mode: Local CardVault",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )
+
+                if (uiState.charavaultMode == "local") {
+                    OutlinedTextField(
+                        value = uiState.cardVaultUrl,
+                        onValueChange = { viewModel.updateCardVaultUrl(it) },
+                        label = { Text("CardVault URL") },
+                        placeholder = { Text("http://192.168.1.100:8787") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                        colors = settingsTextFieldColors()
+                    )
+
+                    Text(
+                        text = "Your local character card index server",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                } else {
+                    Text(
+                        text = "Configure login via the CardVault screen",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
 
                 // Optional Features Section - only show if Chub is available in this build
                 if (BuildConfig.CHUB_ENABLED) {

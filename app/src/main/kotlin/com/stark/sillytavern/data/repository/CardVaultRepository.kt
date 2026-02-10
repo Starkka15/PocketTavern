@@ -11,6 +11,8 @@ import com.stark.sillytavern.domain.model.CardVaultLorebook
 import com.stark.sillytavern.domain.model.CardVaultLorebookSearchResult
 import com.stark.sillytavern.domain.model.CardVaultLorebookStats
 import com.stark.sillytavern.domain.model.LorebookEntryItem
+import com.stark.sillytavern.data.remote.dto.cardvault.CharaVaultLoginResponse
+import com.stark.sillytavern.data.remote.dto.cardvault.CharaVaultUserResponse
 import com.stark.sillytavern.domain.model.Result
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -352,6 +354,96 @@ class CardVaultRepository @Inject constructor(
         val encodedFolder = URLEncoder.encode(character.folder, "UTF-8").replace("+", "%20")
         val encodedFile = URLEncoder.encode(character.file, "UTF-8").replace("+", "%20")
         return "$cleanBaseUrl/cards/$encodedFolder/$encodedFile"
+    }
+
+    // ===== CHARAVAULT.NET AUTH METHODS =====
+
+    suspend fun login(email: String, password: String): Result<CharaVaultLoginResponse> =
+        withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Logging in to CharaVault.net as $email")
+                val response = cardVaultApi.login(mapOf("email" to email, "password" to password))
+
+                if (!response.isSuccessful) {
+                    val errorBody = response.errorBody()?.string()
+                    val detail = try {
+                        kotlinx.serialization.json.Json.decodeFromString<Map<String, String>>(errorBody ?: "")["detail"]
+                    } catch (e: Exception) { null }
+                    return@withContext Result.Error(
+                        Exception(detail ?: "Login failed: ${response.code()}")
+                    )
+                }
+
+                val body = response.body() ?: return@withContext Result.Error(
+                    Exception("Empty response from server")
+                )
+
+                Log.d(TAG, "Login response: success=${body.success}, requires2fa=${body.requires2fa}")
+                Result.Success(body)
+            } catch (e: Exception) {
+                Log.e(TAG, "Login error", e)
+                Result.Error(e)
+            }
+        }
+
+    suspend fun verify2fa(challengeToken: String, code: String): Result<CharaVaultLoginResponse> =
+        withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Verifying 2FA for CharaVault.net")
+                val response = cardVaultApi.verify2fa(
+                    mapOf("challenge_token" to challengeToken, "code" to code)
+                )
+
+                if (!response.isSuccessful) {
+                    val errorBody = response.errorBody()?.string()
+                    val detail = try {
+                        kotlinx.serialization.json.Json.decodeFromString<Map<String, String>>(errorBody ?: "")["detail"]
+                    } catch (e: Exception) { null }
+                    return@withContext Result.Error(
+                        Exception(detail ?: "2FA verification failed: ${response.code()}")
+                    )
+                }
+
+                val body = response.body() ?: return@withContext Result.Error(
+                    Exception("Empty response")
+                )
+                Result.Success(body)
+            } catch (e: Exception) {
+                Log.e(TAG, "2FA verify error", e)
+                Result.Error(e)
+            }
+        }
+
+    suspend fun getMe(): Result<CharaVaultUserResponse> = withContext(Dispatchers.IO) {
+        try {
+            val response = cardVaultApi.getMe()
+            if (!response.isSuccessful) {
+                return@withContext Result.Error(Exception("Not authenticated: ${response.code()}"))
+            }
+            val body = response.body() ?: return@withContext Result.Error(Exception("Empty response"))
+            Result.Success(body)
+        } catch (e: Exception) {
+            Log.e(TAG, "getMe error", e)
+            Result.Error(e)
+        }
+    }
+
+    suspend fun verifyAge(): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val response = cardVaultApi.verifyAge()
+            if (!response.isSuccessful) {
+                val errorBody = response.errorBody()?.string()
+                Log.e(TAG, "verifyAge failed: ${response.code()} $errorBody")
+                return@withContext Result.Error(Exception("Age verification failed: ${response.code()}"))
+            }
+            val body = response.body()
+            val newToken = body?.get("token") as? String
+            Log.d(TAG, "verifyAge success, got new token: ${newToken != null}")
+            Result.Success(newToken ?: "")
+        } catch (e: Exception) {
+            Log.e(TAG, "verifyAge error", e)
+            Result.Error(e)
+        }
     }
 
     // ===== LOREBOOK METHODS =====

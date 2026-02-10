@@ -47,6 +47,17 @@ data class CardVaultUiState(
     val serverUrl: String = "",
     val isServerConfigured: Boolean = false,
 
+    // CharaVault.net auth state
+    val charavaultMode: String = "local", // "local" or "charavault"
+    val isLoggedIn: Boolean = false,
+    val charavaultEmail: String? = null,
+    val nsfwVerified: Boolean = false,
+    val showLoginDialog: Boolean = false,
+    val isLoggingIn: Boolean = false,
+    val loginError: String? = null,
+    val requires2fa: Boolean = false,
+    val challengeToken: String? = null,
+
     // Character-specific
     val characterResults: List<CardVaultCharacter> = emptyList(),
     val selectedCharacter: CardVaultCharacter? = null,
@@ -79,13 +90,42 @@ class CardVaultViewModel @Inject constructor(
     private fun loadServerUrl() {
         viewModelScope.launch {
             val url = settingsDataStore.cardVaultUrlFlow.first()
+            val mode = settingsDataStore.getCharaVaultMode()
+            val session = settingsDataStore.getCharaVaultSession()
+            val isConfigured = if (mode == "charavault") true else url.isNotBlank()
+
             _uiState.update {
                 it.copy(
                     serverUrl = url,
-                    isServerConfigured = url.isNotBlank()
+                    isServerConfigured = isConfigured,
+                    charavaultMode = mode,
+                    isLoggedIn = mode == "charavault" && session != null,
+                    charavaultEmail = session?.email
                 )
             }
-            if (url.isNotBlank()) {
+
+            // If logged in to CharaVault, validate the session
+            if (mode == "charavault" && session != null) {
+                when (val result = repository.getMe()) {
+                    is Result.Success -> {
+                        _uiState.update {
+                            it.copy(
+                                nsfwVerified = result.data.nsfwVerified,
+                                isLoggedIn = true
+                            )
+                        }
+                    }
+                    is Result.Error -> {
+                        // Token expired or invalid
+                        settingsDataStore.clearCharaVaultSession()
+                        _uiState.update {
+                            it.copy(isLoggedIn = false, charavaultEmail = null, nsfwVerified = false)
+                        }
+                    }
+                }
+            }
+
+            if (isConfigured) {
                 loadStats()
                 loadTags()
                 search()
@@ -109,6 +149,161 @@ class CardVaultViewModel @Inject constructor(
             if (url.isNotBlank()) {
                 loadStats()
                 search()
+            }
+        }
+    }
+
+    fun setMode(mode: String) {
+        viewModelScope.launch {
+            settingsDataStore.saveCharaVaultMode(mode)
+            _uiState.update {
+                it.copy(
+                    charavaultMode = mode,
+                    characterResults = emptyList(),
+                    lorebookResults = emptyList(),
+                    currentPage = 1,
+                    error = null,
+                    isServerConfigured = if (mode == "charavault") true else it.serverUrl.isNotBlank()
+                )
+            }
+            // Reload everything with the new mode/base URL
+            loadServerUrl()
+        }
+    }
+
+    fun showLogin() {
+        _uiState.update { it.copy(showLoginDialog = true, loginError = null, requires2fa = false, challengeToken = null) }
+    }
+
+    fun hideLogin() {
+        _uiState.update { it.copy(showLoginDialog = false, loginError = null, requires2fa = false, challengeToken = null) }
+    }
+
+    fun login(email: String, password: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoggingIn = true, loginError = null) }
+
+            when (val result = repository.login(email, password)) {
+                is Result.Success -> {
+                    val response = result.data
+                    if (response.requires2fa) {
+                        _uiState.update {
+                            it.copy(
+                                isLoggingIn = false,
+                                requires2fa = true,
+                                challengeToken = response.challengeToken
+                            )
+                        }
+                    } else if (response.token != null && response.user != null) {
+                        settingsDataStore.saveCharaVaultSession(response.token, response.user.email)
+                        _uiState.update {
+                            it.copy(
+                                isLoggingIn = false,
+                                isLoggedIn = true,
+                                charavaultEmail = response.user.email,
+                                nsfwVerified = response.user.nsfwVerified,
+                                showLoginDialog = false,
+                                requires2fa = false,
+                                challengeToken = null
+                            )
+                        }
+                        // Reload data with auth
+                        loadStats()
+                        loadTags()
+                        search()
+                    } else {
+                        _uiState.update {
+                            it.copy(isLoggingIn = false, loginError = "Login failed")
+                        }
+                    }
+                }
+                is Result.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isLoggingIn = false,
+                            loginError = result.exception.message ?: "Login failed"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun verify2fa(code: String) {
+        val challengeToken = _uiState.value.challengeToken ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoggingIn = true, loginError = null) }
+
+            when (val result = repository.verify2fa(challengeToken, code)) {
+                is Result.Success -> {
+                    val response = result.data
+                    if (response.token != null && response.user != null) {
+                        settingsDataStore.saveCharaVaultSession(response.token, response.user.email)
+                        _uiState.update {
+                            it.copy(
+                                isLoggingIn = false,
+                                isLoggedIn = true,
+                                charavaultEmail = response.user.email,
+                                nsfwVerified = response.user.nsfwVerified,
+                                showLoginDialog = false,
+                                requires2fa = false,
+                                challengeToken = null
+                            )
+                        }
+                        loadStats()
+                        loadTags()
+                        search()
+                    } else {
+                        _uiState.update {
+                            it.copy(isLoggingIn = false, loginError = "2FA verification failed")
+                        }
+                    }
+                }
+                is Result.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isLoggingIn = false,
+                            loginError = result.exception.message ?: "2FA verification failed"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            settingsDataStore.clearCharaVaultSession()
+            _uiState.update {
+                it.copy(
+                    isLoggedIn = false,
+                    charavaultEmail = null,
+                    nsfwVerified = false,
+                    characterResults = emptyList(),
+                    lorebookResults = emptyList()
+                )
+            }
+            search()
+        }
+    }
+
+    fun verifyAge() {
+        viewModelScope.launch {
+            when (val result = repository.verifyAge()) {
+                is Result.Success -> {
+                    // Save updated token if returned
+                    val newToken = result.data
+                    if (newToken.isNotBlank()) {
+                        val email = _uiState.value.charavaultEmail ?: ""
+                        settingsDataStore.saveCharaVaultSession(newToken, email)
+                    }
+                    _uiState.update { it.copy(nsfwVerified = true) }
+                    // Reload to get NSFW content
+                    search()
+                }
+                is Result.Error -> {
+                    _uiState.update { it.copy(error = "Age verification failed: ${result.exception.message}") }
+                }
             }
         }
     }
@@ -621,7 +816,12 @@ class CardVaultViewModel @Inject constructor(
 
     fun buildImageUrl(character: CardVaultCharacter): String {
         return try {
-            val url = repository.buildImageUrl(_uiState.value.serverUrl, character)
+            val baseUrl = if (_uiState.value.charavaultMode == "charavault") {
+                "https://charavault.net"
+            } else {
+                _uiState.value.serverUrl
+            }
+            val url = repository.buildImageUrl(baseUrl, character)
             DebugLogger.log("CardVault: buildImageUrl for '${character.name}' -> $url")
             url
         } catch (e: Exception) {
