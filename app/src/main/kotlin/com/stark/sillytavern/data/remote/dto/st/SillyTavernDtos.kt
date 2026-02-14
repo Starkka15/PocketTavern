@@ -945,6 +945,15 @@ data class CreateGroupRequest(
 )
 
 @Serializable
+data class EditGroupRequest(
+    val id: String,
+    @SerialName("activation_strategy")
+    val activationStrategy: Int? = null,
+    @SerialName("generation_mode")
+    val generationMode: Int? = null,
+)
+
+@Serializable
 data class GetGroupChatRequest(
     val id: String
 )

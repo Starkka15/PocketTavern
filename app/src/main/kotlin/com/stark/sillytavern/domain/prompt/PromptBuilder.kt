@@ -125,6 +125,10 @@ class PromptBuilder(
                             template.outputSequence
                         }
                         sb.append(outputSeq)
+                        // In group context, prefix with sender name if different from current character
+                        if (msg.senderName != null && msg.senderName != character.name) {
+                            sb.append("${msg.senderName}: ")
+                        }
                         sb.append(msg.content)
                         appendSuffix(sb, template, isUser = false)
                         sb.append("\n")
@@ -190,7 +194,7 @@ class PromptBuilder(
             when (item) {
                 is HistoryItem.Message -> {
                     val msg = item.message
-                    val name = if (msg.isUser) userName else character.name
+                    val name = msg.senderName ?: (if (msg.isUser) userName else character.name)
                     sb.append("$name: ${msg.content}\n")
                 }
                 is HistoryItem.Injection -> {

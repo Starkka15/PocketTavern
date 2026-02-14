@@ -1118,6 +1118,17 @@ class SillyTavernRepository @Inject constructor(
         message: String,
         character: Character,
         chatHistory: List<ChatMessage>
+    ): Flow<StreamEvent> = streamGenerationForCharacter(character, chatHistory, message)
+
+    /**
+     * Core streaming generation for a single character.
+     * Used by both 1-on-1 chat and group chat generation.
+     */
+    fun streamGenerationForCharacter(
+        character: Character,
+        chatHistory: List<ChatMessage>,
+        userMessage: String,
+        extraStopStrings: List<String> = emptyList()
     ): Flow<StreamEvent> = flow {
         // Load full chat context for proper prompt building
         val contextResult = loadChatContext(character, chatHistory)
@@ -1136,13 +1147,13 @@ class SillyTavernRepository @Inject constructor(
 
         // Build prompt using PromptBuilder with all context data
         val promptBuilder = PromptBuilder(character, chatContext)
-        val prompt = promptBuilder.buildPrompt(chatHistory, message)
+        val prompt = promptBuilder.buildPrompt(chatHistory, userMessage)
 
         // Debug logging for prompt building diagnostics
-        DebugLogger.logSection("sendMessageStreaming")
+        DebugLogger.logSection("streamGenerationForCharacter")
         DebugLogger.logKeyValue("Character", character.name)
         DebugLogger.logKeyValue("Chat history length", chatHistory.size)
-        DebugLogger.logKeyValue("New message", message)
+        DebugLogger.logKeyValue("New message", userMessage)
         DebugLogger.logSection("Chat Context")
         DebugLogger.logKeyValue("Instruct template", chatContext.instructTemplate?.name ?: "none")
         DebugLogger.logKeyValue("System prompt preset", chatContext.systemPromptPreset.take(100))
@@ -1171,7 +1182,7 @@ class SillyTavernRepository @Inject constructor(
         try {
             // Serialize request based on API type
             val jsonBody = if (useChatCompletions) {
-                val chatRequest = buildChatCompletionRequest(chatHistory, message, character, chatContext, stream = true)
+                val chatRequest = buildChatCompletionRequest(chatHistory, userMessage, character, chatContext, stream = true)
                 Log.d("STRepo", "Chat completion request - source: ${chatRequest.chatCompletionSource}, model: ${chatRequest.model}")
                 jsonSerializer.encodeToString(chatRequest)
             } else {
@@ -1250,7 +1261,18 @@ class SillyTavernRepository @Inject constructor(
                             val token = parseSseEvent(eventBuffer.toString())
                             if (token != null) {
                                 fullText.append(token)
+                                // Check for extra stop strings (group member names)
+                                var stopped = false
+                                for (stop in extraStopStrings) {
+                                    val idx = fullText.indexOf(stop)
+                                    if (idx >= 0) {
+                                        fullText.delete(idx, fullText.length)
+                                        stopped = true
+                                        break
+                                    }
+                                }
                                 emit(StreamEvent.Token(token, fullText.toString()))
+                                if (stopped) break
                             }
                             eventBuffer.clear()
                         }
@@ -1277,6 +1299,172 @@ class SillyTavernRepository @Inject constructor(
             emit(StreamEvent.Error(e.message ?: "Streaming failed"))
         }
     }.flowOn(Dispatchers.IO)
+
+    /**
+     * Stream AI responses for a group chat.
+     * Selects responding characters via activation strategy, generates sequentially,
+     * and emits GroupStreamEvents for the UI.
+     */
+    fun sendGroupMessageStreaming(
+        userMessage: String,
+        group: Group,
+        chatHistory: List<GroupChatMessage>
+    ): Flow<GroupStreamEvent> = flow {
+        try {
+            // Resolve Character objects for enabled members
+            val enabledAvatars = group.enabledMembers
+            val characters = mutableListOf<Character>()
+            for (avatar in enabledAvatars) {
+                when (val result = getCharacter(avatar)) {
+                    is Result.Success -> characters.add(result.data)
+                    is Result.Error -> Log.w("STRepo", "Failed to load character $avatar: ${result.exception.message}")
+                }
+            }
+
+            if (characters.isEmpty()) {
+                emit(GroupStreamEvent.Error("No characters available in group"))
+                return@flow
+            }
+
+            // Convert group history to ChatMessage list with senderName set
+            val baseChatHistory = chatHistory.map { msg ->
+                ChatMessage(
+                    content = msg.content,
+                    isUser = msg.isUser,
+                    senderName = msg.senderName
+                )
+            }
+
+            // Select who responds based on activation strategy
+            val respondingCharacters = selectRespondingCharacters(
+                group = group,
+                characters = characters,
+                userMessage = userMessage,
+                chatHistory = chatHistory
+            )
+
+            if (respondingCharacters.isEmpty()) {
+                emit(GroupStreamEvent.AllComplete)
+                return@flow
+            }
+
+            Log.d("STRepo", "Group generation: ${respondingCharacters.map { it.name }} will respond")
+
+            // Build stop strings from all member names to prevent cross-character leakage
+            val stopStrings = characters.map { "${it.name}:" }
+
+            // Running history that grows as characters respond
+            var runningHistory = baseChatHistory
+
+            for (character in respondingCharacters) {
+                val avatar = character.avatar ?: ""
+                emit(GroupStreamEvent.CharacterStarted(character.name, avatar))
+
+                val charFullText = StringBuilder()
+                var finalText = ""
+
+                streamGenerationForCharacter(
+                    character = character,
+                    chatHistory = runningHistory,
+                    userMessage = userMessage,
+                    extraStopStrings = stopStrings
+                ).collect { event ->
+                    when (event) {
+                        is StreamEvent.Token -> {
+                            charFullText.clear()
+                            charFullText.append(event.accumulated)
+                            emit(GroupStreamEvent.Token(event.token, event.accumulated))
+                        }
+                        is StreamEvent.Complete -> {
+                            finalText = event.fullText
+                        }
+                        is StreamEvent.Error -> {
+                            emit(GroupStreamEvent.Error("${character.name}: ${event.message}"))
+                        }
+                    }
+                }
+
+                // Use the final cleaned text, or whatever we accumulated
+                val responseText = finalText.ifBlank { charFullText.toString().trim() }
+
+                if (responseText.isNotBlank()) {
+                    emit(GroupStreamEvent.CharacterComplete(character.name, avatar, responseText))
+
+                    // Append to running history for next character's context
+                    runningHistory = runningHistory + ChatMessage(
+                        content = responseText,
+                        isUser = false,
+                        senderName = character.name
+                    )
+                }
+            }
+
+            emit(GroupStreamEvent.AllComplete)
+        } catch (e: Exception) {
+            Log.e("STRepo", "Group streaming error: ${e.message}", e)
+            emit(GroupStreamEvent.Error(e.message ?: "Group generation failed"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    /**
+     * Select which characters should respond based on the group's activation strategy.
+     */
+    private fun selectRespondingCharacters(
+        group: Group,
+        characters: List<Character>,
+        userMessage: String,
+        chatHistory: List<GroupChatMessage>
+    ): List<Character> {
+        return when (group.activationStrategy) {
+            ActivationStrategy.LIST -> {
+                // All enabled members in order
+                characters
+            }
+            ActivationStrategy.POOLED -> {
+                // Pick from those who haven't spoken since last user message
+                val lastUserIdx = chatHistory.indexOfLast { it.isUser }
+                val recentSpeakers = if (lastUserIdx >= 0) {
+                    chatHistory.drop(lastUserIdx + 1)
+                        .filter { !it.isUser }
+                        .mapNotNull { it.senderName }
+                        .toSet()
+                } else {
+                    emptySet()
+                }
+                val pool = characters.filter { it.name !in recentSpeakers }
+                if (pool.isNotEmpty()) {
+                    listOf(pool.random())
+                } else {
+                    // Everyone has spoken, pick random from all
+                    listOf(characters.random())
+                }
+            }
+            ActivationStrategy.MANUAL -> {
+                // Manual mode - return empty, UI handles selection
+                emptyList()
+            }
+            else -> {
+                // NATURAL (default): check name mentions, then talkativeness
+                val mentioned = characters.filter { char ->
+                    userMessage.contains(char.name, ignoreCase = true)
+                }
+                if (mentioned.isNotEmpty()) {
+                    return mentioned
+                }
+
+                // Use talkativeness probability for each character, guarantee at least 1
+                val selected = characters.filter { char ->
+                    Math.random() < char.talkativeness
+                }
+                if (selected.isNotEmpty()) {
+                    selected
+                } else {
+                    // Guarantee at least one responds
+                    listOf(characters.random())
+                }
+            }
+        }
+    }
 
     private val streamJson = Json { ignoreUnknownKeys = true; isLenient = true }
 
@@ -2755,12 +2943,35 @@ class SillyTavernRepository @Inject constructor(
                     chatId = dto.chatId,
                     avatar = dto.avatar,
                     description = dto.description,
-                    favorite = dto.favorite
+                    favorite = dto.favorite,
+                    activationStrategy = dto.activationStrategy,
+                    generationMode = dto.generationMode,
+                    disabledMembers = dto.disabledMembers,
+                    allowSelfResponses = dto.allowSelfResponses,
+                    chats = dto.chats
                 )
             })
         } catch (e: Exception) {
             Log.e("STRepo", "Failed to get groups", e)
             Result.Error(Exception("Failed to get groups: ${e.message}", e))
+        }
+    }
+
+    /**
+     * Update a group's activation strategy on the server.
+     */
+    suspend fun setGroupActivationStrategy(groupId: String, strategy: Int): Result<Unit> {
+        return try {
+            val request = EditGroupRequest(id = groupId, activationStrategy = strategy)
+            val response = api.editGroup(request)
+            if (response.isSuccessful) {
+                Result.Success(Unit)
+            } else {
+                Result.Error(Exception("Failed to update group: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e("STRepo", "Failed to edit group", e)
+            Result.Error(Exception("Failed to edit group: ${e.message}", e))
         }
     }
 
@@ -2835,7 +3046,12 @@ class SillyTavernRepository @Inject constructor(
                     chatId = dto.chatId,
                     avatar = dto.avatar,
                     description = dto.description,
-                    favorite = dto.favorite
+                    favorite = dto.favorite,
+                    activationStrategy = dto.activationStrategy,
+                    generationMode = dto.generationMode,
+                    disabledMembers = dto.disabledMembers,
+                    allowSelfResponses = dto.allowSelfResponses,
+                    chats = dto.chats
                 ))
             } else {
                 Result.Error(Exception("Failed to create group: ${response.code()}"))

@@ -11,7 +11,9 @@ data class ChatMessage(
     // Chat integrity slug - only present on first message, used for server-side validation
     val integritySlug: String? = null,
     // Full chat metadata (only on first message) - includes author's note per-chat
-    val chatMetadata: ChatMessageMetadata? = null
+    val chatMetadata: ChatMessageMetadata? = null,
+    // Sender name for group chats - null for 1-on-1 (no behavior change)
+    val senderName: String? = null
 )
 
 // Per-chat metadata stored in the first message

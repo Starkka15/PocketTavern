@@ -142,6 +142,9 @@ interface SillyTavernApi {
     @POST("api/groups/create")
     suspend fun createGroup(@Body request: CreateGroupRequest): Response<GroupDto>
 
+    @POST("api/groups/edit")
+    suspend fun editGroup(@Body request: EditGroupRequest): Response<Unit>
+
     @POST("api/chats/group/get")
     suspend fun getGroupChat(@Body request: GetGroupChatRequest): List<GroupChatMessageDto>
 

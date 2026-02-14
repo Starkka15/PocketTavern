@@ -1,5 +1,6 @@
 package com.stark.sillytavern.ui.screens.groups
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -12,6 +13,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.stark.sillytavern.domain.model.ActivationStrategy
 import com.stark.sillytavern.domain.model.GroupChatMessage
 import com.stark.sillytavern.ui.theme.*
 
@@ -42,10 +46,14 @@ fun GroupChatScreen(
         viewModel.loadGroup(groupId)
     }
 
-    // Auto-scroll to bottom when new messages arrive
-    LaunchedEffect(uiState.messages.size) {
-        if (uiState.messages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.messages.size - 1)
+    // Calculate total item count (messages + optional streaming item)
+    val hasStreamingItem = uiState.isGenerating && uiState.streamingCharacterName.isNotBlank()
+    val totalItems = uiState.messages.size + if (hasStreamingItem) 1 else 0
+
+    // Auto-scroll to bottom when messages change or streaming content updates
+    LaunchedEffect(uiState.messages.size, uiState.streamingContent) {
+        if (totalItems > 0) {
+            listState.animateScrollToItem(totalItems - 1)
         }
     }
 
@@ -59,7 +67,14 @@ fun GroupChatScreen(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        if (uiState.currentModelName.isNotBlank()) {
+                        if (uiState.isGenerating && uiState.streamingCharacterName.isNotBlank()) {
+                            Text(
+                                text = "${uiState.streamingCharacterName} is typing...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = IceBlue,
+                                maxLines = 1
+                            )
+                        } else if (uiState.currentModelName.isNotBlank()) {
                             Text(
                                 text = uiState.currentModelName,
                                 style = MaterialTheme.typography.bodySmall,
@@ -78,7 +93,7 @@ fun GroupChatScreen(
                     // Show member count
                     uiState.group?.let { group ->
                         Row(
-                            modifier = Modifier.padding(end = 8.dp),
+                            modifier = Modifier.padding(end = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
@@ -95,6 +110,57 @@ fun GroupChatScreen(
                             )
                         }
                     }
+
+                    // Overflow menu with activation strategy
+                    var showMenu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = "Options",
+                                tint = TextSecondary
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            Text(
+                                "Activation Strategy",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                            )
+                            val currentStrategy = uiState.group?.activationStrategy ?: ActivationStrategy.NATURAL
+                            listOf(
+                                ActivationStrategy.NATURAL to "Natural",
+                                ActivationStrategy.LIST to "List (All respond)",
+                                ActivationStrategy.POOLED to "Pooled",
+                                ActivationStrategy.MANUAL to "Manual"
+                            ).forEach { (value, label) ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            RadioButton(
+                                                selected = currentStrategy == value,
+                                                onClick = null,
+                                                colors = RadioButtonDefaults.colors(
+                                                    selectedColor = IceBlue,
+                                                    unselectedColor = TextSecondary
+                                                )
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(label, color = TextPrimary)
+                                        }
+                                    },
+                                    onClick = {
+                                        viewModel.setActivationStrategy(value)
+                                        showMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Black,
@@ -106,8 +172,10 @@ fun GroupChatScreen(
             GroupChatInputBar(
                 inputText = uiState.inputText,
                 isSending = uiState.isSending,
+                isGenerating = uiState.isGenerating,
                 onInputChange = { viewModel.updateInputText(it) },
-                onSend = { viewModel.sendMessage() }
+                onSend = { viewModel.sendMessage() },
+                onStop = { viewModel.stopGeneration() }
             )
         }
     ) { padding ->
@@ -124,7 +192,7 @@ fun GroupChatScreen(
                         color = IceBlue
                     )
                 }
-                uiState.messages.isEmpty() -> {
+                uiState.messages.isEmpty() && !uiState.isGenerating -> {
                     Column(
                         modifier = Modifier
                             .align(Alignment.Center)
@@ -164,6 +232,17 @@ fun GroupChatScreen(
                                 avatarUrl = uiState.memberAvatarUrls[message.senderAvatar]
                             )
                         }
+
+                        // Streaming bubble
+                        if (hasStreamingItem) {
+                            item(key = "streaming") {
+                                StreamingBubble(
+                                    characterName = uiState.streamingCharacterName,
+                                    avatarUrl = uiState.memberAvatarUrls[uiState.streamingCharacterAvatar],
+                                    content = uiState.streamingContent
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -175,6 +254,107 @@ fun GroupChatScreen(
         LaunchedEffect(error) {
             kotlinx.coroutines.delay(3000)
             viewModel.clearError()
+        }
+    }
+}
+
+@Composable
+private fun StreamingBubble(
+    characterName: String,
+    avatarUrl: String?,
+    content: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start
+    ) {
+        // Character avatar
+        AsyncImage(
+            model = avatarUrl,
+            contentDescription = characterName,
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .border(1.dp, IceBlue.copy(alpha = 0.3f), CircleShape),
+            contentScale = ContentScale.Crop
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Column(
+            modifier = Modifier.widthIn(max = 280.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            Text(
+                text = characterName,
+                style = MaterialTheme.typography.labelSmall,
+                color = IceBlue,
+                modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
+            )
+
+            Surface(
+                shape = RoundedCornerShape(
+                    topStart = 16.dp,
+                    topEnd = 16.dp,
+                    bottomStart = 4.dp,
+                    bottomEnd = 16.dp
+                ),
+                color = DarkCard,
+                modifier = Modifier.border(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(IceBlue.copy(alpha = 0.3f), IceBlue.copy(alpha = 0.1f))
+                    ),
+                    shape = RoundedCornerShape(
+                        topStart = 16.dp,
+                        topEnd = 16.dp,
+                        bottomStart = 4.dp,
+                        bottomEnd = 16.dp
+                    )
+                )
+            ) {
+                if (content.isBlank()) {
+                    // Typing indicator dots
+                    TypingIndicator(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                    )
+                } else {
+                    Text(
+                        text = content,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextPrimary,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TypingIndicator(modifier: Modifier = Modifier) {
+    val infiniteTransition = rememberInfiniteTransition(label = "typing")
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(3) { index ->
+            val alpha by infiniteTransition.animateFloat(
+                initialValue = 0.3f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(600, delayMillis = index * 200),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "dot$index"
+            )
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(IceBlue.copy(alpha = alpha))
+            )
         }
     }
 }
@@ -280,8 +460,10 @@ private fun GroupMessageBubble(
 private fun GroupChatInputBar(
     inputText: String,
     isSending: Boolean,
+    isGenerating: Boolean,
     onInputChange: (String) -> Unit,
-    onSend: () -> Unit
+    onSend: () -> Unit,
+    onStop: () -> Unit
 ) {
     Surface(
         color = Color.Black,
@@ -299,9 +481,12 @@ private fun GroupChatInputBar(
                 placeholder = { Text("Type a message...", color = TextSecondary) },
                 modifier = Modifier.weight(1f),
                 maxLines = 4,
+                enabled = !isGenerating && !isSending,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = IceBlue,
                     unfocusedBorderColor = TextSecondary.copy(alpha = 0.3f),
+                    disabledBorderColor = TextSecondary.copy(alpha = 0.2f),
+                    disabledTextColor = TextSecondary,
                     cursorColor = IceBlue,
                     focusedTextColor = TextPrimary,
                     unfocusedTextColor = TextPrimary
@@ -311,29 +496,47 @@ private fun GroupChatInputBar(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            IconButton(
-                onClick = onSend,
-                enabled = inputText.isNotBlank() && !isSending,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (inputText.isNotBlank() && !isSending) FireOrange
-                        else TextSecondary.copy(alpha = 0.3f)
-                    )
-            ) {
-                if (isSending) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp,
-                        color = Color.White
-                    )
-                } else {
+            if (isGenerating) {
+                // Stop button during generation
+                IconButton(
+                    onClick = onStop,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Color.Red.copy(alpha = 0.8f))
+                ) {
                     Icon(
-                        Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Send",
+                        Icons.Default.Stop,
+                        contentDescription = "Stop generation",
                         tint = Color.White
                     )
+                }
+            } else {
+                // Send button
+                IconButton(
+                    onClick = onSend,
+                    enabled = inputText.isNotBlank() && !isSending,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (inputText.isNotBlank() && !isSending) FireOrange
+                            else TextSecondary.copy(alpha = 0.3f)
+                        )
+                ) {
+                    if (isSending) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp,
+                            color = Color.White
+                        )
+                    } else {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Send",
+                            tint = Color.White
+                        )
+                    }
                 }
             }
         }
