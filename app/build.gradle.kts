@@ -8,15 +8,15 @@ plugins {
 }
 
 android {
-    namespace = "com.stark.sillytavern"
+    namespace = "com.pockettavern.app"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.stark.sillytavern"
+        applicationId = "com.pockettavern.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 4
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -39,22 +39,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-        }
-    }
-
-    flavorDimensions += "version"
-    productFlavors {
-        create("standard") {
-            dimension = "version"
-            applicationIdSuffix = ""
-            versionNameSuffix = ""
-            buildConfigField("boolean", "CHUB_ENABLED", "false")
-        }
-        create("full") {
-            dimension = "version"
-            applicationIdSuffix = ".full"
-            versionNameSuffix = "-full"
-            buildConfigField("boolean", "CHUB_ENABLED", "true")
         }
     }
 
@@ -117,4 +101,13 @@ dependencies {
 
     // Chrome Custom Tabs for OAuth
     implementation("androidx.browser:browser:1.8.0")
+
+    // Room database (character/chat index)
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
+
+    // SAF DocumentFile support (for folder import)
+    implementation("androidx.documentfile:documentfile:1.0.1")
 }

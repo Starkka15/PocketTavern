@@ -1,16 +1,29 @@
 # PocketTavern
 
-**⚠️ NOT FOR COMMERCIAL USE - See [LICENSE](LICENSE) for details**
+**⚠️ NOT FOR COMMERCIAL USE — See [LICENSE](LICENSE) for details**
 
-PocketTavern is an Android companion app for SillyTavern that lets you chat with your AI characters on the go.
+> **PocketTavern is a fully standalone Android app for chatting with AI characters — no server required.**
+> Connect directly to your LLM backend of choice, manage characters and chats locally, and take your AI companions anywhere.
 
-> **Note:** PocketTavern is a lightweight companion app, not a full replacement for SillyTavern. Some advanced features (extensions, advanced formatting options, group chats, etc.) may not be available yet. We're working to add more features over time, but no promises.
+[![Discord](https://img.shields.io/badge/Discord-Join%20Server-ff247f?style=for-the-badge&logoColor=white)](https://stt.gg/49Bfn8bA)
+[![Release](https://img.shields.io/github/v/release/Starkka15/PocketTavern?style=for-the-badge&color=7c3aed)](https://github.com/Starkka15/PocketTavern/releases/latest)
+[![Android](https://img.shields.io/badge/Android-8.0%2B-3ddc84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Starkka15/PocketTavern/releases/latest)
 
-> **Content Disclaimer:** PocketTavern does not host, store, or provide any character content. All characters and data come from your own self-hosted SillyTavern server and any optional services you configure.
+---
 
-> **Compatibility Notice:** PocketTavern is designed for the official [SillyTavern](https://github.com/SillyTavern/SillyTavern) repository only. Forked versions of SillyTavern are not supported. This app is strictly for personal use. Any issues filed regarding connection problems to a server not fully operated by the issue creator will be ignored.
+## Why We Went Standalone
 
-[![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/zeVUWke2xy)
+PocketTavern started as a companion app for SillyTavern — you needed a running SillyTavern server on your home PC, and the app just connected to it.
+
+**We removed that requirement entirely.**
+
+The original approach had real friction: setting up a Node.js server, configuring network access, keeping a PC running just to chat from your phone. It made the app harder to use than it needed to be, and we kept hearing the same question: *"Why can't it just work on its own?"*
+
+So we built our own backend layer. PocketTavern now talks directly to LLM APIs — KoboldCPP, Ollama, OpenAI-compatible endpoints, Anthropic, and more — without a SillyTavern middleman. Characters, chats, and settings all live on your device in a fully SillyTavern-compatible format, so nothing is locked in.
+
+**The goal was simplicity: one app, no setup server, just chat.**
+
+---
 
 ## Screenshots
 
@@ -29,228 +42,251 @@ PocketTavern is an Android companion app for SillyTavern that lets you chat with
 
 ---
 
-## Prerequisites
+## Quick Start
 
-### 1. SillyTavern Server
+1. Download the APK from the [Releases](https://github.com/Starkka15/PocketTavern/releases/latest) page
+2. Enable **Install from unknown sources** on your Android device
+3. Open the APK to install
+4. Open PocketTavern → **Settings** → **API Configuration**
+5. Enter your LLM backend URL and select your model
+6. Head to **Characters**, import a PNG card or browse CharaVault — and chat
 
-You need a running SillyTavern instance accessible from your Android device.
-
-#### Install SillyTavern
-
-```bash
-# Clone the repository
-git clone https://github.com/SillyTavern/SillyTavern.git
-cd SillyTavern
-
-# Install dependencies
-npm install
-
-# Start the server
-./start.sh
-# Or on Windows: start.bat
-```
-
-By default, SillyTavern runs on `http://localhost:8000`.
-
-#### Enable Network Access
-
-To access SillyTavern from your phone, you need to configure it to listen on your network interface:
-
-1. Open `config.yaml` in the SillyTavern directory
-2. Set `listen: true` to allow external connections
-3. Set `basicAuthMode: false` to disable HTTP basic auth
-4. Note your computer's local IP address (e.g., `192.168.1.100`)
-
-Your server URL will be: `http://192.168.1.100:8000`
-
-#### Multi-User Mode (Required)
-
-PocketTavern requires Multi-User Mode to be enabled:
-
-1. In `config.yaml`, set `enableUserAccounts: true`
-2. Access SillyTavern in your browser and create a user account
-3. You'll use these credentials (username/password) to connect from PocketTavern
+No Node.js. No PC. No SillyTavern server.
 
 ---
 
-## Installing PocketTavern
+## Features
 
-1. Download the APK from the releases page
-2. Enable "Install from unknown sources" on your Android device
-3. Open the APK file to install
+<details>
+<summary><b>Chat</b></summary>
 
----
+### Chat Interface
 
-## Initial Setup
+PocketTavern's chat screen is built around a natural, responsive conversation flow:
 
-### Connect to SillyTavern
+- **Streaming responses** — AI output appears word-by-word as it's generated
+- **Alternative responses (swipes)** — Swipe left/right on any AI message, or use the `‹ 1/2 ›` arrows that appear below it. The `↺` button at the end of the list generates a fresh alternative. All alternatives are saved alongside the original so you can flip back and forth
+- **Edit messages** — Tap any message to edit it directly
+- **Delete messages** — Remove individual messages from history
+- **Continue** — Append to the last AI response without starting a new one
+- **Author's Note** — Inject custom text into the context at a configurable depth and frequency
+- **Character backgrounds** — Display per-character background images behind the chat
 
-1. Open PocketTavern
-2. Tap **Settings** on the main screen
-3. Enter your **Server URL** (e.g., `http://192.168.1.100:8000`)
-4. If using Multi-User Mode, enter your **Username** and **Password**
-5. Tap **Test Connection** to verify
-6. Tap **Save Settings**
+### Group Chat
 
-You should now see "Connected" in the status bar at the bottom of the main screen.
+Chat with multiple AI characters simultaneously:
 
----
+- Create groups with any combination of your local characters
+- Configure reply order (sequential, random, or activation-based)
+- Each character maintains its own persona, description, and world info
+- Narrator mode for injecting scene-setting messages
 
-## Core Features
+</details>
 
-### Characters
+<details>
+<summary><b>LLM Backends</b></summary>
 
-Browse your SillyTavern characters and start chats.
+PocketTavern connects directly to your LLM without any intermediary server. Configure your endpoint once under **Settings → API Configuration**.
 
-- Tap a character to open a chat
-- Long-press a character for more options:
-  - **Edit Character** - Modify character details
-  - **Character Settings** - Configure chat-specific settings
-  - **Upload to CardVault** - Backup to your CardVault server (if configured)
-  - **Delete Character** - Remove the character
+| Backend | Type | Notes |
+|---------|------|-------|
+| **KoboldCPP** | Local | `POST /api/v1/generate` — streaming via `/extra/stream` |
+| **Ollama** | Local | `POST /api/generate` or `/api/chat` with streaming |
+| **OpenAI-Compatible** | Local / Cloud | Works with LM Studio, TabbyAPI, vLLM, Aphrodite, TextGen WebUI, OpenAI, Mistral, Groq, DeepSeek, and any service following the `/v1/chat/completions` spec |
+| **LlamaCpp Server** | Local | `POST /completion` with streaming |
+| **Anthropic** | Cloud | Claude models via `POST /v1/messages` |
+| **NovelAI** | Cloud | Subscription-based creative writing models |
 
-### Recent Chats
+### Connection Profiles
 
-Continue your recent conversations. Shows your chat history with quick access to resume.
+Save multiple backend configurations and switch between them instantly — useful if you run different models for different characters, or swap between local and cloud depending on your connection.
 
-### Create Character
+</details>
 
-Design new characters directly from your phone:
-- Set name, description, personality
-- Write first message and example dialogues
-- Add tags and creator notes
+<details>
+<summary><b>Characters & Cards</b></summary>
 
----
+### Local Character Storage
 
-## Optional Features
+Characters are stored as PNG files with embedded metadata — the same format SillyTavern uses. Every card you import or create stays on your device in `/files/characters/`, and can be exported at any time.
 
-These features are hidden by default and only appear when configured in Settings.
+- Import any `.png` character card by tapping the import button or sharing a card to PocketTavern
+- Create characters from scratch with name, description, personality, first message, scenario, and example dialogues
+- Edit any character's details at any time
+- Assign a background image per character
 
-### CardVault (Local Character Library)
+### Character Settings (per-character)
 
-If you have a collection of character card PNG files and want to browse them from your phone, you can set up CardVault — a self-hosted character card index server.
+Each character can have its own overrides:
 
-#### Setup CardVault Server
+- Custom instruct/context template
+- System prompt override
+- Attached lorebook / world info file
+- Token allocation adjustments
 
-1. Clone the CardVault repository on your home server:
-   ```bash
-   git clone https://github.com/Starkka15/cardvault.git
-   cd cardvault
-   ```
+### Browse CharaVault & Forge
 
-2. Create a virtual environment and install dependencies:
-   ```bash
-   python3 -m venv venv
-   ./venv/bin/pip install -r requirements.txt
-   ```
+Browse thousands of community characters directly in the app:
 
-3. Configure your card directories:
-   ```bash
-   cp .env.example .env
-   nano .env
-   ```
-   Set `CARD_DIRS` to point to your character card folders (colon-separated for multiple).
+- **CharaVault** — Search by name, tag, or description; preview full card details; import with one tap
+- **Forge** — Community character browser with tag filtering
 
-4. Start the server:
-   ```bash
-   ./venv/bin/python server.py
-   ```
+</details>
 
-5. Note the server address (e.g., `http://192.168.1.100:8787`)
+<details>
+<summary><b>Chats & History</b></summary>
 
-#### Enable in PocketTavern
+Chats are stored as `.jsonl` files in SillyTavern-compatible format — one metadata line followed by one JSON message per line.
 
-1. Go to **Settings**
-2. Under **CardVault Server**, enter your CardVault URL
-3. Save settings
-4. The **CardVault** option will now appear on the main screen
+- **Recent Chats** home screen — shows your latest conversations sorted by most recently active, with a preview of the last message
+- **Multiple chats per character** — start fresh or continue any previous conversation
+- **Full chat history** — scroll back through your entire conversation
+- **Export** — chats are plain files you can copy/backup at any time
 
-#### Features
-- Search your entire card collection
-- Filter by tags
-- Preview cards with full details
-- Import cards directly to SillyTavern
-- Upload your created characters to CardVault
+</details>
 
----
+<details>
+<summary><b>World Info & Lorebooks</b></summary>
 
-### Stable Diffusion Forge (Image Generation)
+World Info (lorebooks) inject relevant lore into the AI's context automatically based on what's being discussed.
+
+- Attach lorebooks globally or per-character
+- Character cards with embedded `character_book` entries are automatically loaded
+- Entries activate when their keywords appear in recent messages
+- **Probability** — entries have a configurable activation chance
+- **Token budget** — stops injecting once the context budget is used up
+- **Recursive scanning** — activated entry content is scanned for additional keyword matches
+- **Regex keys** — use `/pattern/flags` as entry keys for advanced matching
+
+</details>
+
+<details>
+<summary><b>Prompt Building & Templates</b></summary>
+
+PocketTavern ships with **96+ bundled templates** copied directly from SillyTavern's open-source preset library. You can also create and save your own.
+
+### Instruct Templates (42 bundled)
+Instruct format wraps each message in the correct tokens for your model family — ChatML, Llama 3, Mistral, DeepSeek, Alpaca, Command-R, Gemma, and many more.
+
+### Context Templates (34 bundled)
+Controls how the character description, persona, scenario, world info, and chat history are assembled into the final prompt.
+
+### TextGen Presets (6 bundled)
+Sampler parameter sets — temperature, top-p, top-k, repetition penalty, min-p, etc. Includes Universal-Creative, Deterministic, and others.
+
+### System Prompt Presets (14 bundled)
+Ready-to-use system prompts: Roleplay - Immersive, Assistant - Expert, Chain of Thought, and more.
+
+### OpenAI / Chat Completion Presets
+For chat-completion APIs (OpenAI, Claude, etc.), configure a prompt order: drag and reorder system prompt blocks, world info injection points, character description, chat history, and custom injections. Each block has configurable role (system / user / assistant) and injection position (in-order or at a specific depth into chat history).
+
+</details>
+
+<details>
+<summary><b>Extensions</b></summary>
+
+PocketTavern has a built-in extension system with three native extensions included:
+
+### Quick Reply
+Pre-defined response buttons appear above the text input. Tap one to instantly send a preset message — useful for common phrases, commands, or choices. Configure sets of buttons per-character or globally.
+
+### Regex Text Replacement
+Apply find-and-replace rules to AI output (and optionally to user messages). Rules support full regular expressions with capture groups. Use cases: strip unwanted tokens, reformat text, clean up model artifacts.
+
+### Token Counter
+Displays a live estimated token count for the current chat context. Useful for knowing when you're approaching your model's context limit.
+
+</details>
+
+<details>
+<summary><b>User Persona</b></summary>
+
+Set up a persona to tell the AI who it's talking to:
+
+- **Display name** — shown in chat bubbles
+- **Description** — injected into the system prompt so characters know who you are
+- **Avatar** — your profile picture in the chat interface
+- Multiple personas — create different personas for different roleplay scenarios and switch between them
+
+</details>
+
+<details>
+<summary><b>Settings & Configuration</b></summary>
+
+### API Configuration
+- Select backend type (KoboldCPP, Ollama, OpenAI-compatible, Anthropic, etc.)
+- Enter endpoint URL and API key (if required)
+- Pick your model from a fetched list or enter manually
+- Streaming toggle
+
+### Connection Profiles
+- Save multiple named API + model configurations
+- Switch profiles from the main screen
+
+### Text Generation Parameters
+- Temperature, top-p, top-k, min-p, repetition penalty, context size, response length
+- Load/save named presets
+
+### Formatting
+- Select instruct template
+- Select context template
+- Configure system prompt
+- Enable/disable individual prompt sections
+
+### OpenAI Preset Editor
+- Full drag-and-reorder prompt block editor
+- Per-block role and injection mode controls
+- Works with any chat-completion-style API
+
+### General Settings
+- Stable Diffusion Forge URL (for avatar generation)
+- CardVault / CharaVault server URL
+- Theme preferences
+- Debug logging toggle
+
+</details>
+
+<details>
+<summary><b>Stable Diffusion Avatar Generation</b></summary>
 
 Generate character avatars using your local Stable Diffusion Forge server.
 
-#### Setup Forge
+1. Install [Stable Diffusion WebUI Forge](https://github.com/lllyasviel/stable-diffusion-webui-forge) with `--api` flag
+2. Note the server address (e.g., `http://192.168.1.100:7860`)
+3. Enter it in **Settings → Stable Diffusion Forge**
 
-1. Install [Stable Diffusion WebUI Forge](https://github.com/lllyasviel/stable-diffusion-webui-forge)
-2. Start with API access enabled: `--api`
-3. Note the server address (e.g., `http://192.168.1.100:7860`)
+Avatar generation is available in the Create Character and Edit Character screens.
 
-#### Enable in PocketTavern
+</details>
 
-1. Go to **Settings**
-2. Under **Stable Diffusion Forge**, enter your Forge URL
-3. Save settings
+<details>
+<summary><b>SillyTavern Import (Migration)</b></summary>
 
-#### Features
-- Generate character avatars from descriptions
-- Customize generation parameters
-- Available in Create Character and Edit Character screens
+Already have characters and chats on a SillyTavern server? Migrate everything to PocketTavern in one step:
 
----
+1. Go to **Settings → Import from SillyTavern**
+2. Enter your SillyTavern server URL and credentials
+3. Select what to import: characters, chats, lorebooks
+4. Tap **Import** — everything is pulled down and saved locally
 
-## Settings Overview
+After import, PocketTavern works completely independently. Your SillyTavern server is no longer needed.
 
-### Connection
-- **Server URL** - Your SillyTavern server address
-- **Username/Password** - For Multi-User Mode authentication
+Alternatively, you can import a folder of `.png` character cards directly via the file picker — no server required.
 
-### Stable Diffusion Forge
-- **Forge URL** - Your Stable Diffusion Forge server address
-
-### CardVault Server
-- **CardVault URL** - Your card-index-server address
-
-### Advanced Settings (in Settings Hub)
-- **API Configuration** - Select AI backend and model
-- **Text Generation** - Adjust sampler parameters and presets
-- **Formatting** - Configure instruct templates and system prompts
-- **World Info / Lorebooks** - Manage lorebook entries
-- **Context Settings** - Configure author's note
-- **Personas** - Manage user personas and avatars
+</details>
 
 ---
 
-## Troubleshooting
+## Content & Legal
 
-### "Connection failed"
-- Verify SillyTavern is running
-- Check that `listen: true` is set in config.yaml
-- Ensure your phone is on the same network
-- Try the IP address instead of hostname
-- Check if a firewall is blocking port 8000
+> **Content Disclaimer:** PocketTavern does not host, store, or provide any character content. All characters come from your own device or optional third-party services (CharaVault, Forge) that you configure. We have no visibility into what characters or content you use.
 
-### Characters not loading
-- Verify connection status shows "Connected"
-- Try pulling down to refresh
-- Check SillyTavern logs for errors
-
-### CardVault not appearing
-- Ensure you've entered a CardVault URL in Settings
-- Verify the CardVault server is running
-- Check the URL is correct (include http:// and port)
-
----
-
-## Tips
-
-1. **Save your settings** - Always tap "Save Settings" after making changes
-2. **Test connection first** - Use the Test Connection button before saving
-3. **Keep SillyTavern updated** - Some features require recent versions
-4. **Use local network** - PocketTavern works best on your home WiFi
-5. **Backup characters** - Use CardVault to backup your favorite characters
+> **Personal Use:** This app is designed strictly for personal use. The app ID and package name (`com.pockettavern.app`) are independent of SillyTavern. PocketTavern is not affiliated with, endorsed by, or derived from any commercial product.
 
 ---
 
 ## Credits
 
-- **[Starkka15](https://github.com/Starkka15)** - Lead Developer
-- **[Kuma3D](https://github.com/Kuma3D)** - UI/Graphical Layout
+- **[Starkka15](https://github.com/Starkka15)** — Lead Developer
+- **[Kuma3D](https://github.com/Kuma3D)** — UI / Graphical Layout
+- **[SillyTavern](https://github.com/SillyTavern/SillyTavern)** — Instruct/context/textgen preset templates bundled under their open-source license
