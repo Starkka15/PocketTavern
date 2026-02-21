@@ -155,6 +155,8 @@ class ChatViewModel @Inject constructor(
 
     // Last known API config — updated when generation starts, used for abort
     @Volatile private var _currentConfig: ApiConfiguration = ApiConfiguration.DEFAULT
+    // Last known persona name — updated when generation starts, used for multi-turn trimming
+    @Volatile private var _currentUserName: String = "User"
 
     // The PNG filename of the current character (e.g. "seraphina.png")
     private var currentAvatarUrl: String = ""
@@ -378,7 +380,7 @@ class ChatViewModel @Inject constructor(
                         _uiState.update { it.copy(streamingContent = event.accumulated) }
                     }
                     is StreamEvent.Complete -> {
-                        val processed = extensionManager.processOutput(event.fullText)
+                        val processed = trimMultiTurn(extensionManager.processOutput(event.fullText))
                         val assistantMessage = ChatMessage(content = processed, isUser = false)
                         _uiState.update {
                             it.copy(
@@ -445,6 +447,7 @@ class ChatViewModel @Inject constructor(
         val preset = if (!config.usesChatCompletions) localRepository.getCurrentTextGenPreset() else null
         val oaiPreset = if (config.usesChatCompletions) localRepository.getCurrentOaiPreset() else null
         val userName = chatContext.userPersona.name.ifBlank { "User" }
+        _currentUserName = userName
         val mainPromptItem = oaiPreset?.promptOrder?.find { it.id == "main_prompt" }
         val mainPromptOverride = if (config.usesChatCompletions && mainPromptItem?.enabled == true)
             mainPromptItem.content ?: "" else ""
@@ -867,7 +870,7 @@ class ChatViewModel @Inject constructor(
                         _uiState.update { it.copy(streamingContent = continued) }
                     }
                     is StreamEvent.Complete -> {
-                        val processed = extensionManager.processOutput(event.fullText)
+                        val processed = trimMultiTurn(extensionManager.processOutput(event.fullText))
                         val fullContent = lastAssistantMessage.content + processed
                         val updatedMessages = messages.toMutableList()
                         updatedMessages[lastAssistantIndex] = lastAssistantMessage.copy(content = fullContent)
@@ -956,7 +959,7 @@ class ChatViewModel @Inject constructor(
                         _uiState.update { it.copy(streamingContent = event.accumulated) }
                     }
                     is StreamEvent.Complete -> {
-                        val newContent = extensionManager.processOutput(event.fullText)
+                        val newContent = trimMultiTurn(extensionManager.processOutput(event.fullText))
                         val assistantMessage = ChatMessage(content = newContent, isUser = false)
                         existingSwipes.add(newContent)
 
@@ -998,5 +1001,20 @@ class ChatViewModel @Inject constructor(
         val swipes = _uiState.value.messageSwipes[messageIndex] ?: return null
         val currentIndex = _uiState.value.currentSwipeIndex[messageIndex] ?: 0
         return currentIndex + 1 to swipes.size
+    }
+
+    /**
+     * Strips any multi-turn continuation the model generated past the character's first response.
+     * Models sometimes write "User: ..." or "PersonaName: ..." after their response, poisoning
+     * chat history. We cut at the first occurrence of a user-role marker on its own line.
+     */
+    private fun trimMultiTurn(text: String): String {
+        val personaName = _currentUserName.trim()
+        val extras = if (personaName.isNotBlank() && personaName != "User") {
+            "|${Regex.escape(personaName)}"
+        } else ""
+        val stopPattern = Regex("""\n\s*(User|You|Human$extras)\s*:""")
+        val match = stopPattern.find(text) ?: return text
+        return text.substring(0, match.range.first).trimEnd()
     }
 }
