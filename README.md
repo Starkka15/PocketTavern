@@ -185,16 +185,115 @@ For chat-completion APIs (OpenAI, Claude, etc.), configure a prompt order: drag 
 <details>
 <summary><b>Extensions</b></summary>
 
-PocketTavern has a built-in extension system with three native extensions included:
+PocketTavern ships with three built-in native extensions and a **JavaScript extension API** that lets developers build and install their own.
 
-### Quick Reply
+### Built-in Extensions
+
+#### Quick Reply
 Pre-defined response buttons appear above the text input. Tap one to instantly send a preset message — useful for common phrases, commands, or choices. Configure sets of buttons per-character or globally.
 
-### Regex Text Replacement
+#### Regex Text Replacement
 Apply find-and-replace rules to AI output (and optionally to user messages). Rules support full regular expressions with capture groups. Use cases: strip unwanted tokens, reformat text, clean up model artifacts.
 
-### Token Counter
+#### Token Counter
 Displays a live estimated token count for the current chat context. Useful for knowing when you're approaching your model's context limit.
+
+---
+
+### JavaScript Extension API
+
+PocketTavern includes a WebView sandbox that runs JavaScript extensions. Extensions are installed from a URL and loaded at startup. They can react to chat events, inject text into the prompt, and persist their own settings.
+
+#### Installing an extension
+
+Go to **Settings → Extensions → JavaScript Extensions** and tap **+**. Enter the URL of the extension's `index.js` or its parent folder — PocketTavern downloads the file and reloads the sandbox automatically.
+
+#### The `PT` global object
+
+Every extension has access to the `PT` global object:
+
+| API | Description |
+|-----|-------------|
+| `PT.events` | Event name constants (see below) |
+| `PT.INJECTION_POSITION` | `BEFORE_CHAR_DEFS`, `AFTER_CHAR_DEFS`, `IN_CHAT` |
+| `PT.eventSource.on(event, fn)` | Subscribe to a PocketTavern event |
+| `PT.eventSource.off(event, fn)` | Unsubscribe |
+| `PT.setExtensionPrompt(id, text, position, depth)` | Inject text into the prompt before the next generation |
+| `PT.getContext()` | Returns `{ character, recentMessages, personaName, apiType }` |
+| `PT.extension_settings` | Persistent settings object keyed by extension id |
+| `PT.saveSettings()` | Persist `PT.extension_settings` to device storage |
+| `PT.log(message)` | Write to PocketTavern's debug log |
+
+#### Events
+
+| Constant | Fires when… |
+|----------|-------------|
+| `PT.events.MESSAGE_SENT` | The user sends a message |
+| `PT.events.MESSAGE_RECEIVED` | An AI response completes |
+| `PT.events.MESSAGE_EDITED` | A message is edited |
+| `PT.events.MESSAGE_DELETED` | A message is deleted |
+| `PT.events.GENERATION_STARTED` | Generation begins |
+| `PT.events.GENERATION_STOPPED` | Generation ends or is aborted |
+| `PT.events.CHAT_CHANGED` | The active chat changes |
+| `PT.events.CHARACTER_CHANGED` | The active character changes |
+
+#### Example extension
+
+```javascript
+// manifest.json (optional, hosted alongside index.js):
+// { "id": "word-count", "name": "Word Count", "version": "1.0.0",
+//   "description": "Logs the word count of every AI response.",
+//   "author": "you" }
+
+(function () {
+    var EXT_ID = 'word-count';
+
+    // Initialise settings with defaults
+    PT.extension_settings[EXT_ID] = PT.extension_settings[EXT_ID] || {
+        enabled: true
+    };
+
+    // React to incoming AI messages
+    PT.eventSource.on(PT.events.MESSAGE_RECEIVED, function (message) {
+        if (!PT.extension_settings[EXT_ID].enabled) return;
+        var words = message ? message.trim().split(/\s+/).length : 0;
+        PT.log('[word-count] Response was ' + words + ' words.');
+    });
+
+    // Inject a reminder into the prompt before every generation
+    PT.eventSource.on(PT.events.GENERATION_STARTED, function () {
+        var ctx = PT.getContext();
+        PT.setExtensionPrompt(
+            EXT_ID,
+            'Keep responses concise — aim for under 200 words.',
+            PT.INJECTION_POSITION.AFTER_CHAR_DEFS
+        );
+    });
+
+    PT.log('[word-count] loaded');
+})();
+```
+
+#### Extension file layout
+
+```
+my-extension/
+├── index.js       ← required — the extension code
+└── manifest.json  ← optional — name, version, description, author, id
+```
+
+`manifest.json` format:
+```json
+{
+  "id": "my-extension",
+  "name": "My Extension",
+  "version": "1.0.0",
+  "description": "What it does.",
+  "author": "your-name"
+}
+```
+
+Host both files anywhere accessible by URL (GitHub raw, a web server, etc.). The install URL can point directly to `index.js` or to the folder — PocketTavern appends `/index.js` automatically.
 
 </details>
 
