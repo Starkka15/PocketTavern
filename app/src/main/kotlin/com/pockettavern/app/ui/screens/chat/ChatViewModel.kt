@@ -82,11 +82,13 @@ data class ChatUiState(
     // Greeting selection for new chat
     val showGreetingPicker: Boolean = false,
     val availableGreetings: List<String> = emptyList(),
-    // Quick reply buttons from enabled presets
+    // Quick reply buttons from enabled presets + JS-registered buttons
     val quickReplyButtons: List<QuickReplyButton> = emptyList(),
     // Token counter (shown when extension is enabled)
     val tokenCount: Int = 0,
-    val showTokenCount: Boolean = false
+    val showTokenCount: Boolean = false,
+    // Message headers set by JS extensions via PT.setMessageHeader(index, text)
+    val messageHeaders: Map<Int, String> = emptyMap()
 )
 
 enum class ImageGenType {
@@ -116,10 +118,26 @@ class ChatViewModel @Inject constructor(
 
     init {
         extensionManager.load()
-        // Observe quick reply buttons
+        // Wire JS sendMessage callback so PT.sendMessage() routes through the normal pipeline
+        extensionManager.jsHost.sendMessageCallback = { text -> sendMessageText(text) }
+        // Observe native quick reply buttons + JS-registered buttons combined
         viewModelScope.launch {
-            extensionManager.quickReply.activeButtons.collect { buttons ->
-                _uiState.update { it.copy(quickReplyButtons = buttons) }
+            extensionManager.quickReply.activeButtons.collect { nativeButtons ->
+                val jsButtons = extensionManager.jsButtonSets.value.values.flatten()
+                _uiState.update { it.copy(quickReplyButtons = nativeButtons + jsButtons) }
+            }
+        }
+        viewModelScope.launch {
+            extensionManager.jsButtonSets.collect { jsSets ->
+                val nativeButtons = extensionManager.quickReply.activeButtons.value
+                val jsButtons = jsSets.values.flatten()
+                _uiState.update { it.copy(quickReplyButtons = nativeButtons + jsButtons) }
+            }
+        }
+        // Observe JS message headers
+        viewModelScope.launch {
+            extensionManager.messageHeaders.collect { headers ->
+                _uiState.update { it.copy(messageHeaders = headers) }
             }
         }
         // Observe token counter enabled state
@@ -255,6 +273,7 @@ class ChatViewModel @Inject constructor(
                     )
                 }
                 extensionManager.emit(ExtensionEvent.CHAT_CHANGED, fileName)
+                extensionManager.clearMessageHeaders()
             }
             is Result.Error -> createNewChat()
         }
@@ -389,7 +408,17 @@ class ChatViewModel @Inject constructor(
                                 streamingContent = ""
                             )
                         }
-                        extensionManager.emit(ExtensionEvent.MESSAGE_RECEIVED, processed)
+                        // Emit MESSAGE_RECEIVED with structured {text, index} payload so JS
+                        // extensions can call PT.setMessageHeader(data.index, ...) on the right message
+                        val msgIndex = _uiState.value.messages.lastIndex
+                        val safeText = processed
+                            .replace("\\", "\\\\")
+                            .replace("\"", "\\\"")
+                            .replace("\n", "\\n")
+                        extensionManager.emitJson(
+                            ExtensionEvent.MESSAGE_RECEIVED,
+                            "{\"text\":\"$safeText\",\"index\":$msgIndex,\"isUser\":false}"
+                        )
                         extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
                         generationJob = null
                         saveCurrentChat()

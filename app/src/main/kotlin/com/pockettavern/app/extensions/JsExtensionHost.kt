@@ -6,12 +6,18 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.pockettavern.app.data.local.JsExtensionStorage
+import com.pockettavern.app.domain.model.QuickReplyButton
 import com.pockettavern.app.util.DebugLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -39,6 +45,17 @@ class JsExtensionHost @Inject constructor(
 
     // Context JSON updated before each generation by ExtensionManager.updateContext()
     @Volatile private var _contextJson: String = "{}"
+
+    // Message headers: messageIndex → header text (set by JS via PT.setMessageHeader)
+    private val _messageHeaders = MutableStateFlow<Map<Int, String>>(emptyMap())
+    val messageHeaders: StateFlow<Map<Int, String>> = _messageHeaders.asStateFlow()
+
+    // Buttons registered by JS extensions: extensionId → button list
+    private val _jsButtonSets = MutableStateFlow<Map<String, List<QuickReplyButton>>>(emptyMap())
+    val jsButtonSets: StateFlow<Map<String, List<QuickReplyButton>>> = _jsButtonSets.asStateFlow()
+
+    // Callback wired by ChatViewModel so JS can send messages as the user
+    var sendMessageCallback: ((String) -> Unit)? = null
 
     // ── Init / reload ─────────────────────────────────────────────────────────
 
@@ -68,6 +85,8 @@ class JsExtensionHost @Inject constructor(
     fun reload() {
         ready = false
         _injections.clear()
+        _messageHeaders.value = emptyMap()
+        _jsButtonSets.value = emptyMap()
         scope.launch {
             webView?.loadData("<html><body></body></html>", "text/html", "utf-8")
         }
@@ -79,6 +98,7 @@ class JsExtensionHost @Inject constructor(
 
     // ── Events ────────────────────────────────────────────────────────────────
 
+    /** Dispatch an event with a plain string payload. */
     fun dispatchEvent(event: ExtensionEvent, data: Any? = null) {
         if (!ready) return
         val safe = data?.toString()
@@ -91,6 +111,22 @@ class JsExtensionHost @Inject constructor(
             )
         }
     }
+
+    /**
+     * Dispatch an event with a raw JSON payload (object/array, not a quoted string).
+     * Used for structured events like MESSAGE_RECEIVED that carry { text, index }.
+     */
+    fun dispatchEventJson(event: ExtensionEvent, jsonData: String) {
+        if (!ready) return
+        scope.launch {
+            webView?.evaluateJavascript(
+                "if(window.__ptDispatchEvent)__ptDispatchEvent('${event.name}',$jsonData);", null
+            )
+        }
+    }
+
+    /** Clear all message headers without reloading the sandbox (e.g. on chat change). */
+    fun clearMessageHeaders() { _messageHeaders.value = emptyMap() }
 
     // ── Prompt injections ─────────────────────────────────────────────────────
 
@@ -159,6 +195,72 @@ class JsExtensionHost @Inject constructor(
         @JavascriptInterface
         fun log(message: String) {
             DebugLogger.log("[JsExt] $message")
+        }
+
+        // ── New APIs ──────────────────────────────────────────────────────────
+
+        /**
+         * Called by PT.setMessageHeader(index, text).
+         * Sets a header box that appears above the AI message at [messageIndex].
+         * Pass empty string to clear it.
+         */
+        @JavascriptInterface
+        fun setMessageHeader(messageIndex: Int, text: String) {
+            val current = _messageHeaders.value.toMutableMap()
+            if (text.isBlank()) current.remove(messageIndex)
+            else current[messageIndex] = text
+            _messageHeaders.value = current
+        }
+
+        /** Called by PT.clearMessageHeader(index). */
+        @JavascriptInterface
+        fun clearMessageHeader(messageIndex: Int) {
+            _messageHeaders.value = _messageHeaders.value - messageIndex
+        }
+
+        /** Called by PT.clearAllHeaders(). */
+        @JavascriptInterface
+        fun clearAllHeaders() {
+            _messageHeaders.value = emptyMap()
+        }
+
+        /**
+         * Called by PT.registerButtons(id, buttons).
+         * [buttonsJson] is a JSON array: [{"label":"...", "message":"..."}]
+         */
+        @JavascriptInterface
+        fun registerButtons(extensionId: String, buttonsJson: String) {
+            try {
+                val arr = JSONArray(buttonsJson)
+                val buttons = (0 until arr.length()).map { i ->
+                    val obj = arr.getJSONObject(i)
+                    QuickReplyButton(
+                        label   = obj.optString("label", "?"),
+                        message = obj.optString("message", "")
+                    )
+                }
+                _jsButtonSets.value = _jsButtonSets.value + (extensionId to buttons)
+            } catch (e: Exception) {
+                DebugLogger.log("[JsExt] registerButtons parse error: ${e.message}")
+            }
+        }
+
+        /** Called by PT.clearButtons(id). */
+        @JavascriptInterface
+        fun clearButtons(extensionId: String) {
+            _jsButtonSets.value = _jsButtonSets.value - extensionId
+        }
+
+        /**
+         * Called by PT.sendMessage(text).
+         * Sends a message as the user through the normal send pipeline.
+         */
+        @JavascriptInterface
+        fun sendMessage(text: String) {
+            if (text.isBlank()) return
+            scope.launch(Dispatchers.Main) {
+                sendMessageCallback?.invoke(text)
+            }
         }
     }
 }

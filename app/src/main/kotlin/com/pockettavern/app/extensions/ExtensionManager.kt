@@ -1,8 +1,10 @@
 package com.pockettavern.app.extensions
 
+import com.pockettavern.app.domain.model.QuickReplyButton
 import com.pockettavern.app.extensions.builtin.QuickReplyExtension
 import com.pockettavern.app.extensions.builtin.RegexExtension
 import com.pockettavern.app.extensions.builtin.TokenCounterExtension
+import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,6 +20,18 @@ class ExtensionManager @Inject constructor(
     val jsHost: JsExtensionHost
 ) {
     val all: List<NativeExtension> get() = listOf(quickReply, regex, tokenCounter)
+
+    /**
+     * Message headers set by JS extensions via PT.setMessageHeader().
+     * Map of messageIndex → header text string.
+     */
+    val messageHeaders: StateFlow<Map<Int, String>> get() = jsHost.messageHeaders
+
+    /**
+     * Buttons registered by JS extensions via PT.registerButtons().
+     * Map of extensionId → button list. Combine with native quick reply for the full set.
+     */
+    val jsButtonSets: StateFlow<Map<String, List<QuickReplyButton>>> get() = jsHost.jsButtonSets
 
     /** Load persisted settings and initialise the JS sandbox. Call once at app start. */
     fun load() {
@@ -43,8 +57,22 @@ class ExtensionManager @Inject constructor(
         jsHost.dispatchEvent(event, data)
     }
 
+    /**
+     * Emit an event with a structured JSON payload (not a quoted string).
+     * Used for MESSAGE_RECEIVED which carries { text, index } so JS extensions
+     * can call PT.setMessageHeader(data.index, ...).
+     */
+    fun emitJson(event: ExtensionEvent, jsonData: String) {
+        all.forEach { ext -> if (ext.enabled) ext.onEvent(event, jsonData) }
+        ExtensionEventBus.emit(event, jsonData)
+        jsHost.dispatchEventJson(event, jsonData)
+    }
+
     /** Collect prompt injections from all enabled native extensions and JS extensions. */
     fun getPromptInjections(): List<String> =
         all.filter { it.enabled }.mapNotNull { it.getPromptInjection() } +
         jsHost.getInjections()
+
+    /** Clear all JS message headers without reloading the sandbox (call when changing chat). */
+    fun clearMessageHeaders() = jsHost.clearMessageHeaders()
 }

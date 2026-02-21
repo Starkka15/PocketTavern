@@ -3,7 +3,6 @@ package com.pockettavern.app.ui.screens.profile
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -27,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pockettavern.app.ui.components.ConfirmDialog
 import com.pockettavern.app.ui.components.ErrorDialog
 import com.pockettavern.app.ui.theme.*
+import com.pockettavern.app.ui.theme.LocalPocketTavernColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +37,7 @@ fun ProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showLogoutConfirm by remember { mutableStateOf(false) }
+    val avatarShape = LocalPocketTavernColors.current.avatarShape.toShape()
 
     // Handle logout success
     LaunchedEffect(uiState.logoutSuccess) {
@@ -63,7 +64,7 @@ fun ProfileScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkSurface
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
@@ -91,15 +92,15 @@ fun ProfileScreen(
                 Box(
                     modifier = Modifier
                         .size(100.dp)
-                        .clip(CircleShape)
-                        .background(DarkSurfaceVariant),
+                        .clip(avatarShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.Person,
                         contentDescription = "Avatar",
                         modifier = Modifier.size(60.dp),
-                        tint = TextSecondary
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -108,27 +109,27 @@ fun ProfileScreen(
                     Text(
                         text = "@${user.handle}",
                         style = MaterialTheme.typography.titleLarge,
-                        color = AccentGreen
+                        color = MaterialTheme.colorScheme.primary
                     )
 
                     if (user.name != user.handle) {
                         Text(
                             text = user.name,
                             style = MaterialTheme.typography.bodyLarge,
-                            color = TextPrimary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
                     if (user.isAdmin) {
                         Surface(
-                            color = AccentGreen.copy(alpha = 0.2f),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
                             shape = MaterialTheme.shapes.small
                         ) {
                             Text(
                                 text = "Admin",
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                                 style = MaterialTheme.typography.labelMedium,
-                                color = AccentGreen
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
@@ -141,7 +142,7 @@ fun ProfileScreen(
                     onClick = { viewModel.showPasswordDialog() },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = AccentGreen
+                        contentColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
                     Icon(Icons.Default.Lock, contentDescription = null)
@@ -154,7 +155,7 @@ fun ProfileScreen(
                     onClick = { showLogoutConfirm = true },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = ErrorRed
+                        containerColor = MaterialTheme.colorScheme.error
                     )
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
@@ -166,7 +167,7 @@ fun ProfileScreen(
                 if (uiState.passwordChangeSuccess) {
                     Text(
                         text = "Password changed successfully!",
-                        color = AccentGreen,
+                        color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -300,7 +301,7 @@ private fun PasswordChangeDialog(
                 error?.let {
                     Text(
                         text = it,
-                        color = ErrorRed,
+                        color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -334,12 +335,12 @@ private fun PasswordChangeDialog(
 
 @Composable
 private fun dialogTextFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedContainerColor = DarkInputBackground,
-    unfocusedContainerColor = DarkInputBackground,
-    focusedBorderColor = AccentGreen,
-    unfocusedBorderColor = DarkSurfaceVariant,
-    focusedTextColor = TextPrimary,
-    unfocusedTextColor = TextPrimary,
-    focusedLabelColor = AccentGreen,
-    unfocusedLabelColor = TextSecondary
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedLabelColor = MaterialTheme.colorScheme.primary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
 )

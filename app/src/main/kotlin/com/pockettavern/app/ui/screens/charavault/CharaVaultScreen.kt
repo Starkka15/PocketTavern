@@ -142,7 +142,7 @@ fun CharaVaultScreen(
                     if (uiState.charavaultMode == "charavault") {
                         if (uiState.isLoggedIn) {
                             IconButton(onClick = { showSettingsDialog = true }) {
-                                Icon(Icons.Default.AccountCircle, contentDescription = "Account", tint = Color(0xFF4CAF50))
+                                Icon(Icons.Default.AccountCircle, contentDescription = "Account", tint = MaterialTheme.colorScheme.primary)
                             }
                         } else {
                             TextButton(onClick = { viewModel.showLogin() }) {
@@ -694,7 +694,7 @@ private fun CharaVaultCharacterCard(
                 Text(
                     text = character.creator,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF4CAF50), // Green accent like Chub
+                    color = MaterialTheme.colorScheme.primary, // Green accent like Chub
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -780,7 +780,7 @@ private fun CharacterPreviewSheet(
                         Text(
                             text = "by ${character.creator}",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF4CAF50)
+                            color = MaterialTheme.colorScheme.primary
                         )
 
                         Text(
@@ -988,7 +988,7 @@ private fun ServerSettingsDialog(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Default.AccountCircle, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(32.dp))
+                            Icon(Icons.Default.AccountCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     charavaultEmail ?: "Logged in",
@@ -998,7 +998,7 @@ private fun ServerSettingsDialog(
                                 Text(
                                     if (nsfwVerified) "NSFW Enabled" else "SFW Only",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (nsfwVerified) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (nsfwVerified) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -1363,7 +1363,7 @@ private fun CharaVaultLorebookCard(
             Text(
                 text = lorebook.creator,
                 style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF4CAF50),
+                color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1497,7 +1497,7 @@ private fun LorebookPreviewSheet(
                     Text(
                         text = "by ${lorebook.creator}",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF4CAF50)
+                        color = MaterialTheme.colorScheme.primary
                     )
 
                     Spacer(Modifier.height(8.dp))

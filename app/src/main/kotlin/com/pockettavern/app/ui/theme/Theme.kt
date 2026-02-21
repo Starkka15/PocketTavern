@@ -6,6 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
@@ -15,38 +16,38 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 
-private val DarkColorScheme = darkColorScheme(
-    primary = AccentGreen,
-    onPrimary = DarkBackground,
-    primaryContainer = AccentGreenDark,
-    onPrimaryContainer = TextPrimary,
-    secondary = AccentGreen,
-    onSecondary = DarkBackground,
-    secondaryContainer = DarkSurfaceVariant,
-    onSecondaryContainer = TextPrimary,
-    tertiary = DarkSurfaceVariant,
-    onTertiary = TextPrimary,
-    background = DarkBackground,
-    onBackground = TextPrimary,
-    surface = DarkSurface,
-    onSurface = TextPrimary,
-    surfaceVariant = DarkSurfaceVariant,
-    onSurfaceVariant = TextSecondary,
-    surfaceContainerLowest = DarkBackground,
-    surfaceContainerLow = DarkSurface,
-    surfaceContainer = DarkSurface,
-    surfaceContainerHigh = DarkSurfaceVariant,
-    surfaceContainerHighest = DarkInputBackground,
-    error = ErrorRed,
-    onError = TextPrimary,
-    errorContainer = ErrorRed.copy(alpha = 0.3f),
-    onErrorContainer = ErrorRed,
-    outline = DarkSurfaceVariant,
-    outlineVariant = TextTertiary,
-    inverseSurface = TextPrimary,
-    inverseOnSurface = DarkBackground,
-    inversePrimary = AccentGreenDark,
-    scrim = DarkBackground.copy(alpha = 0.5f)
+private fun buildColorScheme(c: PocketTavernColors) = darkColorScheme(
+    primary                 = c.accentPrimary,
+    onPrimary               = c.background,
+    primaryContainer        = AccentGreenDark,
+    onPrimaryContainer      = c.textPrimary,
+    secondary               = c.accentPrimary,
+    onSecondary             = c.background,
+    secondaryContainer      = c.surfaceVariant,
+    onSecondaryContainer    = c.textPrimary,
+    tertiary                = c.accentPrimary,
+    onTertiary              = c.background,
+    background              = c.background,
+    onBackground            = c.textPrimary,
+    surface                 = c.surface,
+    onSurface               = c.textPrimary,
+    surfaceVariant          = c.surfaceVariant,
+    onSurfaceVariant        = c.textSecondary,
+    surfaceContainerLowest  = c.background,
+    surfaceContainerLow     = c.surface,
+    surfaceContainer        = c.surface,
+    surfaceContainerHigh    = c.surfaceVariant,
+    surfaceContainerHighest = c.inputBackground,
+    error                   = ErrorRed,
+    onError                 = c.textPrimary,
+    errorContainer          = ErrorRed.copy(alpha = 0.3f),
+    onErrorContainer        = ErrorRed,
+    outline                 = c.borderColor,
+    outlineVariant          = c.surfaceVariant,
+    inverseSurface          = c.textPrimary,
+    inverseOnSurface        = c.background,
+    inversePrimary          = AccentGreenDark,
+    scrim                   = c.background.copy(alpha = 0.5f)
 )
 
 private val AppTypography = Typography(
@@ -153,9 +154,10 @@ private val AppTypography = Typography(
 
 @Composable
 fun SillyTavernTheme(
+    colors: PocketTavernColors = PocketTavernColors.Default,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = DarkColorScheme
+    val colorScheme = buildColorScheme(colors)
     val view = LocalView.current
 
     if (!view.isInEditMode) {
@@ -170,9 +172,11 @@ fun SillyTavernTheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = AppTypography,
-        content = content
-    )
+    CompositionLocalProvider(LocalPocketTavernColors provides colors) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography  = AppTypography,
+            content     = content
+        )
+    }
 }

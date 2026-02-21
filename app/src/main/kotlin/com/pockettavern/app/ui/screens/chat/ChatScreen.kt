@@ -37,12 +37,6 @@ import com.pockettavern.app.domain.model.GenerationState
 import com.pockettavern.app.domain.model.QuickReplyButton
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import com.pockettavern.app.ui.theme.AccentGreen
-import com.pockettavern.app.ui.theme.DarkSurface
-import com.pockettavern.app.ui.theme.DarkSurfaceVariant
-import com.pockettavern.app.ui.theme.ErrorRed
-import com.pockettavern.app.ui.theme.TextPrimary
-import com.pockettavern.app.ui.theme.TextSecondary
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -202,7 +196,7 @@ fun ChatScreen(
                                     showSettingsMenu = false
                                     viewModel.showDeleteDialog()
                                 },
-                                leadingIcon = { Icon(Icons.Default.Delete, null, tint = ErrorRed) }
+                                leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }
                             )
                             DropdownMenuItem(
                                 text = { Text("Delete Character") },
@@ -210,13 +204,13 @@ fun ChatScreen(
                                     showSettingsMenu = false
                                     showDeleteCharacterDialog = true
                                 },
-                                leadingIcon = { Icon(Icons.Default.Delete, null, tint = ErrorRed) }
+                                leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }
                             )
                         }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkSurface
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         },
@@ -225,7 +219,7 @@ fun ChatScreen(
                 // API indicator bar
                 if (uiState.currentApiName.isNotBlank()) {
                     Surface(
-                        color = DarkSurfaceVariant,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -238,18 +232,18 @@ fun ChatScreen(
                             Text(
                                 text = uiState.currentApiName,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = AccentGreen
+                                color = MaterialTheme.colorScheme.primary
                             )
                             if (uiState.currentModelName.isNotBlank()) {
                                 Text(
                                     text = " \u2022 ",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = TextSecondary
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
                                     text = uiState.currentModelName,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = TextSecondary,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1
                                 )
                             }
@@ -267,7 +261,7 @@ fun ChatScreen(
                     ) {
                         Button(
                             onClick = { viewModel.stopGeneration() },
-                            colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                         ) {
                             Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
@@ -318,7 +312,7 @@ fun ChatScreen(
                         Text(
                             text = "~${uiState.tokenCount} tokens",
                             style = MaterialTheme.typography.labelSmall,
-                            color = TextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -391,6 +385,7 @@ fun ChatScreen(
                                 characterName = uiState.character?.name ?: "Assistant",
                                 swipeInfo = swipeInfo,
                                 isLastAssistantMessage = isLastAsstMsg,
+                                header = uiState.messageHeaders[index],
                                 onLongPress = { viewModel.showMessageActions(index) },
                                 onSwipeLeft = { viewModel.swipeLeft(index) },
                                 onSwipeRight = {
@@ -670,6 +665,7 @@ private fun MessageWithActions(
     characterName: String,
     swipeInfo: Pair<Int, Int>?,
     isLastAssistantMessage: Boolean,
+    header: String? = null,
     onLongPress: () -> Unit,
     onSwipeLeft: () -> Unit,
     onSwipeRight: () -> Unit
@@ -703,7 +699,8 @@ private fun MessageWithActions(
         ) {
             ChatBubble(
                 message = message,
-                characterName = characterName
+                characterName = characterName,
+                header = header
             )
         }
 
@@ -759,7 +756,7 @@ private fun ImageGenerationDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Type selector
-                Text("Image Type", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                Text("Image Type", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -779,7 +776,7 @@ private fun ImageGenerationDialog(
                 }
 
                 // Prompt preview/editor
-                Text("Prompt", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                Text("Prompt", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(
                     value = promptPreview,
                     onValueChange = onUpdatePrompt,
@@ -832,7 +829,7 @@ private fun ImageGenerationDialog(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .heightIn(max = 200.dp)
-                                        .border(1.dp, DarkSurfaceVariant, RoundedCornerShape(8.dp)),
+                                        .border(1.dp, MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
                                     contentScale = ContentScale.Fit
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -845,12 +842,12 @@ private fun ImageGenerationDialog(
                                         Icon(
                                             Icons.Default.Check,
                                             contentDescription = null,
-                                            tint = AccentGreen,
+                                            tint = MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.size(18.dp)
                                         )
                                         Text(
                                             "Saved to Pictures/SillyTavern",
-                                            color = AccentGreen,
+                                            color = MaterialTheme.colorScheme.primary,
                                             style = MaterialTheme.typography.bodySmall
                                         )
                                     }
@@ -862,12 +859,12 @@ private fun ImageGenerationDialog(
                                         Icon(
                                             Icons.Default.Check,
                                             contentDescription = null,
-                                            tint = AccentGreen,
+                                            tint = MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.size(18.dp)
                                         )
                                         Text(
                                             "Set as chat background",
-                                            color = AccentGreen,
+                                            color = MaterialTheme.colorScheme.primary,
                                             style = MaterialTheme.typography.bodySmall
                                         )
                                     }
@@ -902,14 +899,14 @@ private fun ImageGenerationDialog(
                                     }
                                 }
                             } else {
-                                Text("Failed to display image", color = ErrorRed)
+                                Text("Failed to display image", color = MaterialTheme.colorScheme.error)
                             }
                         }
                     }
                     is GenerationState.Error -> {
                         Text(
                             "Error: ${generationState.message}",
-                            color = ErrorRed,
+                            color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -995,11 +992,11 @@ private fun MessageActionsDialog(
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = null,
-                        tint = ErrorRed,
+                        tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text("Delete Message", color = ErrorRed)
+                    Text("Delete Message", color = MaterialTheme.colorScheme.error)
                     Spacer(modifier = Modifier.weight(1f))
                 }
 
@@ -1012,11 +1009,11 @@ private fun MessageActionsDialog(
                         Icon(
                             Icons.Default.Refresh,
                             contentDescription = null,
-                            tint = AccentGreen,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text("Regenerate", color = AccentGreen)
+                        Text("Regenerate", color = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
@@ -1107,13 +1104,13 @@ private fun SwipeIndicator(
                 Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                 contentDescription = "Previous",
                 modifier = Modifier.size(18.dp),
-                tint = if (currentSwipe > 1) TextPrimary else TextSecondary.copy(alpha = 0.3f)
+                tint = if (currentSwipe > 1) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
             )
         }
         Text(
             text = "$currentSwipe/$totalSwipes",
             style = MaterialTheme.typography.labelSmall,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         // Right button: navigates to next alt, or generates a new one when at the end
         IconButton(
@@ -1125,7 +1122,7 @@ private fun SwipeIndicator(
                 else Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = if (isAtLastAlt) "Generate new response" else "Next",
                 modifier = Modifier.size(18.dp),
-                tint = TextPrimary.copy(alpha = if (isAtLastAlt) 0.6f else 1f)
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isAtLastAlt) 0.6f else 1f)
             )
         }
     }
@@ -1151,7 +1148,7 @@ private fun GreetingPickerDialog(
                             .fillMaxWidth()
                             .clickable { onSelectGreeting(greeting) },
                         colors = CardDefaults.cardColors(
-                            containerColor = DarkSurfaceVariant
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     ) {
                         Column(
@@ -1160,13 +1157,13 @@ private fun GreetingPickerDialog(
                             Text(
                                 text = if (index == 0) "Default Greeting" else "Alternate ${index}",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = AccentGreen
+                                color = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = greeting.take(200) + if (greeting.length > 200) "..." else "",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = TextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 4
                             )
                         }
@@ -1189,7 +1186,7 @@ private fun QuickReplyBar(
     buttons: List<QuickReplyButton>,
     onButtonClick: (QuickReplyButton) -> Unit
 ) {
-    Surface(color = DarkSurfaceVariant, modifier = Modifier.fillMaxWidth()) {
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

@@ -31,6 +31,7 @@ import coil.compose.AsyncImage
 import com.pockettavern.app.domain.model.ActivationStrategy
 import com.pockettavern.app.domain.model.GroupChatMessage
 import com.pockettavern.app.ui.theme.*
+import com.pockettavern.app.ui.theme.LocalPocketTavernColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,14 +72,14 @@ fun GroupChatScreen(
                             Text(
                                 text = "${uiState.streamingCharacterName} is typing...",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = IceBlue,
+                                color = MaterialTheme.colorScheme.primary,
                                 maxLines = 1
                             )
                         } else if (uiState.currentModelName.isNotBlank()) {
                             Text(
                                 text = uiState.currentModelName,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = TextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1
                             )
                         }
@@ -99,13 +100,13 @@ fun GroupChatScreen(
                             Icon(
                                 Icons.Default.Groups,
                                 contentDescription = null,
-                                tint = IceBlue,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 "${group.members.size}",
-                                color = TextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }
@@ -118,7 +119,7 @@ fun GroupChatScreen(
                             Icon(
                                 Icons.Default.MoreVert,
                                 contentDescription = "Options",
-                                tint = TextSecondary
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         DropdownMenu(
@@ -128,7 +129,7 @@ fun GroupChatScreen(
                             Text(
                                 "Activation Strategy",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = TextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                             )
                             val currentStrategy = uiState.group?.activationStrategy ?: ActivationStrategy.NATURAL
@@ -145,12 +146,12 @@ fun GroupChatScreen(
                                                 selected = currentStrategy == value,
                                                 onClick = null,
                                                 colors = RadioButtonDefaults.colors(
-                                                    selectedColor = IceBlue,
-                                                    unselectedColor = TextSecondary
+                                                    selectedColor = MaterialTheme.colorScheme.primary,
+                                                    unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
                                             )
                                             Spacer(modifier = Modifier.width(4.dp))
-                                            Text(label, color = TextPrimary)
+                                            Text(label, color = MaterialTheme.colorScheme.onSurface)
                                         }
                                     },
                                     onClick = {
@@ -164,7 +165,7 @@ fun GroupChatScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Black,
-                    titleContentColor = TextPrimary
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         },
@@ -183,13 +184,13 @@ fun GroupChatScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(DarkBackground)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             when {
                 uiState.isLoading -> {
                     CircularProgressIndicator(
                         modifier = Modifier.align(Alignment.Center),
-                        color = IceBlue
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
                 uiState.messages.isEmpty() && !uiState.isGenerating -> {
@@ -203,19 +204,19 @@ fun GroupChatScreen(
                             Icons.Default.Groups,
                             contentDescription = null,
                             modifier = Modifier.size(64.dp),
-                            tint = TextSecondary
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             "Start the conversation!",
                             style = MaterialTheme.typography.titleMedium,
-                            color = TextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             "Send a message to chat with the group",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary.copy(alpha = 0.7f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
                     }
                 }
@@ -264,6 +265,7 @@ private fun StreamingBubble(
     avatarUrl: String?,
     content: String
 ) {
+    val avatarShape = LocalPocketTavernColors.current.avatarShape.toShape()
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Start
@@ -274,8 +276,8 @@ private fun StreamingBubble(
             contentDescription = characterName,
             modifier = Modifier
                 .size(36.dp)
-                .clip(CircleShape)
-                .border(1.dp, IceBlue.copy(alpha = 0.3f), CircleShape),
+                .clip(avatarShape)
+                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), avatarShape),
             contentScale = ContentScale.Crop
         )
         Spacer(modifier = Modifier.width(8.dp))
@@ -287,7 +289,7 @@ private fun StreamingBubble(
             Text(
                 text = characterName,
                 style = MaterialTheme.typography.labelSmall,
-                color = IceBlue,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
             )
 
@@ -298,11 +300,11 @@ private fun StreamingBubble(
                     bottomStart = 4.dp,
                     bottomEnd = 16.dp
                 ),
-                color = DarkCard,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
                 modifier = Modifier.border(
                     width = 1.dp,
                     brush = Brush.linearGradient(
-                        colors = listOf(IceBlue.copy(alpha = 0.3f), IceBlue.copy(alpha = 0.1f))
+                        colors = listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
                     ),
                     shape = RoundedCornerShape(
                         topStart = 16.dp,
@@ -321,7 +323,7 @@ private fun StreamingBubble(
                     Text(
                         text = content,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(12.dp)
                     )
                 }
@@ -353,7 +355,7 @@ private fun TypingIndicator(modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .size(8.dp)
                     .clip(CircleShape)
-                    .background(IceBlue.copy(alpha = alpha))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha))
             )
         }
     }
@@ -364,6 +366,7 @@ private fun GroupMessageBubble(
     message: GroupChatMessage,
     avatarUrl: String?
 ) {
+    val avatarShape = LocalPocketTavernColors.current.avatarShape.toShape()
     val isUser = message.isUser
 
     Row(
@@ -377,8 +380,8 @@ private fun GroupMessageBubble(
                 contentDescription = message.senderName,
                 modifier = Modifier
                     .size(36.dp)
-                    .clip(CircleShape)
-                    .border(1.dp, IceBlue.copy(alpha = 0.3f), CircleShape),
+                    .clip(avatarShape)
+                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), avatarShape),
                 contentScale = ContentScale.Crop
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -393,7 +396,7 @@ private fun GroupMessageBubble(
                 Text(
                     text = message.senderName,
                     style = MaterialTheme.typography.labelSmall,
-                    color = IceBlue,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
                 )
             }
@@ -406,17 +409,17 @@ private fun GroupMessageBubble(
                     bottomEnd = if (isUser) 4.dp else 16.dp
                 ),
                 color = if (isUser) {
-                    FireOrange.copy(alpha = 0.8f)
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
                 } else {
-                    DarkCard
+                    MaterialTheme.colorScheme.surfaceContainerLow
                 },
                 modifier = Modifier.border(
                     width = 1.dp,
                     brush = Brush.linearGradient(
                         colors = if (isUser) {
-                            listOf(FireOrange.copy(alpha = 0.5f), FireOrange.copy(alpha = 0.2f))
+                            listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                         } else {
-                            listOf(IceBlue.copy(alpha = 0.3f), IceBlue.copy(alpha = 0.1f))
+                            listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
                         }
                     ),
                     shape = RoundedCornerShape(
@@ -430,7 +433,7 @@ private fun GroupMessageBubble(
                 Text(
                     text = message.content,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(12.dp)
                 )
             }
@@ -442,14 +445,14 @@ private fun GroupMessageBubble(
             Box(
                 modifier = Modifier
                     .size(36.dp)
-                    .clip(CircleShape)
-                    .background(FireOrange.copy(alpha = 0.3f)),
+                    .clip(avatarShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     "You",
                     style = MaterialTheme.typography.labelSmall,
-                    color = FireOrange
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -478,18 +481,18 @@ private fun GroupChatInputBar(
             OutlinedTextField(
                 value = inputText,
                 onValueChange = onInputChange,
-                placeholder = { Text("Type a message...", color = TextSecondary) },
+                placeholder = { Text("Type a message...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 modifier = Modifier.weight(1f),
                 maxLines = 4,
                 enabled = !isGenerating && !isSending,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = IceBlue,
-                    unfocusedBorderColor = TextSecondary.copy(alpha = 0.3f),
-                    disabledBorderColor = TextSecondary.copy(alpha = 0.2f),
-                    disabledTextColor = TextSecondary,
-                    cursorColor = IceBlue,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                    disabledBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                    disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    cursorColor = MaterialTheme.colorScheme.primary,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                 ),
                 shape = RoundedCornerShape(24.dp)
             )
@@ -520,8 +523,8 @@ private fun GroupChatInputBar(
                         .size(48.dp)
                         .clip(CircleShape)
                         .background(
-                            if (inputText.isNotBlank() && !isSending) FireOrange
-                            else TextSecondary.copy(alpha = 0.3f)
+                            if (inputText.isNotBlank() && !isSending) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                         )
                 ) {
                     if (isSending) {

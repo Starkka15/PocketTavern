@@ -33,7 +33,6 @@ import com.pockettavern.app.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pockettavern.app.ui.components.ConnectionStatusBar
-import com.pockettavern.app.ui.components.FireIceBackground
 import com.pockettavern.app.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,7 +52,7 @@ fun MainScreen(
         topBar = {
             // Taller top bar
             Surface(
-                color = Color.Black,
+                color = MaterialTheme.colorScheme.background,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(80.dp)
@@ -90,11 +89,6 @@ fun MainScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Animated fire & ice background
-            FireIceBackground(
-                modifier = Modifier.fillMaxSize()
-            )
-
             // Centered content - bigger cards with more spacing
             Column(
                 modifier = Modifier
@@ -107,7 +101,7 @@ fun MainScreen(
                     icon = Icons.Default.People,
                     title = "Characters",
                     description = "Browse and chat with your characters",
-                    iconColor = FireOrange,
+                    iconColor = MaterialTheme.colorScheme.primary,
                     onClick = onNavigateToCharacters
                 )
 
@@ -117,7 +111,7 @@ fun MainScreen(
                     icon = Icons.Default.History,
                     title = "Recent Chats",
                     description = "Continue your recent conversations",
-                    iconColor = IceBlue,
+                    iconColor = MaterialTheme.colorScheme.primary,
                     onClick = onNavigateToRecentChats
                 )
 
@@ -127,7 +121,7 @@ fun MainScreen(
                     icon = Icons.Default.Add,
                     title = "Create Character",
                     description = "Design a new character from scratch",
-                    iconColor = FireGold,
+                    iconColor = MaterialTheme.colorScheme.primary,
                     onClick = onNavigateToCreateCharacter
                 )
 
@@ -139,7 +133,7 @@ fun MainScreen(
                         icon = Icons.Default.Storage,
                         title = "CharaVault",
                         description = "Your local character card library",
-                        iconColor = Color(0xFF9C27B0),  // Purple
+                        iconColor = MaterialTheme.colorScheme.primary,
                         onClick = onNavigateToCharaVault
                     )
 
@@ -150,7 +144,7 @@ fun MainScreen(
                     icon = Icons.Default.Settings,
                     title = "Settings",
                     description = "Configure server and app preferences",
-                    iconColor = FireRed,
+                    iconColor = MaterialTheme.colorScheme.primary,
                     onClick = onNavigateToSettings
                 )
             }
@@ -168,7 +162,7 @@ fun MainScreen(
                 Icon(
                     Icons.Default.Update,
                     contentDescription = null,
-                    tint = IceBlue
+                    tint = MaterialTheme.colorScheme.primary
                 )
             },
             title = {
@@ -184,12 +178,12 @@ fun MainScreen(
                     Text(
                         "Current: v${updateInfo.currentVersion}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         "Latest: v${updateInfo.latestVersion}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = IceBlue
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             },
@@ -201,17 +195,17 @@ fun MainScreen(
                         viewModel.dismissUpdateDialog()
                     }
                 ) {
-                    Text("Download", color = IceBlue)
+                    Text("Download", color = MaterialTheme.colorScheme.primary)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissUpdateDialog() }) {
-                    Text("Later", color = TextSecondary)
+                    Text("Later", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
             containerColor = Color.Black.copy(alpha = 0.95f),
-            titleContentColor = TextPrimary,
-            textContentColor = TextPrimary
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -240,7 +234,7 @@ private fun NavigationCard(
                 shape = RoundedCornerShape(16.dp)
             )
             .clickable(onClick = onClick),
-        color = Color.Black.copy(alpha = 0.35f),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
         shape = RoundedCornerShape(16.dp)
     ) {
         Row(
@@ -281,13 +275,13 @@ private fun NavigationCard(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleLarge,
-                    color = TextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
                 )
             }

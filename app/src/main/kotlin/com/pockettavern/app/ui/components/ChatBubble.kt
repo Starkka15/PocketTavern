@@ -26,7 +26,8 @@ import com.pockettavern.app.ui.theme.*
 fun ChatBubble(
     message: ChatMessage,
     characterName: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    header: String? = null
 ) {
     // Narrator/system messages render as full-width centered italic text
     if (message.isNarrator) {
@@ -36,7 +37,7 @@ fun ChatBubble(
                 .padding(horizontal = 8.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            HorizontalDivider(modifier = Modifier.weight(1f), color = DarkSurfaceVariant)
+            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.surfaceVariant)
             Text(
                 text = formatMessage(message.content),
                 style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
@@ -44,14 +45,15 @@ fun ChatBubble(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 12.dp)
             )
-            HorizontalDivider(modifier = Modifier.weight(1f), color = DarkSurfaceVariant)
+            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.surfaceVariant)
         }
         return
     }
 
-    val bubbleColor = if (message.isUser) UserBubble else AssistantBubble
-    val textColor = if (message.isUser) UserBubbleText else AssistantBubbleText
-    val senderColor = if (message.isUser) UserBubbleText else AccentGreen
+    val ptColors = LocalPocketTavernColors.current
+    val bubbleColor = if (message.isUser) ptColors.userBubble else ptColors.assistantBubble
+    val textColor = if (message.isUser) ptColors.userBubbleText else ptColors.assistantBubbleText
+    val senderColor = if (message.isUser) ptColors.userBubbleText else ptColors.accentPrimary
     val senderName = if (message.isUser) "You" else characterName
 
     val alignment = if (message.isUser) Alignment.End else Alignment.Start
@@ -66,6 +68,23 @@ fun ChatBubble(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = alignment
     ) {
+        // Header box set by JS extensions via PT.setMessageHeader()
+        if (!message.isUser && !header.isNullOrBlank()) {
+            Surface(
+                modifier = Modifier
+                    .widthIn(max = 320.dp)
+                    .padding(bottom = 4.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Text(
+                    text = header,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
         Surface(
             modifier = Modifier.widthIn(max = 320.dp),
             shape = bubbleShape,
@@ -106,23 +125,24 @@ fun StreamingChatBubble(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.Start
     ) {
+        val ptColors = LocalPocketTavernColors.current
         Surface(
             modifier = Modifier.widthIn(max = 320.dp),
             shape = bubbleShape,
-            color = AssistantBubble
+            color = ptColors.assistantBubble
         ) {
             Column(modifier = Modifier.padding(12.dp, 8.dp)) {
                 Text(
                     text = characterName,
                     style = MaterialTheme.typography.labelSmall,
-                    color = AccentGreen,
+                    color = ptColors.accentPrimary,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = formatMessage(content + "▌"),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AssistantBubbleText
+                    color = ptColors.assistantBubbleText
                 )
             }
         }

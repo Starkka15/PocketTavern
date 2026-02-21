@@ -359,6 +359,99 @@ Avatar generation is available in the Create Character and Edit Character screen
 </details>
 
 <details>
+<summary><b>Appearance & Themes</b></summary>
+
+PocketTavern's visual style is fully themeable. Go to **Settings → Appearance** to import or apply themes.
+
+### Importing a SillyTavern theme
+
+1. In SillyTavern, export a theme from its **User Settings → Themes** panel (saves as a `.json` file)
+2. Transfer the file to your Android device
+3. In PocketTavern → **Settings → Appearance**, tap **Import SillyTavern Theme (.json)**
+4. Pick the file — the theme is applied immediately
+
+Themes are stored in your app's private storage and persist between sessions.
+
+---
+
+### PocketTavern theme format
+
+You can author themes specifically for PocketTavern. The format is a simple JSON file with color values expressed as `rgba(r, g, b, a)` strings. You don't need any of the web/CSS fields that SillyTavern uses — only the fields below are read.
+
+#### Supported fields
+
+| Field | Maps to | Notes |
+|-------|---------|-------|
+| `underline_text_color` | Accent / primary color | Buttons, icons, highlights |
+| `main_text_color` | Primary text | Body text, message text |
+| `quote_text_color` | Secondary text | Subtitles, timestamps, hints |
+| `blur_tint_color` | Surface / card color | Chat bubbles, cards, dialogs — alpha is stripped, color is made opaque |
+| `shadow_color` | Background color | App background — alpha is stripped |
+| `border_color` | Border / divider color | Separators, card outlines — if alpha ≈ 0, a subtle tint is derived automatically |
+| `user_mes_blur_tint_color` | User chat bubble | If transparent, falls back to the accent color |
+| `bot_mes_blur_tint_color` | AI chat bubble | Falls back to `chat_tint_color`, then the default |
+| `chat_tint_color` | AI chat bubble (fallback) | Used when `bot_mes_blur_tint_color` is absent or transparent |
+| `avatar_style` | Avatar shape | `0` = circle (default), `1` = rounded square |
+
+> **Tip:** User bubble text color is computed automatically — black on light bubbles, white on dark ones.
+
+#### Ignored fields
+
+The following SillyTavern fields exist in `.json` exports but are not applicable to Android and are silently skipped on import:
+
+`italics_text_color`, `font_scale`, `blur_strength`, `chat_display`, `avatar_style` (only 0/1 is used), `noShadows`, `chat_width`, `hideChatAvatars`, `hotswap_enabled`, all `timestamp_*` toggles, `mesIDDisplay`, `messageTimer_enabled`, `scrollLock`, `custom_css`
+
+---
+
+### Example PocketTavern theme
+
+Save this as `midnight-plum.json` and import it via the Appearance screen:
+
+```json
+{
+  "name": "Midnight Plum",
+
+  "shadow_color":             "rgba(12, 10, 22, 1)",
+  "blur_tint_color":          "rgba(40, 32, 68, 0.95)",
+  "border_color":             "rgba(110, 85, 170, 0.55)",
+
+  "underline_text_color":     "rgba(190, 150, 255, 1)",
+  "main_text_color":          "rgba(230, 220, 245, 1)",
+  "quote_text_color":         "rgba(160, 140, 200, 1)",
+
+  "user_mes_blur_tint_color": "rgba(110, 75, 190, 0.85)",
+  "bot_mes_blur_tint_color":  "rgba(35, 28, 60, 0.85)",
+  "chat_tint_color":          "rgba(35, 28, 60, 0.8)",
+
+  "avatar_style": 0
+}
+```
+
+A second example with rounded-square avatars and a warm amber accent:
+
+```json
+{
+  "name": "Ember",
+
+  "shadow_color":             "rgba(14, 10, 8, 1)",
+  "blur_tint_color":          "rgba(38, 28, 20, 0.95)",
+  "border_color":             "rgba(180, 100, 30, 0.6)",
+
+  "underline_text_color":     "rgba(255, 165, 60, 1)",
+  "main_text_color":          "rgba(240, 228, 210, 1)",
+  "quote_text_color":         "rgba(185, 158, 120, 1)",
+
+  "user_mes_blur_tint_color": "rgba(180, 90, 20, 0.9)",
+  "bot_mes_blur_tint_color":  "rgba(32, 22, 14, 0.9)",
+  "chat_tint_color":          "rgba(32, 22, 14, 0.85)",
+
+  "avatar_style": 1
+}
+```
+
+</details>
+
+<details>
 <summary><b>SillyTavern Import (Migration)</b></summary>
 
 Already have characters and chats on a SillyTavern server? Migrate everything to PocketTavern in one step:

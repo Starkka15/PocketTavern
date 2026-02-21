@@ -36,6 +36,7 @@ import coil.compose.AsyncImage
 import com.pockettavern.app.domain.model.Persona
 import com.pockettavern.app.domain.model.PersonaPosition
 import com.pockettavern.app.domain.model.PersonaRole
+import com.pockettavern.app.ui.theme.LocalPocketTavernColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -250,6 +251,7 @@ private fun SelectedPersonaCard(
     serverUrl: String,
     onEdit: () -> Unit
 ) {
+    val avatarShape = LocalPocketTavernColors.current.avatarShape.toShape()
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -267,8 +269,8 @@ private fun SelectedPersonaCard(
                 contentDescription = "Avatar",
                 modifier = Modifier
                     .size(72.dp)
-                    .clip(CircleShape)
-                    .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                    .clip(avatarShape)
+                    .border(3.dp, MaterialTheme.colorScheme.primary, avatarShape),
                 contentScale = ContentScale.Crop
             )
 
@@ -317,6 +319,7 @@ private fun PersonaListItem(
     onEdit: () -> Unit,
     isSaving: Boolean
 ) {
+    val avatarShape = LocalPocketTavernColors.current.avatarShape.toShape()
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -340,10 +343,10 @@ private fun PersonaListItem(
                 contentDescription = "Avatar",
                 modifier = Modifier
                     .size(48.dp)
-                    .clip(CircleShape)
+                    .clip(avatarShape)
                     .then(
                         if (isSelected) {
-                            Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                            Modifier.border(2.dp, MaterialTheme.colorScheme.primary, avatarShape)
                         } else {
                             Modifier
                         }
@@ -583,6 +586,7 @@ private fun CreatePersonaDialog(
     isSaving: Boolean
 ) {
     val context = LocalContext.current
+    val avatarShape = LocalPocketTavernColors.current.avatarShape.toShape()
     var selectedTab by remember { mutableIntStateOf(0) }
 
     val imagePicker = rememberLauncherForActivityResult(
@@ -633,7 +637,7 @@ private fun CreatePersonaDialog(
                 Box(
                     modifier = Modifier
                         .size(120.dp)
-                        .clip(CircleShape)
+                        .clip(avatarShape)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .then(
                             if (selectedTab == 0 && !isGenerating) {
@@ -671,7 +675,7 @@ private fun CreatePersonaDialog(
                                     contentDescription = "Avatar",
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .clip(CircleShape),
+                                        .clip(avatarShape),
                                     contentScale = ContentScale.Crop
                                 )
                             }

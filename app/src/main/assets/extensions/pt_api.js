@@ -6,10 +6,23 @@
  *
  * Quick-start:
  *
+ *   // React to a message
  *   PT.eventSource.on(PT.events.MESSAGE_RECEIVED, function(data) {
- *       PT.log('Got message: ' + JSON.stringify(data));
+ *       // data = { text: "...", index: 5, isUser: false }
+ *       var mood = (data.text.match(/\[mood: (\w+)\]/) || [])[1];
+ *       if (mood) PT.setMessageHeader(data.index, '💭 Mood: ' + mood);
  *   });
  *
+ *   // Add quick reply buttons
+ *   PT.registerButtons('my-ext', [
+ *       { label: 'Continue', message: 'Please continue.' },
+ *       { label: 'Shorter',  message: 'Be more concise.' }
+ *   ]);
+ *
+ *   // Send a message programmatically
+ *   PT.sendMessage('Hello!');
+ *
+ *   // Inject a system prompt
  *   PT.setExtensionPrompt('my-ext', 'Always respond in rhyme.', PT.INJECTION_POSITION.AFTER_CHAR_DEFS);
  */
 (function () {
@@ -22,7 +35,11 @@
 
     /** Dispatch an event from Kotlin into all registered JS handlers. */
     window.__ptDispatchEvent = function (eventName, dataJson) {
-        var data = dataJson ? JSON.parse(dataJson) : null;
+        var data = (dataJson !== null && dataJson !== undefined) ? dataJson : null;
+        // dataJson may already be a parsed object (for structured events) or a string
+        if (typeof data === 'string') {
+            try { data = JSON.parse(data); } catch (e) { /* keep as string */ }
+        }
         var handlers = _listeners[eventName] ? _listeners[eventName].slice() : [];
         for (var i = 0; i < handlers.length; i++) {
             try {
@@ -143,6 +160,90 @@
          */
         log: function (message) {
             if (window.PtBridge) PtBridge.log(String(message));
+        },
+
+        // ── UI: Quick reply buttons ───────────────────────────────────────────
+
+        /**
+         * Register quick reply buttons above the chat input.
+         * Replaces any buttons previously registered under the same id.
+         *
+         * @param {string} extensionId  Unique id for this set of buttons.
+         * @param {Array}  buttons      Array of { label: string, message: string }
+         *
+         * @example
+         *   PT.registerButtons('my-ext', [
+         *       { label: 'Continue', message: 'Please continue.' },
+         *       { label: 'Shorter',  message: 'Keep it brief.' }
+         *   ]);
+         */
+        registerButtons: function (extensionId, buttons) {
+            if (window.PtBridge) {
+                PtBridge.registerButtons(extensionId, JSON.stringify(buttons || []));
+            }
+        },
+
+        /**
+         * Remove all quick reply buttons registered under extensionId.
+         * @param {string} extensionId
+         */
+        clearButtons: function (extensionId) {
+            if (window.PtBridge) {
+                PtBridge.clearButtons(extensionId);
+            }
+        },
+
+        /**
+         * Send a message as the user through the normal generation pipeline.
+         * @param {string} text  The message text to send.
+         */
+        sendMessage: function (text) {
+            if (window.PtBridge && text) {
+                PtBridge.sendMessage(String(text));
+            }
+        },
+
+        // ── UI: Message headers ───────────────────────────────────────────────
+
+        /**
+         * Set a header box that appears above the AI message at [messageIndex].
+         * The box content updates whenever you call this again with the same index.
+         * Pass empty string to remove the header.
+         *
+         * The message index is provided in MESSAGE_RECEIVED event data as data.index.
+         *
+         * @param {number} messageIndex  Index of the message to attach the header to.
+         * @param {string} text          Text to display in the header box.
+         *
+         * @example
+         *   PT.eventSource.on(PT.events.MESSAGE_RECEIVED, function(data) {
+         *       var thinking = data.text.match(/<thinking>([\s\S]*?)<\/thinking>/);
+         *       if (thinking) PT.setMessageHeader(data.index, '🤔 ' + thinking[1].trim());
+         *   });
+         */
+        setMessageHeader: function (messageIndex, text) {
+            if (window.PtBridge) {
+                PtBridge.setMessageHeader(messageIndex, text || '');
+            }
+        },
+
+        /**
+         * Remove the header box for a specific message.
+         * @param {number} messageIndex
+         */
+        clearMessageHeader: function (messageIndex) {
+            if (window.PtBridge) {
+                PtBridge.clearMessageHeader(messageIndex);
+            }
+        },
+
+        /**
+         * Remove all message headers (e.g. when CHAT_CHANGED fires).
+         */
+        clearAllHeaders: function () {
+            if (window.PtBridge) {
+                PtBridge.clearAllHeaders();
+            }
         }
     };
 
