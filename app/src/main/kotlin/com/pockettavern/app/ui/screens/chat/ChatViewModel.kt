@@ -480,7 +480,8 @@ class ChatViewModel @Inject constructor(
         val mainPromptItem = oaiPreset?.promptOrder?.find { it.id == "main_prompt" }
         val mainPromptOverride = if (config.usesChatCompletions && mainPromptItem?.enabled == true)
             mainPromptItem.content ?: "" else ""
-        val builder = PromptBuilder(character, chatContext, userName, mainPromptOverride)
+        val extensionInjections = extensionManager.getPromptInjections()
+        val builder = PromptBuilder(character, chatContext, userName, mainPromptOverride, extensionInjections)
         val prompt = builder.buildPrompt(history, userMessage)
 
         // For chat completion APIs, also build structured messages for proper role formatting.

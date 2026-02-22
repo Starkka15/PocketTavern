@@ -2,7 +2,9 @@ package com.pockettavern.app.extensions
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.pockettavern.app.data.local.JsExtensionStorage
@@ -71,6 +73,13 @@ class JsExtensionHost @Inject constructor(
                 allowUniversalAccessFromFileURLs = false
             }
             wv.addJavascriptInterface(PtJsBridge(), "PtBridge")
+            wv.webChromeClient = object : WebChromeClient() {
+                override fun onConsoleMessage(msg: ConsoleMessage): Boolean {
+                    val level = msg.messageLevel()?.name ?: "INFO"
+                    DebugLogger.log("[JsExt:$level] ${msg.message()} (line ${msg.lineNumber()})")
+                    return true
+                }
+            }
             wv.webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String) {
                     ready = true
@@ -157,12 +166,13 @@ class JsExtensionHost @Inject constructor(
         DebugLogger.log("[JsExtensionHost] " + "Loading ${extensions.size} JS extension(s)")
         extensions.forEach { ext ->
             try {
-                wv.evaluateJavascript(ext.scriptFile.readText()) { result ->
-                    if (result != null && result != "null")
-                        DebugLogger.log("[JsExtensionHost] " + "Loaded '${ext.name}': $result")
+                val script = ext.scriptFile.readText()
+                DebugLogger.log("[JsExtensionHost] Loading '${ext.name}' (${script.length} chars)")
+                wv.evaluateJavascript(script) { result ->
+                    DebugLogger.log("[JsExtensionHost] '${ext.name}' result: $result")
                 }
             } catch (e: Exception) {
-                DebugLogger.log("[JsExtensionHost] " + "Error loading '${ext.name}': ${e.message}")
+                DebugLogger.log("[JsExtensionHost] Error loading '${ext.name}': ${e.message}")
             }
         }
     }

@@ -19,7 +19,8 @@ class PromptBuilder(
     private val character: Character,
     private val chatContext: ChatContext,
     private val userName: String = "User",
-    private val mainPromptOverride: String = ""  // OAI preset's main_prompt, takes priority over sysprompt preset
+    private val mainPromptOverride: String = "",  // OAI preset's main_prompt, takes priority over sysprompt preset
+    private val extensionInjections: List<String> = emptyList()
 ) {
     private val instructTemplate = chatContext.instructTemplate
     // Combine global system prompt with character's custom system prompt.
@@ -175,6 +176,16 @@ class PromptBuilder(
             }
         }
 
+        // Extension prompt injections (after char defs, before chat history)
+        if (extensionInjections.isNotEmpty()) {
+            extensionInjections.forEach { injection ->
+                if (injection.isNotBlank()) {
+                    DebugLogger.log("  [extension] injecting ${injection.length} chars: ${injection.take(120).replace('\n', ' ')}")
+                    messages.add(PromptMessage("system", substituteMacros(injection)))
+                }
+            }
+        }
+
         // Chat history with depth-based injections — includes OAI preset depth-injection blocks
         val historyItem = promptOrder.find { it.id == "chat_history" }
         if (historyItem?.enabled != false) {
@@ -306,6 +317,16 @@ class PromptBuilder(
             sb.append("\n")
         }
 
+        // === EXTENSION PROMPT INJECTIONS ===
+        if (extensionInjections.isNotEmpty()) {
+            extensionInjections.forEach { injection ->
+                if (injection.isNotBlank()) {
+                    sb.append(wrapAsSystem(substituteMacros(injection), template))
+                }
+            }
+            DebugLogger.log("Injected ${extensionInjections.size} extension prompt(s)")
+        }
+
         // === MESSAGE EXAMPLES ===
         val examples = buildMessageExamples()
         if (examples.isNotBlank()) {
@@ -397,6 +418,15 @@ class PromptBuilder(
         if (storyString.isNotBlank()) {
             sb.append(storyString)
             sb.append("\n\n")
+        }
+
+        // Extension prompt injections
+        if (extensionInjections.isNotEmpty()) {
+            extensionInjections.forEach { injection ->
+                if (injection.isNotBlank()) {
+                    sb.append("[${substituteMacros(injection)}]\n")
+                }
+            }
         }
 
         // Message examples
