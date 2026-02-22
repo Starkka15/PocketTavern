@@ -1040,8 +1040,37 @@ class ChatViewModel @Inject constructor(
                 append(prompt)
             }
 
+            // For text completion backends (KoboldAI), wrap the prompt with the
+            // instruct template so the model knows it needs to generate a response.
+            // Without this, the model sees a completed document and immediately
+            // outputs EOS.  Chat completion backends handle this automatically.
+            val finalPrompt = if (!config.usesChatCompletions) {
+                val charFileName = character?.avatar ?: "${character?.name ?: "char"}.png"
+                val instructTemplate = when (val r = localRepository.loadChatContext(
+                    characterFileName = charFileName,
+                    chatFileName = _uiState.value.currentChatFileName
+                )) {
+                    is Result.Success -> r.data.instructTemplate
+                    is Result.Error -> null
+                }
+                if (instructTemplate != null) {
+                    buildString {
+                        // Wrap as: [input_sequence]prompt[input_suffix][output_sequence]
+                        append(instructTemplate.inputSequence)
+                        append(contextPrompt)
+                        append(instructTemplate.inputSuffix)
+                        append(instructTemplate.outputSequence)
+                    }
+                } else {
+                    // No instruct template — add a generic response marker
+                    contextPrompt + "\n\nResponse:\n"
+                }
+            } else {
+                contextPrompt
+            }
+
             var resultText = ""
-            llmRepository.generate(contextPrompt, config, preset).collect { event ->
+            llmRepository.generate(finalPrompt, config, preset).collect { event ->
                 when (event) {
                     is StreamEvent.Complete -> resultText = event.fullText
                     is StreamEvent.Error -> resultText = ""
