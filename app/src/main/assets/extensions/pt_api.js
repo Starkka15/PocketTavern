@@ -257,6 +257,26 @@
             }
         },
 
+        /**
+         * Get the persisted header entries for a specific message.
+         * Returns an array of { text, extensionId } objects, or an empty array.
+         *
+         * Useful for reading back header data set by any extension (including
+         * manual edits) without having to re-parse the raw message text.
+         *
+         * @param {number} messageIndex  Index of the message.
+         * @returns {Array<{text: string, extensionId: string}>}
+         *
+         * @example
+         *   var headers = PT.getMessageHeaders(3);
+         *   var myHeader = headers.find(function(h) { return h.extensionId === 'my-ext'; });
+         *   if (myHeader) console.log('Header text:', myHeader.text);
+         */
+        getMessageHeaders: function (messageIndex) {
+            if (!window.PtBridge) return [];
+            try { return JSON.parse(PtBridge.getMessageHeaders(messageIndex)); } catch (e) { return []; }
+        },
+
         // ── Header buttons & menus ───────────────────────────────────────────
 
         /**

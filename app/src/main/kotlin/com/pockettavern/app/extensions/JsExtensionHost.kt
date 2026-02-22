@@ -319,6 +319,25 @@ class JsExtensionHost @Inject constructor(
         }
 
         /**
+         * Called by PT.getMessageHeaders(messageIndex).
+         * Returns a JSON array of header entries for the given message:
+         * [{"text":"...","extensionId":"..."}]
+         * Returns "[]" if no headers exist for that index.
+         */
+        @JavascriptInterface
+        fun getMessageHeaders(messageIndex: Int): String {
+            val entries = _messageHeaders.value[messageIndex] ?: return "[]"
+            val arr = org.json.JSONArray()
+            entries.forEach { entry ->
+                val obj = org.json.JSONObject()
+                obj.put("text", entry.text)
+                obj.put("extensionId", entry.extensionId)
+                arr.put(obj)
+            }
+            return arr.toString()
+        }
+
+        /**
          * Called by PT.registerButtons(id, buttons).
          * [buttonsJson] is a JSON array: [{"label":"...", "message":"..."}]
          */
