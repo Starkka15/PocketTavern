@@ -15,13 +15,11 @@
 
 PocketTavern started as a companion app for SillyTavern — you needed a running SillyTavern server on your home PC, and the app just connected to it.
 
-**We removed that requirement entirely.**
+**We wanted more than that.**
 
-The original approach had real friction: setting up a Node.js server, configuring network access, keeping a PC running just to chat from your phone. It made the app harder to use than it needed to be, and we kept hearing the same question: *"Why can't it just work on its own?"*
+Going standalone gave us three things: **one app** instead of a phone client tethered to a desktop server, **full control** over the experience without fighting a web UI that wasn't designed for mobile, and the freedom to **build features** that would be difficult or impossible to bolt onto SillyTavern's frontend.
 
-So we built our own backend layer. PocketTavern now talks directly to LLM APIs — KoboldCPP, Ollama, OpenAI-compatible endpoints, Anthropic, and more — without a SillyTavern middleman. Characters, chats, and settings all live on your device in a fully SillyTavern-compatible format, so nothing is locked in.
-
-**The goal was simplicity: one app, no setup server, just chat.**
+PocketTavern now talks directly to LLM APIs — KoboldCPP, Ollama, OpenAI-compatible endpoints, Anthropic, and more — with no middleman. Characters, chats, and settings all live on your device in a fully SillyTavern-compatible format, so nothing is locked in.
 
 ---
 
