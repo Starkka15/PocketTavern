@@ -168,6 +168,11 @@ class JsExtensionHost @Inject constructor(
         _messageHeaders.value = emptyMap()
     }
 
+    /** Replace the entire message headers map (e.g. after index shifts from deleting a message). */
+    fun replaceMessageHeaders(headers: Map<Int, List<MessageHeaderEntry>>) {
+        _messageHeaders.value = headers
+    }
+
     /**
      * Restore persisted message headers when loading a chat from disk.
      *

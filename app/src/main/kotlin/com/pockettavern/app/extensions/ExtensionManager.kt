@@ -89,4 +89,9 @@ class ExtensionManager @Inject constructor(
     /** Restore persisted message headers when loading an existing chat. */
     fun restoreMessageHeaders(headers: Map<Int, List<MessageHeaderEntry>>) =
         jsHost.restoreMessageHeaders(headers)
+
+    /** Replace the entire message headers map (e.g. after deleting/shifting messages). */
+    fun replaceMessageHeaders(headers: Map<Int, List<MessageHeaderEntry>>) {
+        jsHost.replaceMessageHeaders(headers)
+    }
 }

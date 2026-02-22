@@ -149,7 +149,8 @@ class ChatViewModel @Inject constructor(
             extensionManager.messageHeaders.collect { headers ->
                 _uiState.update { it.copy(messageHeaders = headers) }
                 // Persist headers onto message objects and save so they survive chat reload
-                if (headers.isNotEmpty() && persistExtensionHeaders()) {
+                // Only persist if we actually have messages in the current chat
+                if (_uiState.value.messages.isNotEmpty() && persistExtensionHeaders()) {
                     saveCurrentChat()
                 }
             }
@@ -360,12 +361,15 @@ class ChatViewModel @Inject constructor(
                         restoredHeaders[index] = msg.extensionHeaders
                     }
                 }
+                // Clear stale state from previous chat before loading new one
+                extensionManager.clearMessageHeaders()
                 _uiState.update {
                     it.copy(
                         messages = messages,
                         currentChatFileName = fileName,
                         isLoading = false,
-                        messageHeaders = restoredHeaders
+                        messageHeaders = restoredHeaders,
+                        visibleHeaderButtons = emptySet()
                     )
                 }
                 pushExtensionContext()
@@ -414,10 +418,19 @@ class ChatViewModel @Inject constructor(
             val messages = if (!greeting.isNullOrBlank()) {
                 listOf(ChatMessage(content = greeting, isUser = false))
             } else emptyList()
+            // Clear stale headers from previous chat
+            extensionManager.clearMessageHeaders()
             _uiState.update {
-                it.copy(messages = messages, currentChatFileName = fileName, isLoading = false)
+                it.copy(
+                    messages = messages,
+                    currentChatFileName = fileName,
+                    isLoading = false,
+                    messageHeaders = emptyMap(),
+                    visibleHeaderButtons = emptySet()
+                )
             }
             pushExtensionContext()
+            extensionManager.emit(ExtensionEvent.CHAT_CHANGED, fileName)
             if (messages.isNotEmpty()) {
                 saveCurrentChat()
                 refreshChatsList()
@@ -672,8 +685,30 @@ class ChatViewModel @Inject constructor(
         val messages = _uiState.value.messages.toMutableList()
         if (index in messages.indices) {
             messages.removeAt(index)
+            // Shift headers: remove deleted index, shift higher indices down by 1
+            val oldHeaders = _uiState.value.messageHeaders
+            val newHeaders = mutableMapOf<Int, List<MessageHeaderEntry>>()
+            oldHeaders.forEach { (idx, entries) ->
+                when {
+                    idx < index -> newHeaders[idx] = entries
+                    idx > index -> newHeaders[idx - 1] = entries
+                    // idx == index: dropped (deleted message)
+                }
+            }
+            // Also shift visibleHeaderButtons
+            val newVisibleBtns = _uiState.value.visibleHeaderButtons
+                .filter { it.first != index }
+                .map { if (it.first > index) (it.first - 1) to it.second else it }
+                .toSet()
+            extensionManager.replaceMessageHeaders(newHeaders)
             _uiState.update {
-                it.copy(messages = messages, showMessageActions = false, selectedMessageIndex = null)
+                it.copy(
+                    messages = messages,
+                    showMessageActions = false,
+                    selectedMessageIndex = null,
+                    messageHeaders = newHeaders,
+                    visibleHeaderButtons = newVisibleBtns
+                )
             }
             viewModelScope.launch { saveCurrentChat() }
         }
@@ -890,18 +925,20 @@ class ChatViewModel @Inject constructor(
     /** Snapshot current extension headers onto the corresponding ChatMessage objects. Returns true if anything changed. */
     private fun persistExtensionHeaders(): Boolean {
         val headers = _uiState.value.messageHeaders
-        if (headers.isEmpty()) return false
         val messages = _uiState.value.messages.toMutableList()
         var changed = false
-        headers.forEach { (index, entries) ->
-            if (index in messages.indices) {
-                val msg = messages[index]
-                if (msg.extensionHeaders != entries) {
-                    messages[index] = msg.copy(extensionHeaders = entries)
-                    changed = true
-                }
+
+        // Apply current headers to messages, and clear headers from messages
+        // that no longer have entries (e.g. after clearing or shifting)
+        for (index in messages.indices) {
+            val msg = messages[index]
+            val entries = headers[index] ?: emptyList()
+            if (msg.extensionHeaders != entries) {
+                messages[index] = msg.copy(extensionHeaders = entries)
+                changed = true
             }
         }
+
         if (changed) {
             _uiState.update { it.copy(messages = messages) }
         }
