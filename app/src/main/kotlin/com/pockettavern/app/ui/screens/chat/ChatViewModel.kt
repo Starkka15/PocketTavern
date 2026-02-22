@@ -9,6 +9,7 @@ import android.provider.MediaStore
 import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.pockettavern.app.GenerationService
 import com.pockettavern.app.data.repository.BackgroundRepository
 import com.pockettavern.app.data.repository.ForgeRepository
 import com.pockettavern.app.data.repository.LocalRepository
@@ -195,6 +196,24 @@ class ChatViewModel @Inject constructor(
             extensionManager.quickReply.autoTriggerFlow.collect { button ->
                 if (_uiState.value.character != null && !_uiState.value.isGenerating) {
                     sendQuickReply(button)
+                }
+            }
+        }
+        // Start/stop foreground service to keep CPU alive during generation
+        viewModelScope.launch {
+            var serviceRunning = false
+            _uiState.collect { state ->
+                val imageGenActive = state.imageGenState is GenerationState.Starting ||
+                        state.imageGenState is GenerationState.InProgress
+                val needsService = state.isGenerating || imageGenActive
+
+                if (needsService && !serviceRunning) {
+                    val msg = if (imageGenActive) "Generating image..." else "Generating response..."
+                    GenerationService.start(context, msg)
+                    serviceRunning = true
+                } else if (!needsService && serviceRunning) {
+                    GenerationService.stop(context)
+                    serviceRunning = false
                 }
             }
         }
@@ -716,6 +735,38 @@ class ChatViewModel @Inject constructor(
             }
             viewModelScope.launch { saveCurrentChat() }
         }
+    }
+
+    fun deleteMessagesFromIndex(index: Int) {
+        val messages = _uiState.value.messages.toMutableList()
+        if (index !in messages.indices) return
+
+        // Remove this message and everything after it
+        val removed = messages.size - index
+        while (messages.size > index) {
+            messages.removeAt(messages.size - 1)
+        }
+
+        // Rebuild headers: keep only indices before the cutoff
+        val oldHeaders = _uiState.value.messageHeaders
+        val newHeaders = oldHeaders.filterKeys { it < index }
+        val newVisibleBtns = _uiState.value.visibleHeaderButtons
+            .filter { it.first < index }
+            .toSet()
+
+        extensionManager.replaceMessageHeaders(newHeaders)
+        _uiState.update {
+            it.copy(
+                messages = messages,
+                showMessageActions = false,
+                selectedMessageIndex = null,
+                messageHeaders = newHeaders,
+                visibleHeaderButtons = newVisibleBtns
+            )
+        }
+        viewModelScope.launch { saveCurrentChat() }
+        // Notify extensions
+        extensionManager.emit(ExtensionEvent.MESSAGE_DELETED, index)
     }
 
     fun regenerateResponse() {

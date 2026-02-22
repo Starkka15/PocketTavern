@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
@@ -527,6 +528,9 @@ fun ChatScreen(
                 onGenerateImage = {
                     viewModel.showImageGenerationDialog(messageIndex)
                 },
+                onDeleteFromHere = {
+                    viewModel.deleteMessagesFromIndex(messageIndex)
+                },
                 onDismiss = { viewModel.dismissMessageActions() }
             )
         }
@@ -1001,6 +1005,7 @@ private fun MessageActionsDialog(
     isLastAssistantMessage: Boolean,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onDeleteFromHere: () -> Unit,
     onRegenerate: () -> Unit,
     onGenerateImage: () -> Unit,
     onDismiss: () -> Unit
@@ -1040,6 +1045,22 @@ private fun MessageActionsDialog(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text("Delete Message", color = MaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+
+                // Delete from here - removes this message and all after it
+                TextButton(
+                    onClick = onDeleteFromHere,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Default.DeleteForever,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Delete From Here", color = MaterialTheme.colorScheme.error)
                     Spacer(modifier = Modifier.weight(1f))
                 }
 
