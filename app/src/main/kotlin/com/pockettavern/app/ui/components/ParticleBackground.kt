@@ -191,6 +191,12 @@ fun ParticleBackground(modifier: Modifier = Modifier) {
                         cap = StrokeCap.Round
                     )
                 }
+                ParticleShape.CLOUD -> {
+                    drawPath(
+                        path = cloudPath(center, p.size),
+                        color = p.color.copy(alpha = a)
+                    )
+                }
             }
         }
     }
@@ -262,6 +268,54 @@ private fun snowflakePath(center: Offset, radius: Float): Path {
             )
         }
     }
+    return path
+}
+
+/**
+ * Draws a cumulus-style cloud shape: a flat base with 3 bumpy lobes on top.
+ * Total width ≈ 3×radius, height ≈ 1.8×radius.
+ */
+private fun cloudPath(center: Offset, radius: Float): Path {
+    val path = Path()
+    val r = radius
+    // Base rectangle bottom-center at `center`
+    val baseY = center.y + r * 0.3f
+    val baseTop = center.y - r * 0.1f
+    val baseLeft = center.x - r * 1.5f
+    val baseRight = center.x + r * 1.5f
+
+    // Start at bottom-left, go across the flat base
+    path.moveTo(baseLeft, baseY)
+    path.lineTo(baseRight, baseY)
+
+    // Right lobe — arc up from right edge
+    path.arcTo(
+        rect = androidx.compose.ui.geometry.Rect(
+            center.x + r * 0.2f, baseTop - r * 0.6f,
+            center.x + r * 1.5f, baseY
+        ),
+        startAngleDegrees = 0f, sweepAngleDegrees = -180f, forceMoveTo = false
+    )
+
+    // Center lobe — tallest bump
+    path.arcTo(
+        rect = androidx.compose.ui.geometry.Rect(
+            center.x - r * 0.6f, baseTop - r * 1.0f,
+            center.x + r * 0.6f, baseTop + r * 0.2f
+        ),
+        startAngleDegrees = -20f, sweepAngleDegrees = -140f, forceMoveTo = false
+    )
+
+    // Left lobe — arc up from left side
+    path.arcTo(
+        rect = androidx.compose.ui.geometry.Rect(
+            center.x - r * 1.5f, baseTop - r * 0.5f,
+            center.x - r * 0.2f, baseY
+        ),
+        startAngleDegrees = -20f, sweepAngleDegrees = -160f, forceMoveTo = false
+    )
+
+    path.close()
     return path
 }
 

@@ -3,7 +3,7 @@ package com.pockettavern.app.ui.theme
 import androidx.compose.runtime.staticCompositionLocalOf
 
 enum class ParticleShape {
-    CIRCLE, SQUARE, DIAMOND, STAR, SNOWFLAKE, RAINDROP
+    CIRCLE, SQUARE, DIAMOND, STAR, SNOWFLAKE, RAINDROP, CLOUD
 }
 
 enum class ParticleDirection {

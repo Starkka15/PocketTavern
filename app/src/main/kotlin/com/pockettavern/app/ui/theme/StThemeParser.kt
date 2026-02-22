@@ -198,6 +198,7 @@ object StThemeParser {
         "star"      -> ParticleShape.STAR
         "snowflake" -> ParticleShape.SNOWFLAKE
         "raindrop"  -> ParticleShape.RAINDROP
+        "cloud"     -> ParticleShape.CLOUD
         else        -> null
     }
 
