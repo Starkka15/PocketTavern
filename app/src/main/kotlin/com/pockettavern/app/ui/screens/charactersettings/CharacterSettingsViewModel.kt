@@ -3,10 +3,13 @@ package com.pockettavern.app.ui.screens.charactersettings
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.pockettavern.app.data.local.TtsVoiceStorage
 import com.pockettavern.app.data.repository.LocalRepository
 import com.pockettavern.app.domain.model.Character
 import com.pockettavern.app.domain.model.Result
 import com.pockettavern.app.domain.model.WorldInfoListItem
+import com.pockettavern.app.ui.audio.TtsManager
+import com.pockettavern.app.ui.audio.TtsVoice
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +34,10 @@ data class CharacterSettingsUiState(
     val isFavorite: Boolean = false,
     // Available world info files
     val availableWorldInfo: List<WorldInfoListItem> = emptyList(),
+    // TTS voice
+    val ttsVoiceId: String? = null,
+    val ttsProviderOverride: String? = null,
+    val availableVoices: List<TtsVoice> = emptyList(),
     // Messages
     val error: String? = null,
     val saveSuccess: Boolean = false
@@ -39,6 +46,8 @@ data class CharacterSettingsUiState(
 @HiltViewModel
 class CharacterSettingsViewModel @Inject constructor(
     private val localRepository: LocalRepository,
+    private val ttsVoiceStorage: TtsVoiceStorage,
+    private val ttsManager: TtsManager,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -50,6 +59,7 @@ class CharacterSettingsViewModel @Inject constructor(
     init {
         loadCharacter()
         loadAvailableWorldInfo()
+        loadTtsVoice()
     }
 
     private fun loadCharacter() {
@@ -171,5 +181,48 @@ class CharacterSettingsViewModel @Inject constructor(
 
     fun clearSaveSuccess() {
         _uiState.update { it.copy(saveSuccess = false) }
+    }
+
+    // ── TTS Voice ──────────────────────────────────────────────────────────
+
+    private fun loadTtsVoice() {
+        if (fileName.isBlank()) return
+        val voiceId = ttsVoiceStorage.getVoiceId(fileName)
+        val providerOverride = ttsVoiceStorage.getProviderOverride(fileName)
+        _uiState.update { it.copy(ttsVoiceId = voiceId, ttsProviderOverride = providerOverride) }
+        // Load available voices
+        viewModelScope.launch {
+            val voices = ttsManager.getVoices()
+            _uiState.update { it.copy(availableVoices = voices) }
+        }
+    }
+
+    fun updateTtsVoice(voiceId: String?) {
+        _uiState.update { it.copy(ttsVoiceId = voiceId) }
+        if (voiceId != null) {
+            ttsVoiceStorage.setVoiceId(fileName, voiceId)
+        } else {
+            ttsVoiceStorage.clearVoice(fileName)
+        }
+    }
+
+    fun updateTtsProviderOverride(provider: String?) {
+        _uiState.update { it.copy(ttsProviderOverride = provider) }
+        ttsVoiceStorage.setProviderOverride(fileName, provider)
+        // Reload voices for the new provider
+        viewModelScope.launch {
+            val voices = if (provider != null) {
+                ttsManager.getVoicesForProvider(provider)
+            } else {
+                ttsManager.getVoices()
+            }
+            _uiState.update { it.copy(availableVoices = voices) }
+        }
+    }
+
+    fun testTtsVoice() {
+        viewModelScope.launch {
+            ttsManager.speak("Hello, this is a voice test for this character.", fileName)
+        }
     }
 }

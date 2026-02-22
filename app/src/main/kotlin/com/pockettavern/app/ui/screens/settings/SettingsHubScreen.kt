@@ -9,6 +9,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.StickyNote2
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -50,6 +51,7 @@ fun SettingsHubScreen(
     onNavigateToExtensions: () -> Unit = {},
     onNavigateToConnectionProfiles: () -> Unit = {},
     onNavigateToTheme: () -> Unit = {},
+    onNavigateToTtsSettings: () -> Unit = {},
     viewModel: SettingsHubViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -62,7 +64,7 @@ fun SettingsHubScreen(
         viewModel.refresh()
     }
 
-    val settingsItems = remember(isConnected, currentPersonaName, usesChatCompletions, onNavigateToOaiPresets, onNavigateToExtensions, onNavigateToConnectionProfiles, onNavigateToTheme) {
+    val settingsItems = remember(isConnected, currentPersonaName, usesChatCompletions, onNavigateToOaiPresets, onNavigateToExtensions, onNavigateToConnectionProfiles, onNavigateToTheme, onNavigateToTtsSettings) {
         listOf(
             SettingsItem(
                 title = "Stable Diffusion Forge",
@@ -152,6 +154,13 @@ fun SettingsHubScreen(
                 subtitle = "Import and apply SillyTavern themes",
                 icon = Icons.Default.Palette,
                 onClick = onNavigateToTheme,
+                requiresConnection = false
+            ),
+            SettingsItem(
+                title = "Text-to-Speech",
+                subtitle = "Voice synthesis for chat messages",
+                icon = Icons.Default.RecordVoiceOver,
+                onClick = onNavigateToTtsSettings,
                 requiresConnection = false
             )
         )

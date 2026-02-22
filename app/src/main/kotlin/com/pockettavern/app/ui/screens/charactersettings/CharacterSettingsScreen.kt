@@ -8,6 +8,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -138,6 +140,16 @@ fun CharacterSettingsScreen(
                 TalkativenessSection(
                     talkativeness = uiState.talkativeness,
                     onTalkativenessChange = viewModel::updateTalkativeness
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+
+                // TTS Voice
+                TtsVoiceSection(
+                    voiceId = uiState.ttsVoiceId,
+                    availableVoices = uiState.availableVoices,
+                    onVoiceChange = viewModel::updateTtsVoice,
+                    onTestVoice = viewModel::testTtsVoice
                 )
 
                 Spacer(modifier = Modifier.height(32.dp))
@@ -480,5 +492,100 @@ private fun TalkativenessSection(
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.align(Alignment.CenterHorizontally)
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TtsVoiceSection(
+    voiceId: String?,
+    availableVoices: List<com.pockettavern.app.ui.audio.TtsVoice>,
+    onVoiceChange: (String?) -> Unit,
+    onTestVoice: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "TTS Voice",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        Text(
+            text = "Assign a specific voice to this character. Leave as 'Default' to use the global TTS voice.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = it }
+        ) {
+            OutlinedTextField(
+                value = voiceId ?: "Default (global)",
+                onValueChange = { },
+                readOnly = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                label = { Text("Voice") },
+                leadingIcon = { Icon(Icons.Default.RecordVoiceOver, contentDescription = null) },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            )
+
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Default (global)") },
+                    onClick = {
+                        onVoiceChange(null)
+                        expanded = false
+                    }
+                )
+                availableVoices.forEach { voice ->
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(voice.name)
+                                if (voice.language.isNotBlank()) {
+                                    Text(
+                                        voice.language,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        },
+                        onClick = {
+                            onVoiceChange(voice.id)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+
+        // Test button
+        OutlinedButton(
+            onClick = onTestVoice,
+            modifier = Modifier.align(Alignment.End)
+        ) {
+            Icon(
+                Icons.Default.PlayArrow,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("Test Voice")
+        }
     }
 }

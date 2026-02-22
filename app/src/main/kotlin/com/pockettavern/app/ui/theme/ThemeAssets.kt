@@ -14,7 +14,9 @@ data class ThemeAssets(
     val backgroundScaleMode: BackgroundScaleMode = BackgroundScaleMode.FILL,
     val backgroundOpacity: Float = 0.3f,
     val logoImagePath: String? = null,
-    val logoTint: Color? = null
+    val logoTint: Color? = null,
+    val audioPath: String? = null,
+    val audioLoop: Boolean = true
 ) {
     companion object {
         val Default = ThemeAssets()

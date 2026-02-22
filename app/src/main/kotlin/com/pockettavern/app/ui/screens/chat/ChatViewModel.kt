@@ -29,7 +29,9 @@ import com.pockettavern.app.domain.model.GenerationState
 import com.pockettavern.app.domain.model.QuickReplyButton
 import com.pockettavern.app.domain.model.Result
 import com.pockettavern.app.domain.model.StreamEvent
+import com.pockettavern.app.data.local.SettingsDataStore
 import com.pockettavern.app.domain.prompt.PromptBuilder
+import com.pockettavern.app.ui.audio.TtsManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -103,7 +105,10 @@ data class ChatUiState(
     // True while the LLM is generating an image prompt
     val isGeneratingImagePrompt: Boolean = false,
     // Base64-encoded character avatar for img2img (loaded when Character mode selected)
-    val characterAvatarBase64: String? = null
+    val characterAvatarBase64: String? = null,
+    // TTS
+    val isTtsSpeaking: Boolean = false,
+    val isTtsEnabled: Boolean = false
 )
 
 enum class ImageGenType {
@@ -118,7 +123,9 @@ class ChatViewModel @Inject constructor(
     private val llmRepository: LlmRepository,
     private val forgeRepository: ForgeRepository,
     private val backgroundRepository: BackgroundRepository,
-    private val extensionManager: ExtensionManager
+    private val extensionManager: ExtensionManager,
+    private val ttsManager: TtsManager,
+    private val settingsDataStore: SettingsDataStore
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -130,6 +137,9 @@ class ChatViewModel @Inject constructor(
     private var autoContinueEnabled = false
     private var autoContinueMinLength = 200
     private var autoContinueCount = 0
+
+    // TTS auto-play state
+    private var ttsAutoPlay = false
 
     init {
         extensionManager.load()
@@ -227,6 +237,19 @@ class ChatViewModel @Inject constructor(
                         currentModelName = config.currentModel
                     )
                 }
+            }
+        }
+        // Observe TTS speaking state
+        viewModelScope.launch {
+            ttsManager.speakingState.collect { speaking ->
+                _uiState.update { it.copy(isTtsSpeaking = speaking) }
+            }
+        }
+        // Load TTS enabled state
+        viewModelScope.launch {
+            settingsDataStore.ttsConfigFlow.collect { config ->
+                _uiState.update { it.copy(isTtsEnabled = config.enabled) }
+                ttsAutoPlay = config.enabled && config.autoPlay
             }
         }
     }
@@ -582,6 +605,13 @@ class ChatViewModel @Inject constructor(
                         extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
                         generationJob = null
                         saveCurrentChat()
+                        // Auto-play TTS for new AI message
+                        if (ttsAutoPlay) {
+                            val ttsText = extensionManager.applyOutputFilters(processed)
+                            val charFile = _uiState.value.character?.avatar
+                                ?: "${_uiState.value.character?.name ?: "unknown"}.png"
+                            viewModelScope.launch { ttsManager.speak(ttsText, charFile) }
+                        }
                         // Auto-continue: if response is shorter than min length, request more
                         val estimatedTokens = extensionManager.tokenCounter.estimateTokens(processed)
                         if (autoContinueEnabled && autoContinueCount < 3 && estimatedTokens < autoContinueMinLength) {
@@ -702,6 +732,19 @@ class ChatViewModel @Inject constructor(
 
     fun dismissMessageActions() {
         _uiState.update { it.copy(selectedMessageIndex = null, showMessageActions = false) }
+    }
+
+    // ── TTS ──────────────────────────────────────────────────────────────────
+
+    fun speakMessage(index: Int) {
+        val message = _uiState.value.messages.getOrNull(index) ?: return
+        val charFile = _uiState.value.character?.avatar
+            ?: "${_uiState.value.character?.name ?: "unknown"}.png"
+        viewModelScope.launch { ttsManager.speak(message.content, charFile) }
+    }
+
+    fun stopTts() {
+        ttsManager.stop()
     }
 
     fun deleteMessage(index: Int) {

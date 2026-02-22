@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
@@ -531,6 +532,16 @@ fun ChatScreen(
                 onDeleteFromHere = {
                     viewModel.deleteMessagesFromIndex(messageIndex)
                 },
+                onSpeakTts = {
+                    viewModel.speakMessage(messageIndex)
+                    viewModel.dismissMessageActions()
+                },
+                onStopTts = {
+                    viewModel.stopTts()
+                    viewModel.dismissMessageActions()
+                },
+                isTtsEnabled = uiState.isTtsEnabled,
+                isTtsSpeaking = uiState.isTtsSpeaking,
                 onDismiss = { viewModel.dismissMessageActions() }
             )
         }
@@ -1008,6 +1019,10 @@ private fun MessageActionsDialog(
     onDeleteFromHere: () -> Unit,
     onRegenerate: () -> Unit,
     onGenerateImage: () -> Unit,
+    onSpeakTts: () -> Unit = {},
+    onStopTts: () -> Unit = {},
+    isTtsEnabled: Boolean = false,
+    isTtsSpeaking: Boolean = false,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -1096,6 +1111,40 @@ private fun MessageActionsDialog(
                         Spacer(modifier = Modifier.width(12.dp))
                         Text("Generate Image")
                         Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+
+                // TTS - play/stop for any message when TTS is enabled
+                if (isTtsEnabled) {
+                    if (isTtsSpeaking) {
+                        TextButton(
+                            onClick = onStopTts,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                Icons.Default.Stop,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Stop TTS", color = MaterialTheme.colorScheme.error)
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    } else {
+                        TextButton(
+                            onClick = onSpeakTts,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                Icons.Default.RecordVoiceOver,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Play TTS")
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
                     }
                 }
             }

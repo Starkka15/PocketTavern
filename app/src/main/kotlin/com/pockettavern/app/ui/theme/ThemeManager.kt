@@ -17,7 +17,8 @@ data class ThemeEntry(
     val name: String,
     val isDefault: Boolean,
     val effectName: String = "None",
-    val hasBackground: Boolean = false
+    val hasBackground: Boolean = false,
+    val hasAudio: Boolean = false
 )
 
 @Singleton
@@ -74,7 +75,9 @@ class ThemeManager @Inject constructor(
                 } catch (_: Exception) { "None" }
                 val hasBackground = listOf("background.gif", "background.png", "background.jpg", "background.webp")
                     .any { File(dir, it).exists() }
-                list += ThemeEntry(dir.name, name, isDefault = false, effectName = effectName, hasBackground = hasBackground)
+                val hasAudio = listOf("music.mp3", "music.ogg", "music.wav")
+                    .any { File(dir, it).exists() }
+                list += ThemeEntry(dir.name, name, isDefault = false, effectName = effectName, hasBackground = hasBackground, hasAudio = hasAudio)
             }
         return list
     }
@@ -205,23 +208,27 @@ class ThemeManager @Inject constructor(
         } catch (_: Exception) { null }
     }
 
-    /** Returns a File pointing to the bundled theme's asset cache directory (copies images on first access). */
+    /** Returns a File pointing to the bundled theme's asset cache directory (copies assets on first access). */
     private fun bundledAssetDir(id: String): File? {
         val cacheDir = File(context.cacheDir, "bundled_themes/$id")
         if (cacheDir.exists()) return cacheDir
-        // Check if asset directory has images by trying to open known files
-        val imageNames = listOf("background.gif", "background.png", "background.jpg", "background.webp", "logo.gif", "logo.png")
-        var hasImages = false
-        for (img in imageNames) {
+        // Check if asset directory has files by trying to open known filenames
+        val assetNames = listOf(
+            "background.gif", "background.png", "background.jpg", "background.webp",
+            "logo.gif", "logo.png",
+            "music.mp3", "music.ogg", "music.wav"
+        )
+        var hasAssets = false
+        for (name in assetNames) {
             try {
-                context.assets.open("themes/$id/$img").use { src ->
+                context.assets.open("themes/$id/$name").use { src ->
                     cacheDir.mkdirs()
-                    File(cacheDir, img).outputStream().use { dst -> src.copyTo(dst) }
-                    hasImages = true
+                    File(cacheDir, name).outputStream().use { dst -> src.copyTo(dst) }
+                    hasAssets = true
                 }
             } catch (_: Exception) { /* file doesn't exist in assets */ }
         }
-        return if (hasImages) cacheDir else null
+        return if (hasAssets) cacheDir else null
     }
 
     private fun loadFromDisk(id: String) {

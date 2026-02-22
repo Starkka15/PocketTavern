@@ -184,12 +184,24 @@ object StThemeParser {
 
             val logoTint = if (logoPath != null) null else parseRgba(fields["logo_tint"])
 
+            // Audio
+            val hasAudio = root["theme_audio"]?.jsonPrimitive?.booleanOrNull == true
+            val audioPath = if (hasAudio && themeDir != null) {
+                listOf("music.mp3", "music.ogg", "music.wav")
+                    .map { File(themeDir, it) }
+                    .firstOrNull { it.exists() }
+                    ?.absolutePath
+            } else null
+            val audioLoop = root["theme_audio_loop"]?.jsonPrimitive?.booleanOrNull ?: true
+
             ThemeAssets(
                 backgroundImagePath = backgroundPath,
                 backgroundScaleMode = scaleMode,
                 backgroundOpacity = bgOpacity.coerceIn(0f, 1f),
                 logoImagePath = logoPath,
-                logoTint = logoTint
+                logoTint = logoTint,
+                audioPath = audioPath,
+                audioLoop = audioLoop
             )
         } catch (e: Exception) {
             DebugLogger.log("[StThemeParser] Failed to parse theme assets: ${e.message}")

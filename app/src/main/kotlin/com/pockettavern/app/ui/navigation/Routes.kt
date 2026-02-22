@@ -90,4 +90,7 @@ sealed class Route {
 
     @Serializable
     data object ThemeSettings : Route()
+
+    @Serializable
+    data object TtsSettings : Route()
 }

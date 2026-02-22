@@ -31,11 +31,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Image
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.pockettavern.app.R
 import java.io.File
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.pockettavern.app.ui.audio.ThemeAudioManager
 import com.pockettavern.app.ui.components.ConnectionStatusBar
 import com.pockettavern.app.ui.components.ParticleBackground
 import com.pockettavern.app.ui.theme.BackgroundScaleMode
@@ -50,11 +54,40 @@ fun MainScreen(
     onNavigateToCharaVault: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToProfile: () -> Unit,
+    themeAudioManager: ThemeAudioManager? = null,
     viewModel: MainViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val assets = LocalThemeAssets.current
+
+    // Theme audio: start/stop based on audioPath
+    LaunchedEffect(assets.audioPath) {
+        if (assets.audioPath != null && themeAudioManager != null) {
+            themeAudioManager.play(assets.audioPath, assets.audioLoop)
+        } else {
+            themeAudioManager?.stop()
+        }
+    }
+
+    // Pause/resume on lifecycle events
+    if (themeAudioManager != null && assets.audioPath != null) {
+        val lifecycleOwner = LocalLifecycleOwner.current
+        DisposableEffect(lifecycleOwner) {
+            val observer = LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_PAUSE -> themeAudioManager.pause()
+                    Lifecycle.Event.ON_RESUME -> themeAudioManager.resume()
+                    else -> {}
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+                themeAudioManager.pause()
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
     // Theme background image (behind particles)

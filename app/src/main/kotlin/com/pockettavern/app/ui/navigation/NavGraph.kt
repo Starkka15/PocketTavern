@@ -36,10 +36,13 @@ import com.pockettavern.app.ui.screens.extensions.regex.RegexSettingsScreen
 import com.pockettavern.app.ui.screens.connectionprofiles.ConnectionProfilesScreen
 import com.pockettavern.app.ui.screens.debug.DebugLogScreen
 import com.pockettavern.app.ui.screens.theme.ThemeScreen
+import com.pockettavern.app.ui.screens.settings.TtsSettingsScreen
+import com.pockettavern.app.ui.audio.ThemeAudioManager
 
 @Composable
 fun SillyTavernNavGraph(
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    themeAudioManager: ThemeAudioManager? = null
 ) {
     // Track when character list needs refresh (after add/import/edit)
     var shouldRefreshCharacters by rememberSaveable { mutableStateOf(false) }
@@ -67,7 +70,8 @@ fun SillyTavernNavGraph(
                 },
                 onNavigateToProfile = {
                     navController.navigate(Route.Profile)
-                }
+                },
+                themeAudioManager = themeAudioManager
             )
         }
 
@@ -118,7 +122,8 @@ fun SillyTavernNavGraph(
                 onNavigateToOaiPresets = { navController.navigate(Route.OaiPresetSettings) },
                 onNavigateToExtensions = { navController.navigate(Route.Extensions) },
                 onNavigateToConnectionProfiles = { navController.navigate(Route.ConnectionProfiles) },
-                onNavigateToTheme = { navController.navigate(Route.ThemeSettings) }
+                onNavigateToTheme = { navController.navigate(Route.ThemeSettings) },
+                onNavigateToTtsSettings = { navController.navigate(Route.TtsSettings) }
             )
         }
 
@@ -277,6 +282,10 @@ fun SillyTavernNavGraph(
 
         composable<Route.ThemeSettings> {
             ThemeScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable<Route.TtsSettings> {
+            TtsSettingsScreen(onBack = { navController.popBackStack() })
         }
 
         composable<Route.GroupChat> { backStackEntry ->

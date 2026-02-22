@@ -8,7 +8,9 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.preferences.core.floatPreferencesKey
 import com.pockettavern.app.domain.model.ApiConfiguration
+import com.pockettavern.app.domain.model.TtsConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -64,6 +66,17 @@ class SettingsDataStore @Inject constructor(
         val USER_PERSONA_DESC = stringPreferencesKey("user_persona_desc")
         val USER_PERSONA_POSITION = intPreferencesKey("user_persona_position")
         val USER_PERSONA_DEPTH = intPreferencesKey("user_persona_depth")
+
+        // TTS
+        val TTS_ENABLED = booleanPreferencesKey("tts_enabled")
+        val TTS_PROVIDER = stringPreferencesKey("tts_provider")
+        val TTS_AUTO_PLAY = booleanPreferencesKey("tts_auto_play")
+        val TTS_OPENAI_URL = stringPreferencesKey("tts_openai_url")
+        val TTS_OPENAI_KEY = stringPreferencesKey("tts_openai_key")
+        val TTS_OPENAI_VOICE = stringPreferencesKey("tts_openai_voice")
+        val TTS_OPENAI_MODEL = stringPreferencesKey("tts_openai_model")
+        val TTS_SPEED = floatPreferencesKey("tts_speed")
+        val TTS_FILTER_MODE = stringPreferencesKey("tts_filter_mode")
 
         // Global Author's Note (applies to all chats unless overridden per-chat)
         val GLOBAL_AUTHORS_NOTE_CONTENT = stringPreferencesKey("global_authors_note_content")
@@ -305,6 +318,38 @@ class SettingsDataStore @Inject constructor(
             prefs[Keys.GLOBAL_AUTHORS_NOTE_INTERVAL] = interval
             prefs[Keys.GLOBAL_AUTHORS_NOTE_POSITION] = position
             prefs[Keys.GLOBAL_AUTHORS_NOTE_ROLE] = role
+        }
+    }
+
+    // ── TTS ─────────────────────────────────────────────────────────────────
+
+    val ttsConfigFlow: Flow<TtsConfig> = context.dataStore.data.map { prefs ->
+        TtsConfig(
+            enabled = prefs[Keys.TTS_ENABLED] ?: false,
+            provider = prefs[Keys.TTS_PROVIDER] ?: "system",
+            autoPlay = prefs[Keys.TTS_AUTO_PLAY] ?: true,
+            openAiUrl = prefs[Keys.TTS_OPENAI_URL] ?: "",
+            openAiKey = prefs[Keys.TTS_OPENAI_KEY] ?: "",
+            openAiVoice = prefs[Keys.TTS_OPENAI_VOICE] ?: "alloy",
+            openAiModel = prefs[Keys.TTS_OPENAI_MODEL] ?: "tts-1",
+            speed = prefs[Keys.TTS_SPEED] ?: 1.0f,
+            filterMode = prefs[Keys.TTS_FILTER_MODE] ?: "all"
+        )
+    }
+
+    suspend fun getTtsConfig(): TtsConfig = ttsConfigFlow.first()
+
+    suspend fun saveTtsConfig(config: TtsConfig) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.TTS_ENABLED] = config.enabled
+            prefs[Keys.TTS_PROVIDER] = config.provider
+            prefs[Keys.TTS_AUTO_PLAY] = config.autoPlay
+            prefs[Keys.TTS_OPENAI_URL] = config.openAiUrl
+            prefs[Keys.TTS_OPENAI_KEY] = config.openAiKey
+            prefs[Keys.TTS_OPENAI_VOICE] = config.openAiVoice
+            prefs[Keys.TTS_OPENAI_MODEL] = config.openAiModel
+            prefs[Keys.TTS_SPEED] = config.speed
+            prefs[Keys.TTS_FILTER_MODE] = config.filterMode
         }
     }
 
