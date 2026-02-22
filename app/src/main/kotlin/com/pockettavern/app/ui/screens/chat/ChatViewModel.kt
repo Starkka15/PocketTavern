@@ -193,6 +193,57 @@ class ChatViewModel @Inject constructor(
     // Last known persona name — updated when generation starts, used for multi-turn trimming
     @Volatile private var _currentUserName: String = "User"
 
+    /**
+     * Rebuild the context JSON that JS extensions see via PT.getContext().
+     * Includes the current character, recent messages (with index, text, isUser),
+     * persona name, and API type.  Called whenever messages or character change.
+     */
+    private fun pushExtensionContext() {
+        val state = _uiState.value
+        val character = state.character
+        val messages = state.messages
+
+        val sb = StringBuilder()
+        sb.append("{")
+        // character
+        if (character != null) {
+            sb.append("\"character\":{")
+            sb.append("\"name\":").append(jsonString(character.name)).append(",")
+            sb.append("\"description\":").append(jsonString(character.description)).append(",")
+            sb.append("\"personality\":").append(jsonString(character.personality)).append(",")
+            sb.append("\"scenario\":").append(jsonString(character.scenario))
+            sb.append("},")
+        }
+        // recentMessages — include raw text (before output filter) so extensions can parse tags
+        sb.append("\"recentMessages\":[")
+        for (i in messages.indices) {
+            if (i > 0) sb.append(",")
+            val msg = messages[i]
+            val text = msg.rawContent ?: msg.content
+            sb.append("{\"index\":").append(i)
+            sb.append(",\"text\":").append(jsonString(text))
+            sb.append(",\"isUser\":").append(msg.isUser)
+            sb.append("}")
+        }
+        sb.append("],")
+        sb.append("\"personaName\":").append(jsonString(_currentUserName)).append(",")
+        sb.append("\"apiType\":").append(jsonString(_currentConfig.displayName))
+        sb.append("}")
+
+        extensionManager.updateContext(sb.toString())
+    }
+
+    /** JSON-escape a string value (with surrounding quotes). */
+    private fun jsonString(value: String): String {
+        val escaped = value
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
+        return "\"$escaped\""
+    }
+
     // The PNG filename of the current character (e.g. "seraphina.png")
     private var currentAvatarUrl: String = ""
 
@@ -298,6 +349,7 @@ class ChatViewModel @Inject constructor(
                         messageHeaders = restoredHeaders
                     )
                 }
+                pushExtensionContext()
                 extensionManager.emit(ExtensionEvent.CHAT_CHANGED, fileName)
                 extensionManager.restoreMessageHeaders(restoredHeaders)
             }
@@ -346,6 +398,7 @@ class ChatViewModel @Inject constructor(
             _uiState.update {
                 it.copy(messages = messages, currentChatFileName = fileName, isLoading = false)
             }
+            pushExtensionContext()
             if (messages.isNotEmpty()) {
                 saveCurrentChat()
                 refreshChatsList()
@@ -416,6 +469,7 @@ class ChatViewModel @Inject constructor(
                 streamingContent = ""
             )
         }
+        pushExtensionContext()
         extensionManager.emit(ExtensionEvent.MESSAGE_SENT, message)
 
         if (_uiState.value.currentChatFileName == null) {
@@ -446,7 +500,8 @@ class ChatViewModel @Inject constructor(
                                 streamingContent = ""
                             )
                         }
-                        // Step 3: emit MESSAGE_RECEIVED with raw text so extensions can parse tags
+                        // Step 3: update extension context, then emit MESSAGE_RECEIVED
+                        pushExtensionContext()
                         val msgIndex = _uiState.value.messages.lastIndex
                         val safeText = processed
                             .replace("\\", "\\\\")
@@ -466,7 +521,8 @@ class ChatViewModel @Inject constructor(
                             )
                             _uiState.update { it.copy(messages = messages) }
                         }
-                        // Step 5: persist extension headers on this message
+                        // Step 5: refresh context (rawContent now set), persist headers
+                        pushExtensionContext()
                         persistExtensionHeaders()
                         extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
                         generationJob = null
@@ -853,8 +909,31 @@ class ChatViewModel @Inject constructor(
                 is Result.Error -> ApiConfiguration.DEFAULT
             }
             val preset = localRepository.getCurrentTextGenPreset()
+
+            // Build a context-aware prompt: include recent chat history so the LLM
+            // has scene context even though this is a standalone generation.
+            val messages = _uiState.value.messages
+            val character = _uiState.value.character
+            val contextPrompt = buildString {
+                if (character != null) {
+                    append("Character: ").append(character.name).append("\n")
+                }
+                // Include last few messages for context (max 6 to stay concise)
+                val recent = if (messages.size > 6) messages.takeLast(6) else messages
+                if (recent.isNotEmpty()) {
+                    append("Recent conversation:\n")
+                    for (msg in recent) {
+                        val role = if (msg.isUser) _currentUserName else (character?.name ?: "Assistant")
+                        val text = msg.rawContent ?: msg.content
+                        append(role).append(": ").append(text.take(500)).append("\n")
+                    }
+                    append("\n")
+                }
+                append(prompt)
+            }
+
             var resultText = ""
-            llmRepository.generate(prompt, config, preset).collect { event ->
+            llmRepository.generate(contextPrompt, config, preset).collect { event ->
                 when (event) {
                     is StreamEvent.Complete -> resultText = event.fullText
                     is StreamEvent.Error -> resultText = ""
@@ -969,6 +1048,7 @@ class ChatViewModel @Inject constructor(
             _uiState.update {
                 it.copy(messages = messages, editingMessageIndex = null, editingMessageText = "")
             }
+            pushExtensionContext()
             viewModelScope.launch { saveCurrentChat() }
         }
     }
@@ -1021,7 +1101,8 @@ class ChatViewModel @Inject constructor(
                             )
                             _uiState.update { it.copy(messages = msgs) }
                         }
-                        // Persist extension headers on this message
+                        // Refresh context and persist extension headers
+                        pushExtensionContext()
                         persistExtensionHeaders()
                         extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
                         generationJob = null
