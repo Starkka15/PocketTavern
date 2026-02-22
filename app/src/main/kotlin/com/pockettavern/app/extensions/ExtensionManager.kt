@@ -44,6 +44,9 @@ class ExtensionManager @Inject constructor(
     /** Process a received AI message through all enabled output regex rules. */
     fun processOutput(text: String): String = regex.processOutput(text)
 
+    /** Apply JS extension output filters to strip metadata tags from displayed text. */
+    fun applyOutputFilters(text: String): String = jsHost.applyOutputFilters(text)
+
     /** Process a user input message through all enabled input regex rules. */
     fun processInput(text: String): String = regex.processInput(text)
 

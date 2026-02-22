@@ -244,6 +244,36 @@
             if (window.PtBridge) {
                 PtBridge.clearAllHeaders();
             }
+        },
+
+        // ── Output filters ───────────────────────────────────────────────────
+
+        /**
+         * Register a regex pattern to strip from displayed AI messages.
+         * The matched text is removed before the message is shown in the chat bubble.
+         * Useful for hiding metadata tags that your extension parses into headers.
+         *
+         * @param {string} extensionId  Your extension's unique id.
+         * @param {string} pattern      Regex pattern string (will be applied with 'gi' flags).
+         *
+         * @example
+         *   // Strip [mood: happy] tags from displayed text
+         *   PT.registerOutputFilter('my-ext', '\\[mood:\\s*\\w+\\]');
+         */
+        registerOutputFilter: function (extensionId, pattern) {
+            if (window.PtBridge) {
+                PtBridge.registerOutputFilter(extensionId, pattern);
+            }
+        },
+
+        /**
+         * Remove a previously registered output filter.
+         * @param {string} extensionId
+         */
+        clearOutputFilter: function (extensionId) {
+            if (window.PtBridge) {
+                PtBridge.clearOutputFilter(extensionId);
+            }
         }
     };
 

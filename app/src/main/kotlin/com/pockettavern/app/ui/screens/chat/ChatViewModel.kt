@@ -399,17 +399,18 @@ class ChatViewModel @Inject constructor(
                         _uiState.update { it.copy(streamingContent = event.accumulated) }
                     }
                     is StreamEvent.Complete -> {
+                        // Step 1: apply regex rules + multi-turn trim (keeps extension tags intact)
                         val processed = trimMultiTurn(extensionManager.processOutput(event.fullText))
-                        val assistantMessage = ChatMessage(content = processed, isUser = false)
+                        // Step 2: add message with raw text so we can emit MESSAGE_RECEIVED first
+                        val rawMessage = ChatMessage(content = processed, isUser = false)
                         _uiState.update {
                             it.copy(
-                                messages = it.messages + assistantMessage,
+                                messages = it.messages + rawMessage,
                                 isGenerating = false,
                                 streamingContent = ""
                             )
                         }
-                        // Emit MESSAGE_RECEIVED with structured {text, index} payload so JS
-                        // extensions can call PT.setMessageHeader(data.index, ...) on the right message
+                        // Step 3: emit MESSAGE_RECEIVED with raw text so extensions can parse tags
                         val msgIndex = _uiState.value.messages.lastIndex
                         val safeText = processed
                             .replace("\\", "\\\\")
@@ -419,6 +420,13 @@ class ChatViewModel @Inject constructor(
                             ExtensionEvent.MESSAGE_RECEIVED,
                             "{\"text\":\"$safeText\",\"index\":$msgIndex,\"isUser\":false}"
                         )
+                        // Step 4: apply JS output filters to strip metadata tags from display
+                        val displayText = extensionManager.applyOutputFilters(processed)
+                        if (displayText != processed) {
+                            val messages = _uiState.value.messages.toMutableList()
+                            messages[msgIndex] = messages[msgIndex].copy(content = displayText)
+                            _uiState.update { it.copy(messages = messages) }
+                        }
                         extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
                         generationJob = null
                         saveCurrentChat()
@@ -906,6 +914,13 @@ class ChatViewModel @Inject constructor(
                         updatedMessages[lastAssistantIndex] = lastAssistantMessage.copy(content = fullContent)
                         _uiState.update {
                             it.copy(messages = updatedMessages, isGenerating = false, streamingContent = "")
+                        }
+                        // Apply JS output filters to strip metadata tags from display
+                        val displayContent = extensionManager.applyOutputFilters(fullContent)
+                        if (displayContent != fullContent) {
+                            val msgs = _uiState.value.messages.toMutableList()
+                            msgs[lastAssistantIndex] = msgs[lastAssistantIndex].copy(content = displayContent)
+                            _uiState.update { it.copy(messages = msgs) }
                         }
                         extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
                         generationJob = null

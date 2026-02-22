@@ -56,6 +56,9 @@ class JsExtensionHost @Inject constructor(
     private val _jsButtonSets = MutableStateFlow<Map<String, List<QuickReplyButton>>>(emptyMap())
     val jsButtonSets: StateFlow<Map<String, List<QuickReplyButton>>> = _jsButtonSets.asStateFlow()
 
+    // Output filters registered by JS extensions: extensionId → regex pattern
+    private val _outputFilters = mutableMapOf<String, Regex>()
+
     // Callback wired by ChatViewModel so JS can send messages as the user
     var sendMessageCallback: ((String) -> Unit)? = null
 
@@ -94,6 +97,7 @@ class JsExtensionHost @Inject constructor(
     fun reload() {
         ready = false
         _injections.clear()
+        _outputFilters.clear()
         _messageHeaders.value = emptyMap()
         _jsButtonSets.value = emptyMap()
         scope.launch {
@@ -136,6 +140,16 @@ class JsExtensionHost @Inject constructor(
 
     /** Clear all message headers without reloading the sandbox (e.g. on chat change). */
     fun clearMessageHeaders() { _messageHeaders.value = emptyMap() }
+
+    /** Apply all registered output filters to strip extension metadata from displayed text. */
+    fun applyOutputFilters(text: String): String {
+        if (_outputFilters.isEmpty()) return text
+        var result = text
+        _outputFilters.values.forEach { regex ->
+            result = regex.replace(result, "")
+        }
+        return result.trim()
+    }
 
     // ── Prompt injections ─────────────────────────────────────────────────────
 
@@ -271,6 +285,26 @@ class JsExtensionHost @Inject constructor(
             scope.launch(Dispatchers.Main) {
                 sendMessageCallback?.invoke(text)
             }
+        }
+
+        /**
+         * Called by PT.registerOutputFilter(id, pattern).
+         * Registers a regex pattern to strip from displayed AI messages.
+         */
+        @JavascriptInterface
+        fun registerOutputFilter(extensionId: String, pattern: String) {
+            try {
+                _outputFilters[extensionId] = Regex(pattern, setOf(RegexOption.IGNORE_CASE))
+                DebugLogger.log("[JsExt] Output filter registered for '$extensionId': $pattern")
+            } catch (e: Exception) {
+                DebugLogger.log("[JsExt] Invalid output filter regex for '$extensionId': ${e.message}")
+            }
+        }
+
+        /** Called by PT.clearOutputFilter(id). */
+        @JavascriptInterface
+        fun clearOutputFilter(extensionId: String) {
+            _outputFilters.remove(extensionId)
         }
     }
 }
