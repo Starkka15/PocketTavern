@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonPrimitive
 import javax.inject.Inject
 
 data class ExtensionsUiState(
@@ -19,7 +20,9 @@ data class ExtensionsUiState(
     val tokenCounterEnabled: Boolean = false,
     val jsExtensions: List<JsExtension> = emptyList(),
     val isInstalling: Boolean = false,
-    val installError: String? = null
+    val installError: String? = null,
+    /** Per-extension settings: extensionId → (key → JsonPrimitive) */
+    val jsExtensionSettings: Map<String, Map<String, JsonPrimitive>> = emptyMap()
 )
 
 @HiltViewModel
@@ -33,12 +36,15 @@ class ExtensionsViewModel @Inject constructor(
 
     init {
         extensionManager.load()
+        val extensions = jsExtensionStorage.listExtensions()
+        val settings = extensions.associate { it.id to jsExtensionStorage.getExtensionSettings(it.id) }
         _uiState.update {
             it.copy(
                 quickReplyEnabled   = extensionManager.quickReply.enabled,
                 regexEnabled        = extensionManager.regex.enabled,
                 tokenCounterEnabled = extensionManager.tokenCounter.enabled,
-                jsExtensions        = jsExtensionStorage.listExtensions()
+                jsExtensions        = extensions,
+                jsExtensionSettings = settings
             )
         }
     }
@@ -69,9 +75,8 @@ class ExtensionsViewModel @Inject constructor(
             try {
                 jsExtensionStorage.installFromUrl(url)
                 extensionManager.jsHost.reload()
-                _uiState.update {
-                    it.copy(isInstalling = false, jsExtensions = jsExtensionStorage.listExtensions())
-                }
+                refreshJsExtensions()
+                _uiState.update { it.copy(isInstalling = false) }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(isInstalling = false, installError = e.message ?: "Install failed")
@@ -83,16 +88,37 @@ class ExtensionsViewModel @Inject constructor(
     fun uninstall(id: String) {
         jsExtensionStorage.uninstall(id)
         extensionManager.jsHost.reload()
-        _uiState.update { it.copy(jsExtensions = jsExtensionStorage.listExtensions()) }
+        refreshJsExtensions()
     }
 
     fun setJsExtensionEnabled(id: String, enabled: Boolean) {
         jsExtensionStorage.setEnabled(id, enabled)
         extensionManager.jsHost.reload()
-        _uiState.update { it.copy(jsExtensions = jsExtensionStorage.listExtensions()) }
+        refreshJsExtensions()
     }
 
     fun clearInstallError() {
         _uiState.update { it.copy(installError = null) }
+    }
+
+    // ── JS extension settings ─────────────────────────────────────────────────
+
+    fun updateJsSetting(extensionId: String, key: String, value: JsonPrimitive) {
+        // Persist to disk
+        jsExtensionStorage.updateExtensionSetting(extensionId, key, value)
+        // Push to running JS sandbox
+        extensionManager.jsHost.updateSettingInSandbox(extensionId, key, value.toString())
+        // Update UI state
+        val currentSettings = _uiState.value.jsExtensionSettings.toMutableMap()
+        val extSettings = (currentSettings[extensionId] ?: emptyMap()).toMutableMap()
+        extSettings[key] = value
+        currentSettings[extensionId] = extSettings
+        _uiState.update { it.copy(jsExtensionSettings = currentSettings) }
+    }
+
+    private fun refreshJsExtensions() {
+        val extensions = jsExtensionStorage.listExtensions()
+        val settings = extensions.associate { it.id to jsExtensionStorage.getExtensionSettings(it.id) }
+        _uiState.update { it.copy(jsExtensions = extensions, jsExtensionSettings = settings) }
     }
 }

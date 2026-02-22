@@ -117,6 +117,36 @@ class JsExtensionStorage @Inject constructor(
         settingsFile.writeText(settingsJson)
     }
 
+    /** Get settings for a specific extension as a flat key→JsonPrimitive map. */
+    fun getExtensionSettings(extensionId: String): Map<String, JsonPrimitive> {
+        val allJson = loadAllSettings()
+        return try {
+            val root = json.parseToJsonElement(allJson).jsonObject
+            val extObj = root[extensionId]?.jsonObject ?: return emptyMap()
+            extObj.entries
+                .filter { it.value is JsonPrimitive }
+                .associate { (k, v) -> k to v.jsonPrimitive }
+        } catch (_: Exception) { emptyMap() }
+    }
+
+    /** Update a single setting for an extension and persist. */
+    fun updateExtensionSetting(extensionId: String, key: String, value: JsonElement) {
+        val allJson = loadAllSettings()
+        val root = try {
+            json.parseToJsonElement(allJson).jsonObject.toMutableMap()
+        } catch (_: Exception) { mutableMapOf() }
+
+        val extObj = try {
+            (root[extensionId] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
+        } catch (_: Exception) { mutableMapOf() }
+
+        extObj[key] = value
+        root[extensionId] = JsonObject(extObj)
+
+        val newJson = JsonObject(root).toString()
+        settingsFile.writeText(newJson)
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private fun loadEnabledMap(): Map<String, Boolean> {

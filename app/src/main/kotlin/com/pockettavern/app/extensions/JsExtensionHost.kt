@@ -151,6 +151,17 @@ class JsExtensionHost @Inject constructor(
         return result.trim()
     }
 
+    /** Push a single setting change to the running JS sandbox without full reload. */
+    fun updateSettingInSandbox(extensionId: String, key: String, jsonValue: String) {
+        if (!ready) return
+        val safeKey = key.replace("'", "\\'")
+        scope.launch {
+            webView?.evaluateJavascript(
+                "if(window.PT&&PT.extension_settings['$extensionId']){PT.extension_settings['$extensionId']['$safeKey']=$jsonValue;}", null
+            )
+        }
+    }
+
     // ── Prompt injections ─────────────────────────────────────────────────────
 
     fun getInjections(): List<String> = _injections.values.toList()

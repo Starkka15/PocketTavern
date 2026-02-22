@@ -17,12 +17,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pockettavern.app.extensions.JsExtension
-import com.pockettavern.app.ui.theme.AccentGreen
-import com.pockettavern.app.ui.theme.DarkSurface
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,7 +63,7 @@ fun ExtensionsScreen(
                 Text(
                     text = "Native Extensions",
                     style = MaterialTheme.typography.titleSmall,
-                    color = AccentGreen,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
@@ -104,7 +108,7 @@ fun ExtensionsScreen(
                     Text(
                         text = "JavaScript Extensions",
                         style = MaterialTheme.typography.titleSmall,
-                        color = AccentGreen,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.weight(1f)
                     )
                     FilledTonalIconButton(onClick = { showInstallDialog = true }) {
@@ -115,7 +119,7 @@ fun ExtensionsScreen(
 
             if (uiState.jsExtensions.isEmpty()) {
                 item {
-                    Surface(color = DarkSurface, shape = MaterialTheme.shapes.medium) {
+                    Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -134,8 +138,10 @@ fun ExtensionsScreen(
                 items(uiState.jsExtensions, key = { it.id }) { ext ->
                     JsExtensionCard(
                         ext = ext,
+                        settings = uiState.jsExtensionSettings[ext.id] ?: emptyMap(),
                         onEnabledChange = { viewModel.setJsExtensionEnabled(ext.id, it) },
-                        onUninstall = { viewModel.uninstall(ext.id) }
+                        onUninstall = { viewModel.uninstall(ext.id) },
+                        onSettingChange = { key, value -> viewModel.updateJsSetting(ext.id, key, value) }
                     )
                 }
             }
@@ -173,7 +179,7 @@ private fun ExtensionCard(
     onSettingsClick: (() -> Unit)?
 ) {
     Surface(
-        color = DarkSurface,
+        color = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.medium,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -218,13 +224,16 @@ private fun ExtensionCard(
 @Composable
 private fun JsExtensionCard(
     ext: JsExtension,
+    settings: Map<String, JsonPrimitive>,
     onEnabledChange: (Boolean) -> Unit,
-    onUninstall: () -> Unit
+    onUninstall: () -> Unit,
+    onSettingChange: (String, JsonPrimitive) -> Unit
 ) {
     var showUninstallDialog by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
 
     Surface(
-        color = DarkSurface,
+        color = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.medium,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -264,8 +273,103 @@ private fun JsExtensionCard(
                 }
                 Switch(checked = ext.enabled, onCheckedChange = onEnabledChange)
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider()
+
+            // Settings panel
+            if (settings.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(4.dp))
+                TextButton(
+                    onClick = { showSettings = !showSettings },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text(if (showSettings) "Hide Settings" else "Settings")
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        if (showSettings) Icons.Default.Extension else Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                if (showSettings) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        settings.entries.sortedBy { it.key }.forEach { (key, value) ->
+                            val label = camelCaseToLabel(key)
+                            when {
+                                value.isString -> {
+                                    // String setting
+                                    var text by remember(key, value) { mutableStateOf(value.content) }
+                                    OutlinedTextField(
+                                        value = text,
+                                        onValueChange = { newVal ->
+                                            text = newVal
+                                            onSettingChange(key, JsonPrimitive(newVal))
+                                        },
+                                        label = { Text(label) },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textStyle = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                                value.booleanOrNull != null -> {
+                                    // Boolean toggle
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            label,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Switch(
+                                            checked = value.booleanOrNull == true,
+                                            onCheckedChange = { onSettingChange(key, JsonPrimitive(it)) }
+                                        )
+                                    }
+                                }
+                                value.intOrNull != null -> {
+                                    // Integer setting
+                                    var text by remember(key, value) { mutableStateOf(value.content) }
+                                    OutlinedTextField(
+                                        value = text,
+                                        onValueChange = { newVal ->
+                                            text = newVal
+                                            newVal.toIntOrNull()?.let { onSettingChange(key, JsonPrimitive(it)) }
+                                        },
+                                        label = { Text(label) },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textStyle = MaterialTheme.typography.bodySmall,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                    )
+                                }
+                                value.doubleOrNull != null -> {
+                                    // Float/double setting
+                                    var text by remember(key, value) { mutableStateOf(value.content) }
+                                    OutlinedTextField(
+                                        value = text,
+                                        onValueChange = { newVal ->
+                                            text = newVal
+                                            newVal.toDoubleOrNull()?.let { onSettingChange(key, JsonPrimitive(it)) }
+                                        },
+                                        label = { Text(label) },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textStyle = MaterialTheme.typography.bodySmall,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!showSettings || settings.isEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider()
+            }
             Spacer(modifier = Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -310,6 +414,12 @@ private fun JsExtensionCard(
             }
         )
     }
+}
+
+/** Convert camelCase key to human-readable label: "showHeartMeter" → "Show Heart Meter" */
+private fun camelCaseToLabel(key: String): String {
+    return key.replace(Regex("([a-z])([A-Z])")) { "${it.groupValues[1]} ${it.groupValues[2]}" }
+        .replaceFirstChar { it.uppercase() }
 }
 
 @Composable
