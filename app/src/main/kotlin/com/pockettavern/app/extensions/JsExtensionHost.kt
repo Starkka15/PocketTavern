@@ -154,8 +154,27 @@ class JsExtensionHost @Inject constructor(
     /** Clear all message headers without reloading the sandbox (e.g. on chat change). */
     fun clearMessageHeaders() { _messageHeaders.value = emptyMap() }
 
-    /** Restore persisted message headers when loading a chat from disk. */
-    fun restoreMessageHeaders(headers: Map<Int, String>) { _messageHeaders.value = headers }
+    /**
+     * Restore persisted message headers when loading a chat from disk.
+     *
+     * Deferred via a queued no-op JS eval so that any CHAT_CHANGED handlers
+     * (which typically call PT.clearAllHeaders()) execute first.  The callback
+     * fires on Main after all previously queued evaluateJavascript calls —
+     * including bridge calls like clearAllHeaders() — have completed.
+     */
+    fun restoreMessageHeaders(headers: Map<Int, String>) {
+        if (headers.isEmpty()) return
+        if (!ready || webView == null) {
+            _messageHeaders.value = headers
+            return
+        }
+        scope.launch {
+            webView?.evaluateJavascript("0") { _ ->
+                DebugLogger.log("[JsExtensionHost] Restoring ${headers.size} persisted header(s) after JS event queue drained")
+                _messageHeaders.value = headers
+            }
+        }
+    }
 
     /** Apply all registered output filters to strip extension metadata from displayed text. */
     fun applyOutputFilters(text: String): String {
