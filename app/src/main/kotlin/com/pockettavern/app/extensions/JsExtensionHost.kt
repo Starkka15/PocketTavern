@@ -18,6 +18,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -295,21 +296,23 @@ class JsExtensionHost @Inject constructor(
          */
         @JavascriptInterface
         fun setMessageHeader(messageIndex: Int, text: String, extensionId: String) {
-            val current = _messageHeaders.value.toMutableMap()
-            val list = current[messageIndex]?.toMutableList() ?: mutableListOf()
-            // Remove any existing entry for this extension
-            list.removeAll { it.extensionId == extensionId }
-            if (text.isNotBlank()) {
-                list.add(MessageHeaderEntry(text = text, extensionId = extensionId))
+            _messageHeaders.update { current ->
+                val list = current[messageIndex]?.toMutableList() ?: mutableListOf()
+                // Remove any existing entry for this extension
+                list.removeAll { entry -> entry.extensionId == extensionId }
+                if (text.isNotBlank()) {
+                    list.add(MessageHeaderEntry(text = text, extensionId = extensionId))
+                }
+                val updated = current.toMutableMap()
+                if (list.isEmpty()) updated.remove(messageIndex) else updated[messageIndex] = list.toList()
+                updated
             }
-            if (list.isEmpty()) current.remove(messageIndex) else current[messageIndex] = list
-            _messageHeaders.value = current
         }
 
         /** Called by PT.clearMessageHeader(index). Removes ALL extension headers at this index. */
         @JavascriptInterface
         fun clearMessageHeader(messageIndex: Int) {
-            _messageHeaders.value = _messageHeaders.value - messageIndex
+            _messageHeaders.update { current -> current - messageIndex }
         }
 
         /** Called by PT.clearAllHeaders(). */
