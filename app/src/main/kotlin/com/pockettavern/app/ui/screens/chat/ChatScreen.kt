@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.pockettavern.app.domain.model.MessageHeaderEntry
 import com.pockettavern.app.extensions.JsExtensionHost
 import com.pockettavern.app.ui.components.*
 import com.pockettavern.app.domain.model.GenerationState
@@ -381,15 +382,16 @@ fun ChatScreen(
                             val swipeInfo = viewModel.getSwipeInfo(index)
                             val lastAsstIndex = uiState.messages.indexOfLast { !it.isUser }
                             val isLastAsstMsg = !message.isUser && index == lastAsstIndex
+                            val msgHeaders = uiState.messageHeaders[index] ?: emptyList()
                             MessageWithActions(
                                 message = message,
                                 characterName = uiState.character?.name ?: "Assistant",
                                 swipeInfo = swipeInfo,
                                 isLastAssistantMessage = isLastAsstMsg,
-                                header = uiState.messageHeaders[index],
+                                headers = msgHeaders,
                                 onLongPress = { viewModel.showMessageActions(index) },
-                                onHeaderLongPress = if (uiState.messageHeaders.containsKey(index)) {
-                                    { viewModel.onHeaderLongPressed(index) }
+                                onHeaderLongPress = if (msgHeaders.isNotEmpty()) {
+                                    { extensionId -> viewModel.onHeaderLongPressed(index, extensionId) }
                                 } else null,
                                 onSwipeLeft = { viewModel.swipeLeft(index) },
                                 onSwipeRight = {
@@ -679,9 +681,9 @@ private fun MessageWithActions(
     characterName: String,
     swipeInfo: Pair<Int, Int>?,
     isLastAssistantMessage: Boolean,
-    header: String? = null,
+    headers: List<MessageHeaderEntry> = emptyList(),
     onLongPress: () -> Unit,
-    onHeaderLongPress: (() -> Unit)? = null,
+    onHeaderLongPress: ((String) -> Unit)? = null,
     onSwipeLeft: () -> Unit,
     onSwipeRight: () -> Unit
 ) {
@@ -715,7 +717,7 @@ private fun MessageWithActions(
             ChatBubble(
                 message = message,
                 characterName = characterName,
-                header = header,
+                headers = headers,
                 onHeaderLongPress = onHeaderLongPress
             )
         }

@@ -22,6 +22,7 @@ import com.pockettavern.app.domain.model.Character
 import com.pockettavern.app.domain.model.ChatInfo
 import com.pockettavern.app.domain.model.ChatMessage
 import com.pockettavern.app.domain.model.ChatMessageMetadata
+import com.pockettavern.app.domain.model.MessageHeaderEntry
 import com.pockettavern.app.domain.model.ForgeGenerationParams
 import com.pockettavern.app.domain.model.GenerationState
 import com.pockettavern.app.domain.model.QuickReplyButton
@@ -88,8 +89,8 @@ data class ChatUiState(
     // Token counter (shown when extension is enabled)
     val tokenCount: Int = 0,
     val showTokenCount: Boolean = false,
-    // Message headers set by JS extensions via PT.setMessageHeader(index, text)
-    val messageHeaders: Map<Int, String> = emptyMap(),
+    // Message headers set by JS extensions via PT.setMessageHeader(index, text, extensionId)
+    val messageHeaders: Map<Int, List<MessageHeaderEntry>> = emptyMap(),
     // Edit dialog requested by JS extension via PT.showEditDialog()
     val editDialogRequest: JsExtensionHost.EditDialogRequest? = null
 )
@@ -334,15 +335,11 @@ class ChatViewModel @Inject constructor(
         when (val result = localRepository.getChat(character.name, fileName)) {
             is Result.Success -> {
                 val messages = result.data.messages
-                // Restore persisted extension headers and their owners
-                val restoredHeaders = mutableMapOf<Int, String>()
-                val restoredOwners = mutableMapOf<Int, String>()
+                // Restore persisted extension headers
+                val restoredHeaders = mutableMapOf<Int, List<MessageHeaderEntry>>()
                 messages.forEachIndexed { index, msg ->
-                    if (!msg.extensionHeader.isNullOrBlank()) {
-                        restoredHeaders[index] = msg.extensionHeader
-                    }
-                    if (!msg.extensionHeaderOwner.isNullOrBlank()) {
-                        restoredOwners[index] = msg.extensionHeaderOwner
+                    if (msg.extensionHeaders.isNotEmpty()) {
+                        restoredHeaders[index] = msg.extensionHeaders
                     }
                 }
                 _uiState.update {
@@ -355,7 +352,7 @@ class ChatViewModel @Inject constructor(
                 }
                 pushExtensionContext()
                 extensionManager.emit(ExtensionEvent.CHAT_CHANGED, fileName)
-                extensionManager.restoreMessageHeaders(restoredHeaders, restoredOwners)
+                extensionManager.restoreMessageHeaders(restoredHeaders)
             }
             is Result.Error -> createNewChat()
         }
@@ -878,12 +875,11 @@ class ChatViewModel @Inject constructor(
         if (headers.isEmpty()) return false
         val messages = _uiState.value.messages.toMutableList()
         var changed = false
-        headers.forEach { (index, headerText) ->
+        headers.forEach { (index, entries) ->
             if (index in messages.indices) {
                 val msg = messages[index]
-                val owner = extensionManager.getHeaderOwner(index)
-                if (msg.extensionHeader != headerText || msg.extensionHeaderOwner != owner) {
-                    messages[index] = msg.copy(extensionHeader = headerText, extensionHeaderOwner = owner)
+                if (msg.extensionHeaders != entries) {
+                    messages[index] = msg.copy(extensionHeaders = entries)
                     changed = true
                 }
             }
@@ -896,9 +892,10 @@ class ChatViewModel @Inject constructor(
 
     // ── Header long-press ─────────────────────────────────────────────────
 
-    fun onHeaderLongPressed(messageIndex: Int) {
-        val owner = extensionManager.getHeaderOwner(messageIndex) ?: return
-        val jsonData = "{\"messageIndex\":$messageIndex,\"extensionId\":\"${owner.replace("\"", "\\\"")}\"}"
+    fun onHeaderLongPressed(messageIndex: Int, extensionId: String) {
+        if (extensionId.isBlank()) return
+        val safeId = extensionId.replace("\"", "\\\"")
+        val jsonData = "{\"messageIndex\":$messageIndex,\"extensionId\":\"$safeId\"}"
         extensionManager.emitJson(ExtensionEvent.HEADER_LONG_PRESSED, jsonData)
     }
 

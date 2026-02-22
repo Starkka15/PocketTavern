@@ -8,6 +8,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.pockettavern.app.data.local.JsExtensionStorage
+import com.pockettavern.app.domain.model.MessageHeaderEntry
 import com.pockettavern.app.domain.model.QuickReplyButton
 import com.pockettavern.app.util.DebugLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -48,12 +49,9 @@ class JsExtensionHost @Inject constructor(
     // Context JSON updated before each generation by ExtensionManager.updateContext()
     @Volatile private var _contextJson: String = "{}"
 
-    // Message headers: messageIndex → header text (set by JS via PT.setMessageHeader)
-    private val _messageHeaders = MutableStateFlow<Map<Int, String>>(emptyMap())
-    val messageHeaders: StateFlow<Map<Int, String>> = _messageHeaders.asStateFlow()
-
-    // Header ownership: messageIndex → extensionId that set it
-    private val _headerOwners = mutableMapOf<Int, String>()
+    // Message headers: messageIndex → list of headers (multiple extensions can each set one)
+    private val _messageHeaders = MutableStateFlow<Map<Int, List<MessageHeaderEntry>>>(emptyMap())
+    val messageHeaders: StateFlow<Map<Int, List<MessageHeaderEntry>>> = _messageHeaders.asStateFlow()
 
     // Buttons registered by JS extensions: extensionId → button list
     private val _jsButtonSets = MutableStateFlow<Map<String, List<QuickReplyButton>>>(emptyMap())
@@ -115,7 +113,6 @@ class JsExtensionHost @Inject constructor(
         _injections.clear()
         _outputFilters.clear()
         _messageHeaders.value = emptyMap()
-        _headerOwners.clear()
         _jsButtonSets.value = emptyMap()
         scope.launch {
             webView?.loadData("<html><body></body></html>", "text/html", "utf-8")
@@ -158,11 +155,7 @@ class JsExtensionHost @Inject constructor(
     /** Clear all message headers without reloading the sandbox (e.g. on chat change). */
     fun clearMessageHeaders() {
         _messageHeaders.value = emptyMap()
-        _headerOwners.clear()
     }
-
-    /** Get the extension ID that owns the header at [messageIndex], or null. */
-    fun getHeaderOwner(messageIndex: Int): String? = _headerOwners[messageIndex]
 
     /**
      * Restore persisted message headers when loading a chat from disk.
@@ -172,18 +165,16 @@ class JsExtensionHost @Inject constructor(
      * fires on Main after all previously queued evaluateJavascript calls —
      * including bridge calls like clearAllHeaders() — have completed.
      */
-    fun restoreMessageHeaders(headers: Map<Int, String>, owners: Map<Int, String> = emptyMap()) {
+    fun restoreMessageHeaders(headers: Map<Int, List<MessageHeaderEntry>>) {
         if (headers.isEmpty()) return
         if (!ready || webView == null) {
             _messageHeaders.value = headers
-            _headerOwners.putAll(owners)
             return
         }
         scope.launch {
             webView?.evaluateJavascript("0") { _ ->
-                DebugLogger.log("[JsExtensionHost] Restoring ${headers.size} persisted header(s) after JS event queue drained")
+                DebugLogger.log("[JsExtensionHost] Restoring headers for ${headers.size} message(s) after JS event queue drained")
                 _messageHeaders.value = headers
-                _headerOwners.putAll(owners)
             }
         }
     }
@@ -283,34 +274,32 @@ class JsExtensionHost @Inject constructor(
 
         /**
          * Called by PT.setMessageHeader(index, text, extensionId).
-         * Sets a header box that appears above the AI message at [messageIndex].
-         * Pass empty string to clear it.
+         * Each extension gets its own header entry per message.
+         * Pass empty text to remove this extension's header at that index.
          */
         @JavascriptInterface
         fun setMessageHeader(messageIndex: Int, text: String, extensionId: String) {
             val current = _messageHeaders.value.toMutableMap()
-            if (text.isBlank()) {
-                current.remove(messageIndex)
-                _headerOwners.remove(messageIndex)
-            } else {
-                current[messageIndex] = text
-                if (extensionId.isNotBlank()) _headerOwners[messageIndex] = extensionId
+            val list = current[messageIndex]?.toMutableList() ?: mutableListOf()
+            // Remove any existing entry for this extension
+            list.removeAll { it.extensionId == extensionId }
+            if (text.isNotBlank()) {
+                list.add(MessageHeaderEntry(text = text, extensionId = extensionId))
             }
+            if (list.isEmpty()) current.remove(messageIndex) else current[messageIndex] = list
             _messageHeaders.value = current
         }
 
-        /** Called by PT.clearMessageHeader(index). */
+        /** Called by PT.clearMessageHeader(index). Removes ALL extension headers at this index. */
         @JavascriptInterface
         fun clearMessageHeader(messageIndex: Int) {
             _messageHeaders.value = _messageHeaders.value - messageIndex
-            _headerOwners.remove(messageIndex)
         }
 
         /** Called by PT.clearAllHeaders(). */
         @JavascriptInterface
         fun clearAllHeaders() {
             _messageHeaders.value = emptyMap()
-            _headerOwners.clear()
         }
 
         /**

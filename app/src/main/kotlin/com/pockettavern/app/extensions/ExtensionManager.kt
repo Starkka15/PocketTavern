@@ -1,5 +1,6 @@
 package com.pockettavern.app.extensions
 
+import com.pockettavern.app.domain.model.MessageHeaderEntry
 import com.pockettavern.app.domain.model.QuickReplyButton
 import com.pockettavern.app.extensions.builtin.QuickReplyExtension
 import com.pockettavern.app.extensions.builtin.RegexExtension
@@ -23,9 +24,9 @@ class ExtensionManager @Inject constructor(
 
     /**
      * Message headers set by JS extensions via PT.setMessageHeader().
-     * Map of messageIndex → header text string.
+     * Map of messageIndex → list of headers (multiple extensions can each set one).
      */
-    val messageHeaders: StateFlow<Map<Int, String>> get() = jsHost.messageHeaders
+    val messageHeaders: StateFlow<Map<Int, List<MessageHeaderEntry>>> get() = jsHost.messageHeaders
 
     /**
      * Buttons registered by JS extensions via PT.registerButtons().
@@ -80,9 +81,6 @@ class ExtensionManager @Inject constructor(
     fun clearMessageHeaders() = jsHost.clearMessageHeaders()
 
     /** Restore persisted message headers when loading an existing chat. */
-    fun restoreMessageHeaders(headers: Map<Int, String>, owners: Map<Int, String> = emptyMap()) =
-        jsHost.restoreMessageHeaders(headers, owners)
-
-    /** Get the extension ID that owns the header at [messageIndex], or null. */
-    fun getHeaderOwner(messageIndex: Int): String? = jsHost.getHeaderOwner(messageIndex)
+    fun restoreMessageHeaders(headers: Map<Int, List<MessageHeaderEntry>>) =
+        jsHost.restoreMessageHeaders(headers)
 }

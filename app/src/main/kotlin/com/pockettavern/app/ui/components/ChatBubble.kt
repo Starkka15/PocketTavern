@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.pockettavern.app.domain.model.ChatMessage
+import com.pockettavern.app.domain.model.MessageHeaderEntry
 import com.pockettavern.app.ui.theme.*
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -30,8 +31,8 @@ fun ChatBubble(
     message: ChatMessage,
     characterName: String,
     modifier: Modifier = Modifier,
-    header: String? = null,
-    onHeaderLongPress: (() -> Unit)? = null
+    headers: List<MessageHeaderEntry> = emptyList(),
+    onHeaderLongPress: ((String) -> Unit)? = null
 ) {
     // Narrator/system messages render as full-width centered italic text
     if (message.isNarrator) {
@@ -72,29 +73,31 @@ fun ChatBubble(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = alignment
     ) {
-        // Header box set by JS extensions via PT.setMessageHeader()
-        if (!message.isUser && !header.isNullOrBlank()) {
-            Surface(
-                modifier = Modifier
-                    .widthIn(max = 320.dp)
-                    .padding(bottom = 4.dp)
-                    .then(
-                        if (onHeaderLongPress != null) {
-                            Modifier.combinedClickable(
-                                onClick = { },
-                                onLongClick = onHeaderLongPress
-                            )
-                        } else Modifier
-                    ),
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Text(
-                    text = header,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        // Header boxes set by JS extensions via PT.setMessageHeader()
+        if (!message.isUser && headers.isNotEmpty()) {
+            headers.forEach { entry ->
+                Surface(
+                    modifier = Modifier
+                        .widthIn(max = 320.dp)
+                        .padding(bottom = 4.dp)
+                        .then(
+                            if (onHeaderLongPress != null) {
+                                Modifier.combinedClickable(
+                                    onClick = { },
+                                    onLongClick = { onHeaderLongPress(entry.extensionId) }
+                                )
+                            } else Modifier
+                        ),
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Text(
+                        text = entry.text,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
         Surface(

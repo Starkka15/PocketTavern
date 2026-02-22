@@ -3,6 +3,11 @@ package com.pockettavern.app.domain.model
 import java.time.Instant
 import java.util.UUID
 
+data class MessageHeaderEntry(
+    val text: String,
+    val extensionId: String
+)
+
 data class ChatMessage(
     val id: String = UUID.randomUUID().toString(),
     val content: String,
@@ -18,10 +23,8 @@ data class ChatMessage(
     val senderName: String? = null,
     // Raw content before output filters stripped extension tags (null if no filtering happened)
     val rawContent: String? = null,
-    // Header text set by extensions (persisted so it survives chat reload)
-    val extensionHeader: String? = null,
-    // Extension that owns this header (for long-press dispatch)
-    val extensionHeaderOwner: String? = null
+    // Headers set by extensions (multiple extensions can each set one per message)
+    val extensionHeaders: List<MessageHeaderEntry> = emptyList()
 )
 
 // Per-chat metadata stored in the first message

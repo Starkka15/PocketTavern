@@ -7,6 +7,7 @@ import com.pockettavern.app.domain.model.Chat
 import com.pockettavern.app.domain.model.ChatInfo
 import com.pockettavern.app.domain.model.ChatMessage
 import com.pockettavern.app.domain.model.ChatMessageMetadata
+import com.pockettavern.app.domain.model.MessageHeaderEntry
 import com.pockettavern.app.util.DebugLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -224,8 +225,7 @@ class ChatStorage @Inject constructor(
                         timestamp = parseDate(chatLine.send_date) ?: Instant.now(),
                         senderName = if (!chatLine.isUser && !chatLine.isSystem) chatLine.name else null,
                         rawContent = extra["raw_content"]?.jsonPrimitive?.contentOrNull,
-                        extensionHeader = extra["extension_header"]?.jsonPrimitive?.contentOrNull,
-                        extensionHeaderOwner = extra["extension_header_owner"]?.jsonPrimitive?.contentOrNull
+                        extensionHeaders = parseExtensionHeaders(extra)
                     )
                 } catch (e: Exception) { null }
             }
@@ -251,11 +251,14 @@ class ChatStorage @Inject constructor(
         if (message.rawContent != null) {
             map["raw_content"] = JsonPrimitive(message.rawContent)
         }
-        if (message.extensionHeader != null) {
-            map["extension_header"] = JsonPrimitive(message.extensionHeader)
-        }
-        if (message.extensionHeaderOwner != null) {
-            map["extension_header_owner"] = JsonPrimitive(message.extensionHeaderOwner)
+        if (message.extensionHeaders.isNotEmpty()) {
+            val headersArray = message.extensionHeaders.map { entry ->
+                JsonObject(mapOf(
+                    "text" to JsonPrimitive(entry.text),
+                    "ext" to JsonPrimitive(entry.extensionId)
+                ))
+            }
+            map["extension_headers"] = kotlinx.serialization.json.JsonArray(headersArray)
         }
         return JsonObject(map)
     }
@@ -275,4 +278,27 @@ class ChatStorage @Inject constructor(
 
     private fun sanitizeFileName(name: String): String =
         name.replace(Regex("[^a-zA-Z0-9_\\-. ]"), "_").trim().take(64)
+
+    /** Parse extension headers from extra JSON, with backwards compat for old single-header format. */
+    private fun parseExtensionHeaders(extra: JsonObject): List<MessageHeaderEntry> {
+        // New format: "extension_headers" is a JSON array of { text, ext }
+        val arr = extra["extension_headers"]
+        if (arr is kotlinx.serialization.json.JsonArray) {
+            return arr.mapNotNull { elem ->
+                try {
+                    val obj = elem.jsonObject
+                    val text = obj["text"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                    val ext = obj["ext"]?.jsonPrimitive?.contentOrNull ?: ""
+                    MessageHeaderEntry(text = text, extensionId = ext)
+                } catch (e: Exception) { null }
+            }
+        }
+        // Backwards compat: old format had "extension_header" + "extension_header_owner"
+        val oldHeader = extra["extension_header"]?.jsonPrimitive?.contentOrNull
+        if (!oldHeader.isNullOrBlank()) {
+            val oldOwner = extra["extension_header_owner"]?.jsonPrimitive?.contentOrNull ?: ""
+            return listOf(MessageHeaderEntry(text = oldHeader, extensionId = oldOwner))
+        }
+        return emptyList()
+    }
 }
