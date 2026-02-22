@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
+import java.io.InputStream
+import java.util.zip.ZipInputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -14,7 +16,8 @@ data class ThemeEntry(
     val id: String,
     val name: String,
     val isDefault: Boolean,
-    val effectName: String = "None"
+    val effectName: String = "None",
+    val hasBackground: Boolean = false
 )
 
 @Singleton
@@ -30,10 +33,14 @@ class ThemeManager @Inject constructor(
     private val _particleEffect = MutableStateFlow(ParticlePresets.fireAndIce())
     val particleEffect: StateFlow<ParticleEffectConfig> = _particleEffect.asStateFlow()
 
+    private val _themeAssets = MutableStateFlow(ThemeAssets.Default)
+    val themeAssets: StateFlow<ThemeAssets> = _themeAssets.asStateFlow()
+
     private val _activeId = MutableStateFlow(prefs.getString(KEY_ACTIVE, THEME_DEFAULT) ?: THEME_DEFAULT)
     val activeId: StateFlow<String> = _activeId.asStateFlow()
 
     init {
+        migrateIfNeeded()
         val savedId = _activeId.value
         if (savedId != THEME_DEFAULT) {
             if (savedId in BUNDLED_THEMES) loadBundled(savedId) else loadFromDisk(savedId)
@@ -55,16 +62,19 @@ class ThemeManager @Inject constructor(
             } catch (_: Exception) { "None" }
             list += ThemeEntry(id, name, isDefault = true, effectName = effectName)
         }
-        // User-imported themes from disk
-        themesDir.listFiles { f -> f.extension == "json" }
-            ?.sortedBy { it.nameWithoutExtension }
-            ?.forEach { f ->
-                val json = f.readText()
-                val name = extractName(json) ?: f.nameWithoutExtension
+        // User-imported themes from disk (directory-per-theme)
+        themesDir.listFiles { f -> f.isDirectory }
+            ?.filter { File(it, "theme.json").exists() }
+            ?.sortedBy { it.name }
+            ?.forEach { dir ->
+                val json = File(dir, "theme.json").readText()
+                val name = extractName(json) ?: dir.name
                 val effectName = try {
                     effectDisplayName(StThemeParser.parseParticleEffect(json, isDefault = false))
                 } catch (_: Exception) { "None" }
-                list += ThemeEntry(f.nameWithoutExtension, name, isDefault = false, effectName = effectName)
+                val hasBackground = listOf("background.png", "background.jpg", "background.webp")
+                    .any { File(dir, it).exists() }
+                list += ThemeEntry(dir.name, name, isDefault = false, effectName = effectName, hasBackground = hasBackground)
             }
         return list
     }
@@ -73,6 +83,7 @@ class ThemeManager @Inject constructor(
         if (id == THEME_DEFAULT) {
             _colors.value  = PocketTavernColors.Default
             _particleEffect.value = ParticlePresets.fireAndIce()
+            _themeAssets.value = ThemeAssets.Default
             _activeId.value = THEME_DEFAULT
             prefs.edit().putString(KEY_ACTIVE, THEME_DEFAULT).apply()
         } else if (id in BUNDLED_THEMES) {
@@ -85,9 +96,9 @@ class ThemeManager @Inject constructor(
     /** Import raw JSON, save to disk, return the generated id or null on error. */
     fun importTheme(json: String): String? = try {
         val name = extractName(json) ?: "imported"
-        val id = name.lowercase().replace(Regex("[^a-z0-9_]"), "_").take(40)
-            .ifBlank { "theme_${System.currentTimeMillis()}" }
-        File(themesDir, "$id.json").writeText(json)
+        val id = generateId(name)
+        val themeDir = File(themesDir, id).also { it.mkdirs() }
+        File(themeDir, "theme.json").writeText(json)
         DebugLogger.log("[ThemeManager] Imported '$name' as '$id'")
         id
     } catch (e: Exception) {
@@ -95,14 +106,80 @@ class ThemeManager @Inject constructor(
         null
     }
 
+    /** Import a ZIP bundle containing theme.json + optional images. */
+    fun importThemeZip(inputStream: InputStream): String? = try {
+        val tempDir = File(context.cacheDir, "theme_import_${System.currentTimeMillis()}")
+        tempDir.mkdirs()
+
+        var totalBytes = 0L
+        val maxBytes = 50L * 1024 * 1024 // 50 MB cap
+
+        ZipInputStream(inputStream).use { zis ->
+            var entry = zis.nextEntry
+            while (entry != null) {
+                if (!entry.isDirectory) {
+                    val safeName = File(entry.name).name // ZipSlip protection
+                    val outFile = File(tempDir, safeName)
+                    outFile.outputStream().use { out ->
+                        val buf = ByteArray(8192)
+                        var len: Int
+                        while (zis.read(buf).also { len = it } > 0) {
+                            totalBytes += len
+                            if (totalBytes > maxBytes) throw Exception("ZIP exceeds 50 MB limit")
+                            out.write(buf, 0, len)
+                        }
+                    }
+                }
+                zis.closeEntry()
+                entry = zis.nextEntry
+            }
+        }
+
+        val themeJsonFile = File(tempDir, "theme.json")
+        if (!themeJsonFile.exists()) {
+            tempDir.deleteRecursively()
+            throw Exception("ZIP must contain theme.json")
+        }
+
+        val json = themeJsonFile.readText()
+        val name = extractName(json) ?: "imported"
+        val id = generateId(name)
+
+        val themeDir = File(themesDir, id)
+        if (themeDir.exists()) themeDir.deleteRecursively()
+        tempDir.renameTo(themeDir)
+
+        DebugLogger.log("[ThemeManager] Imported ZIP theme '$name' as '$id'")
+        id
+    } catch (e: Exception) {
+        DebugLogger.log("[ThemeManager] ZIP import failed: ${e.message}")
+        null
+    }
+
     fun deleteTheme(id: String) {
         if (id == THEME_DEFAULT || id in BUNDLED_THEMES) return
-        File(themesDir, "$id.json").delete()
+        File(themesDir, id).deleteRecursively()
         if (_activeId.value == id) applyTheme(THEME_DEFAULT)
         DebugLogger.log("[ThemeManager] Deleted '$id'")
     }
 
     // ── Private ───────────────────────────────────────────────────────────────
+
+    private fun migrateIfNeeded() {
+        val marker = File(themesDir, ".migrated_v2")
+        if (marker.exists()) return
+        themesDir.listFiles { f -> f.isFile && f.extension == "json" }?.forEach { jsonFile ->
+            val id = jsonFile.nameWithoutExtension
+            val dir = File(themesDir, id).also { it.mkdirs() }
+            jsonFile.renameTo(File(dir, "theme.json"))
+        }
+        try { marker.createNewFile() } catch (_: Exception) {}
+        DebugLogger.log("[ThemeManager] Migrated theme storage to directory layout")
+    }
+
+    private fun generateId(name: String): String =
+        name.lowercase().replace(Regex("[^a-z0-9_]"), "_").take(40)
+            .ifBlank { "theme_${System.currentTimeMillis()}" }
 
     private fun loadBundled(id: String) {
         val json = readBundledJson(id)
@@ -110,6 +187,7 @@ class ThemeManager @Inject constructor(
         try {
             _colors.value = StThemeParser.parse(json)
             _particleEffect.value = StThemeParser.parseParticleEffect(json, isDefault = false)
+            _themeAssets.value = StThemeParser.parseThemeAssets(json, bundledAssetDir(id))
             _activeId.value = id
             prefs.edit().putString(KEY_ACTIVE, id).apply()
         } catch (e: Exception) {
@@ -119,16 +197,42 @@ class ThemeManager @Inject constructor(
     }
 
     private fun readBundledJson(id: String): String? = try {
-        context.assets.open("themes/$id.json").bufferedReader().readText()
-    } catch (_: Exception) { null }
+        // Try directory-style first, then flat file
+        context.assets.open("themes/$id/theme.json").bufferedReader().readText()
+    } catch (_: Exception) {
+        try {
+            context.assets.open("themes/$id.json").bufferedReader().readText()
+        } catch (_: Exception) { null }
+    }
+
+    /** Returns a File pointing to the bundled theme's asset cache directory (copies images on first access). */
+    private fun bundledAssetDir(id: String): File? {
+        val cacheDir = File(context.cacheDir, "bundled_themes/$id")
+        if (cacheDir.exists()) return cacheDir
+        // Check if asset directory has images by trying to open known files
+        val imageNames = listOf("background.png", "background.jpg", "background.webp", "logo.png")
+        var hasImages = false
+        for (img in imageNames) {
+            try {
+                context.assets.open("themes/$id/$img").use { src ->
+                    cacheDir.mkdirs()
+                    File(cacheDir, img).outputStream().use { dst -> src.copyTo(dst) }
+                    hasImages = true
+                }
+            } catch (_: Exception) { /* file doesn't exist in assets */ }
+        }
+        return if (hasImages) cacheDir else null
+    }
 
     private fun loadFromDisk(id: String) {
-        val f = File(themesDir, "$id.json")
+        val themeDir = File(themesDir, id)
+        val f = File(themeDir, "theme.json")
         if (!f.exists()) { applyTheme(THEME_DEFAULT); return }
         try {
             val json = f.readText()
             _colors.value   = StThemeParser.parse(json)
             _particleEffect.value = StThemeParser.parseParticleEffect(json, isDefault = false)
+            _themeAssets.value = StThemeParser.parseThemeAssets(json, themeDir)
             _activeId.value = id
             prefs.edit().putString(KEY_ACTIVE, id).apply()
         } catch (e: Exception) {

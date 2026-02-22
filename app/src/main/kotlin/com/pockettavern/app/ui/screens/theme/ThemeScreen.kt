@@ -79,7 +79,7 @@ fun ThemeScreen(
                 ) {
                     Icon(Icons.Default.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Import SillyTavern Theme (.json)")
+                    Text("Import Theme (.json or .zip)")
                 }
             }
 
@@ -95,7 +95,7 @@ fun ThemeScreen(
 
             item {
                 Text(
-                    "Import a SillyTavern theme JSON file. Colors are mapped to PocketTavern's interface.",
+                    "Import a theme JSON or a ZIP bundle with images (background, logo). SillyTavern themes also supported.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp)

@@ -29,7 +29,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeColors by themeManager.colors.collectAsStateWithLifecycle()
             val particleEffect by themeManager.particleEffect.collectAsStateWithLifecycle()
-            SillyTavernTheme(colors = themeColors, particleEffect = particleEffect) {
+            val themeAssets by themeManager.themeAssets.collectAsStateWithLifecycle()
+            SillyTavernTheme(colors = themeColors, particleEffect = particleEffect, themeAssets = themeAssets) {
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()

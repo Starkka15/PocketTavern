@@ -234,20 +234,28 @@ private data class MarkdownSegment(
     val text: String,
     val isBold: Boolean = false,
     val isItalic: Boolean = false,
-    val isCode: Boolean = false
+    val isCode: Boolean = false,
+    val isQuote: Boolean = false
 )
 
 @Composable
 private fun formatMessage(text: String): AnnotatedString {
     val segments = parseMarkdown(text)
+    val ptColors = LocalPocketTavernColors.current
 
     return buildAnnotatedString {
         segments.forEach { segment ->
+            val color = when {
+                segment.isQuote -> ptColors.quoteTextColor
+                segment.isItalic && ptColors.italicTextColor != Color.Unspecified -> ptColors.italicTextColor
+                else -> Color.Unspecified
+            }
             val style = SpanStyle(
                 fontWeight = if (segment.isBold) FontWeight.Bold else FontWeight.Normal,
                 fontStyle = if (segment.isItalic) FontStyle.Italic else FontStyle.Normal,
                 fontFamily = if (segment.isCode) FontFamily.Monospace else null,
-                background = if (segment.isCode) Color(0xFF2D2D2D) else Color.Unspecified
+                background = if (segment.isCode) ptColors.codeBackgroundColor else Color.Unspecified,
+                color = color
             )
             withStyle(style) {
                 append(segment.text)
@@ -360,6 +368,23 @@ private fun parseMarkdown(text: String): List<MarkdownSegment> {
                     segments.add(MarkdownSegment(
                         text = text.substring(i + 1, closeIndex),
                         isItalic = true
+                    ))
+                    i = closeIndex + 1
+                } else {
+                    sb.append(text[i])
+                    i++
+                }
+            }
+
+            // Quoted dialogue: "text"
+            text[i] == '"' -> {
+                val closeIndex = text.indexOf('"', i + 1)
+                if (closeIndex > i) {
+                    flushPlainText()
+                    // Include the quote marks in the displayed text
+                    segments.add(MarkdownSegment(
+                        text = text.substring(i, closeIndex + 1),
+                        isQuote = true
                     ))
                     i = closeIndex + 1
                 } else {

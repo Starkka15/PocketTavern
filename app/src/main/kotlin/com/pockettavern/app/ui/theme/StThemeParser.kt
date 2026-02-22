@@ -2,6 +2,7 @@ package com.pockettavern.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import java.io.File
 import com.pockettavern.app.util.DebugLogger
 import kotlinx.serialization.json.*
 
@@ -86,7 +87,10 @@ object StThemeParser {
             userBubble          = userBubble,
             userBubbleText      = userBubbleText,
             assistantBubble     = assistantBubble,
-            assistantBubbleText = textPrimary
+            assistantBubbleText = textPrimary,
+            quoteTextColor      = color("quote_text_color") ?: QuoteTextColor,
+            italicTextColor     = color("italic_text_color") ?: ItalicTextColor,
+            codeBackgroundColor = color("code_background_color") ?: CodeBackgroundColor
         )
     }
 
@@ -144,6 +148,49 @@ object StThemeParser {
         } catch (e: Exception) {
             DebugLogger.log("[StThemeParser] Failed to parse particle_effect: ${e.message}")
             if (isDefault) ParticleEffectConfig.Default else ParticleEffectConfig.None
+        }
+    }
+
+    fun parseThemeAssets(json: String, themeDir: File?): ThemeAssets {
+        return try {
+            val fields = extractStringFields(json)
+            val root = jsonParser.parseToJsonElement(json).jsonObject
+
+            // Background image
+            val hasBackground = root["background_image"]?.jsonPrimitive?.booleanOrNull == true
+            val backgroundPath = if (hasBackground && themeDir != null) {
+                listOf("background.png", "background.jpg", "background.webp")
+                    .map { File(themeDir, it) }
+                    .firstOrNull { it.exists() }
+                    ?.absolutePath
+            } else null
+
+            val scaleMode = when (fields["background_image_mode"]?.lowercase()) {
+                "fit" -> BackgroundScaleMode.FIT
+                "stretch" -> BackgroundScaleMode.STRETCH
+                else -> BackgroundScaleMode.FILL
+            }
+
+            val bgOpacity = root["background_opacity"]?.jsonPrimitive?.floatOrNull ?: 0.3f
+
+            // Logo
+            val hasLogo = root["logo_image"]?.jsonPrimitive?.booleanOrNull == true
+            val logoPath = if (hasLogo && themeDir != null) {
+                File(themeDir, "logo.png").takeIf { it.exists() }?.absolutePath
+            } else null
+
+            val logoTint = if (logoPath != null) null else parseRgba(fields["logo_tint"])
+
+            ThemeAssets(
+                backgroundImagePath = backgroundPath,
+                backgroundScaleMode = scaleMode,
+                backgroundOpacity = bgOpacity.coerceIn(0f, 1f),
+                logoImagePath = logoPath,
+                logoTint = logoTint
+            )
+        } catch (e: Exception) {
+            DebugLogger.log("[StThemeParser] Failed to parse theme assets: ${e.message}")
+            ThemeAssets.Default
         }
     }
 

@@ -63,12 +63,23 @@ class ThemeViewModel @Inject constructor(
     fun importFromUri(uri: Uri) {
         viewModelScope.launch {
             try {
-                val json = withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)
-                        ?.bufferedReader()?.readText()
-                        ?: throw Exception("Could not read file")
-                }
-                val id = themeManager.importTheme(json) ?: throw Exception("Invalid theme file")
+                val id = withContext(Dispatchers.IO) {
+                    val mimeType = context.contentResolver.getType(uri)
+                    val isZip = mimeType == "application/zip" ||
+                        mimeType == "application/x-zip-compressed" ||
+                        uri.toString().endsWith(".zip", ignoreCase = true)
+
+                    if (isZip) {
+                        context.contentResolver.openInputStream(uri)?.use { stream ->
+                            themeManager.importThemeZip(stream)
+                        } ?: throw Exception("Could not read file")
+                    } else {
+                        val json = context.contentResolver.openInputStream(uri)
+                            ?.bufferedReader()?.readText()
+                            ?: throw Exception("Could not read file")
+                        themeManager.importTheme(json)
+                    }
+                } ?: throw Exception("Invalid theme file")
                 themeManager.applyTheme(id)
                 refresh()
                 _uiState.update { it.copy(importError = null) }

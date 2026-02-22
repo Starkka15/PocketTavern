@@ -25,16 +25,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Image
+import coil.compose.AsyncImage
 import com.pockettavern.app.R
+import java.io.File
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pockettavern.app.ui.components.ConnectionStatusBar
 import com.pockettavern.app.ui.components.ParticleBackground
-import com.pockettavern.app.ui.theme.*
+import com.pockettavern.app.ui.theme.BackgroundScaleMode
+import com.pockettavern.app.ui.theme.LocalThemeAssets
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,7 +54,26 @@ fun MainScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    val assets = LocalThemeAssets.current
+
     Box(modifier = Modifier.fillMaxSize()) {
+    // Theme background image (behind particles)
+    assets.backgroundImagePath?.let { path ->
+        val scaleMode = when (assets.backgroundScaleMode) {
+            BackgroundScaleMode.FILL -> ContentScale.Crop
+            BackgroundScaleMode.FIT -> ContentScale.Fit
+            BackgroundScaleMode.STRETCH -> ContentScale.FillBounds
+        }
+        AsyncImage(
+            model = File(path),
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxSize()
+                .alpha(assets.backgroundOpacity),
+            contentScale = scaleMode
+        )
+    }
+
     ParticleBackground()
 
     Scaffold(
@@ -68,16 +92,29 @@ fun MainScreen(
                         .padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Logo takes most of the space
-                    Image(
-                        painter = painterResource(id = R.drawable.logo_pockettavern),
-                        contentDescription = "PocketTavern",
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .padding(vertical = 12.dp, horizontal = 8.dp),
-                        contentScale = ContentScale.Fit
-                    )
+                    // Logo — custom from theme or default (optionally tinted)
+                    if (assets.logoImagePath != null) {
+                        AsyncImage(
+                            model = File(assets.logoImagePath),
+                            contentDescription = "PocketTavern",
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .padding(vertical = 12.dp, horizontal = 8.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(id = R.drawable.logo_pockettavern),
+                            contentDescription = "PocketTavern",
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .padding(vertical = 12.dp, horizontal = 8.dp),
+                            contentScale = ContentScale.Fit,
+                            colorFilter = assets.logoTint?.let { ColorFilter.tint(it) }
+                        )
+                    }
 
                 }
             }

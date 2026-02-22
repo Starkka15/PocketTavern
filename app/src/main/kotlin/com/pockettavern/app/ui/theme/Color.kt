@@ -43,3 +43,8 @@ val UserBubble = FireOrange
 val UserBubbleText = Color(0xFF000000)
 val AssistantBubble = Color(0xFF1A2A3A)  // Dark blue-tinted
 val AssistantBubbleText = TextPrimary
+
+// Markdown styling defaults
+val QuoteTextColor = Color(0xFF888888)     // Blockquote text
+val ItalicTextColor = Color.Unspecified    // Unspecified = inherit bubble text color
+val CodeBackgroundColor = Color(0xFF2D2D2D)

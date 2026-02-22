@@ -36,7 +36,10 @@ data class PocketTavernColors(
     val userBubble: Color      = UserBubble,
     val userBubbleText: Color  = UserBubbleText,
     val assistantBubble: Color     = AssistantBubble,
-    val assistantBubbleText: Color = AssistantBubbleText
+    val assistantBubbleText: Color = AssistantBubbleText,
+    val quoteTextColor: Color      = QuoteTextColor,
+    val italicTextColor: Color     = ItalicTextColor,
+    val codeBackgroundColor: Color = CodeBackgroundColor
 ) {
     companion object {
         val Default = PocketTavernColors()

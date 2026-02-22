@@ -85,11 +85,15 @@ fun ParticleBackground(modifier: Modifier = Modifier) {
         label = "progress"
     )
 
+    val hasBackgroundImage = LocalThemeAssets.current.backgroundImagePath != null
+
     Canvas(modifier = modifier.fillMaxSize()) {
         val w = size.width
         val h = size.height
 
-        drawRect(color = bg)
+        if (!hasBackgroundImage) {
+            drawRect(color = bg)
+        }
 
         // Per-layer directional glow — each layer glows at its origin edge
         if (config.backgroundGlow) {
