@@ -34,7 +34,8 @@ fun ChatBubble(
     visibleButtonExtensions: Set<String> = emptySet(),
     headerMenus: Map<String, List<JsExtensionHost.HeaderAction>> = emptyMap(),
     onHeaderLongPress: ((String) -> Unit)? = null,
-    onHeaderActionClick: ((String, String) -> Unit)? = null
+    onHeaderActionClick: ((String, String) -> Unit)? = null,
+    onBubbleLongPress: (() -> Unit)? = null
 ) {
     // Narrator/system messages render as full-width centered italic text
     if (message.isNarrator) {
@@ -156,7 +157,16 @@ fun ChatBubble(
             }
         }
         Surface(
-            modifier = Modifier.widthIn(max = 320.dp),
+            modifier = Modifier
+                .widthIn(max = 320.dp)
+                .then(
+                    if (onBubbleLongPress != null) {
+                        Modifier.combinedClickable(
+                            onClick = { },
+                            onLongClick = onBubbleLongPress
+                        )
+                    } else Modifier
+                ),
             shape = bubbleShape,
             color = bubbleColor
         ) {

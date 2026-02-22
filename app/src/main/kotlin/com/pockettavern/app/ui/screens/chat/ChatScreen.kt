@@ -702,10 +702,6 @@ private fun MessageWithActions(
     Column {
         Box(
             modifier = Modifier
-                .combinedClickable(
-                    onClick = { },
-                    onLongClick = onLongPress
-                )
                 .pointerInput(swipeInfo, isLastAssistantMessage) {
                     if (message.isUser) return@pointerInput
                     var accumulated = 0f
@@ -734,7 +730,8 @@ private fun MessageWithActions(
                 visibleButtonExtensions = visibleButtonExtensions,
                 headerMenus = headerMenus,
                 onHeaderLongPress = onHeaderLongPress,
-                onHeaderActionClick = onHeaderActionClick
+                onHeaderActionClick = onHeaderActionClick,
+                onBubbleLongPress = onLongPress
             )
         }
 
