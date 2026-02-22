@@ -80,5 +80,9 @@ class ExtensionManager @Inject constructor(
     fun clearMessageHeaders() = jsHost.clearMessageHeaders()
 
     /** Restore persisted message headers when loading an existing chat. */
-    fun restoreMessageHeaders(headers: Map<Int, String>) = jsHost.restoreMessageHeaders(headers)
+    fun restoreMessageHeaders(headers: Map<Int, String>, owners: Map<Int, String> = emptyMap()) =
+        jsHost.restoreMessageHeaders(headers, owners)
+
+    /** Get the extension ID that owns the header at [messageIndex], or null. */
+    fun getHeaderOwner(messageIndex: Int): String? = jsHost.getHeaderOwner(messageIndex)
 }

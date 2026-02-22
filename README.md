@@ -202,11 +202,11 @@ Displays a live estimated token count for the current chat context. Useful for k
 
 ### JavaScript Extension API
 
-PocketTavern includes a WebView sandbox that runs JavaScript extensions. Extensions are installed from a URL and loaded at startup. They can react to chat events, inject text into the prompt, and persist their own settings.
+PocketTavern includes a WebView sandbox that runs JavaScript extensions. Extensions are installed from a URL and loaded at startup. They can react to chat events, inject text into the prompt, show dialogs, send hidden LLM requests, and persist their own settings.
 
 #### Installing an extension
 
-Go to **Settings → Extensions → JavaScript Extensions** and tap **+**. Enter the URL of the extension's `index.js` or its parent folder — PocketTavern downloads the file and reloads the sandbox automatically.
+Go to **Settings -> Extensions -> JavaScript Extensions** and tap **+**. Enter the URL of the extension's `index.js` or its parent folder -- PocketTavern downloads the file and reloads the sandbox automatically.
 
 #### The `PT` global object
 
@@ -214,60 +214,114 @@ Every extension has access to the `PT` global object:
 
 | API | Description |
 |-----|-------------|
-| `PT.events` | Event name constants (see below) |
+| `PT.events` | Event name constants (see Events below) |
 | `PT.INJECTION_POSITION` | `BEFORE_CHAR_DEFS`, `AFTER_CHAR_DEFS`, `IN_CHAT` |
 | `PT.eventSource.on(event, fn)` | Subscribe to a PocketTavern event |
-| `PT.eventSource.off(event, fn)` | Unsubscribe |
-| `PT.setExtensionPrompt(id, text, position, depth)` | Inject text into the prompt before the next generation |
-| `PT.getContext()` | Returns `{ character, recentMessages, personaName, apiType }` |
+| `PT.eventSource.off(event, fn)` | Unsubscribe from a previously registered handler |
 | `PT.extension_settings` | Persistent settings object keyed by extension id |
 | `PT.saveSettings()` | Persist `PT.extension_settings` to device storage |
 | `PT.log(message)` | Write to PocketTavern's debug log |
 
+#### Core APIs
+
+| API | Description |
+|-----|-------------|
+| `PT.setExtensionPrompt(id, text, position, depth)` | Inject text into the prompt before the next generation. Position: `PT.INJECTION_POSITION.*`. Pass empty text to clear. |
+| `PT.getContext()` | Returns `{ character, recentMessages, personaName, apiType }`. Each `recentMessages` entry has `{ index, text, isUser }`. |
+| `PT.sendMessage(text)` | Send a message as the user through the normal generation pipeline. |
+
+#### UI: Message Headers
+
+Display custom header boxes above AI messages (e.g. mood trackers, metadata).
+
+| API | Description |
+|-----|-------------|
+| `PT.setMessageHeader(index, text, extensionId)` | Set a header box above the AI message at `index`. Pass `extensionId` for long-press ownership. Pass empty text to remove. |
+| `PT.clearMessageHeader(index)` | Remove the header at a specific message index. |
+| `PT.clearAllHeaders()` | Remove all message headers (typically called on `CHAT_CHANGED`). |
+
+Headers are persisted to disk automatically. When a user long-presses a header, the `HEADER_LONG_PRESSED` event fires with `{ messageIndex, extensionId }` so the owning extension can show its own edit UI.
+
+#### UI: Quick Reply Buttons
+
+Register custom buttons above the chat input.
+
+| API | Description |
+|-----|-------------|
+| `PT.registerButtons(extensionId, buttons)` | Register buttons. Each button: `{ label, message }` (sends message) or `{ label, action }` (fires `BUTTON_CLICKED` event with `{ action, label }`). |
+| `PT.clearButtons(extensionId)` | Remove all buttons registered under `extensionId`. |
+
+#### Output Filters
+
+Strip extension metadata tags from displayed AI messages.
+
+| API | Description |
+|-----|-------------|
+| `PT.registerOutputFilter(extensionId, pattern)` | Register a regex pattern to strip from displayed text. Applied with case-insensitive flag. |
+| `PT.clearOutputFilter(extensionId)` | Remove a previously registered filter. |
+
+The raw (unfiltered) message text is preserved and available via `PT.getContext().recentMessages[i].text`.
+
+#### Dialogs
+
+| API | Description |
+|-----|-------------|
+| `PT.showEditDialog(title, fields)` | Show a native edit dialog. `fields`: array of `{ key, label, value }`. Returns a `Promise<object\|null>` resolving to `{ key: value }` or `null` if cancelled. |
+
+#### Hidden Generation
+
+| API | Description |
+|-----|-------------|
+| `PT.generateHidden(prompt)` | Send a prompt to the LLM without adding messages to the chat. Returns a `Promise<string>` with the AI's response. Recent chat history is automatically prepended for context. |
+
 #### Events
 
-| Constant | Fires when… |
-|----------|-------------|
-| `PT.events.MESSAGE_SENT` | The user sends a message |
-| `PT.events.MESSAGE_RECEIVED` | An AI response completes |
-| `PT.events.MESSAGE_EDITED` | A message is edited |
-| `PT.events.MESSAGE_DELETED` | A message is deleted |
-| `PT.events.GENERATION_STARTED` | Generation begins |
-| `PT.events.GENERATION_STOPPED` | Generation ends or is aborted |
-| `PT.events.CHAT_CHANGED` | The active chat changes |
-| `PT.events.CHARACTER_CHANGED` | The active character changes |
+| Constant | Data | Fires when... |
+|----------|------|---------------|
+| `PT.events.MESSAGE_SENT` | message text | The user sends a message |
+| `PT.events.MESSAGE_RECEIVED` | `{ text, index, isUser }` | An AI response completes |
+| `PT.events.MESSAGE_EDITED` | message index | A message is edited |
+| `PT.events.MESSAGE_DELETED` | message index | A message is deleted |
+| `PT.events.GENERATION_STARTED` | null | Generation begins |
+| `PT.events.GENERATION_STOPPED` | null | Generation ends or is aborted |
+| `PT.events.CHAT_CHANGED` | file name | The active chat changes |
+| `PT.events.CHARACTER_CHANGED` | character name | The active character changes |
+| `PT.events.BUTTON_CLICKED` | `{ action, label }` | A quick reply button with `action` is tapped |
+| `PT.events.HEADER_LONG_PRESSED` | `{ messageIndex, extensionId }` | User long-presses a message header |
 
 #### Example extension
 
 ```javascript
-// manifest.json (optional, hosted alongside index.js):
-// { "id": "word-count", "name": "Word Count", "version": "1.0.0",
-//   "description": "Logs the word count of every AI response.",
-//   "author": "you" }
-
 (function () {
     var EXT_ID = 'word-count';
 
-    // Initialise settings with defaults
     PT.extension_settings[EXT_ID] = PT.extension_settings[EXT_ID] || {
         enabled: true
     };
 
     // React to incoming AI messages
-    PT.eventSource.on(PT.events.MESSAGE_RECEIVED, function (message) {
+    PT.eventSource.on(PT.events.MESSAGE_RECEIVED, function (data) {
         if (!PT.extension_settings[EXT_ID].enabled) return;
-        var words = message ? message.trim().split(/\s+/).length : 0;
+        var words = data.text ? data.text.trim().split(/\s+/).length : 0;
         PT.log('[word-count] Response was ' + words + ' words.');
+        PT.setMessageHeader(data.index, 'Words: ' + words, EXT_ID);
     });
 
-    // Inject a reminder into the prompt before every generation
+    // Inject a system prompt
     PT.eventSource.on(PT.events.GENERATION_STARTED, function () {
-        var ctx = PT.getContext();
         PT.setExtensionPrompt(
             EXT_ID,
-            'Keep responses concise — aim for under 200 words.',
+            'Keep responses concise.',
             PT.INJECTION_POSITION.AFTER_CHAR_DEFS
         );
+    });
+
+    // Handle header long-press
+    PT.eventSource.on(PT.events.HEADER_LONG_PRESSED, function (data) {
+        if (data.extensionId !== EXT_ID) return;
+        PT.registerButtons(EXT_ID, [
+            { label: 'Recount', action: 'recount' }
+        ]);
     });
 
     PT.log('[word-count] loaded');
@@ -278,8 +332,8 @@ Every extension has access to the `PT` global object:
 
 ```
 my-extension/
-├── index.js       ← required — the extension code
-└── manifest.json  ← optional — name, version, description, author, id
++-- index.js       <- required
++-- manifest.json  <- optional (name, version, description, author, id)
 ```
 
 `manifest.json` format:
@@ -293,7 +347,7 @@ my-extension/
 }
 ```
 
-Host both files anywhere accessible by URL (GitHub raw, a web server, etc.). The install URL can point directly to `index.js` or to the folder — PocketTavern appends `/index.js` automatically.
+Host both files anywhere accessible by URL (GitHub raw, a web server, etc.). The install URL can point directly to `index.js` or to the folder -- PocketTavern appends `/index.js` automatically.
 
 </details>
 

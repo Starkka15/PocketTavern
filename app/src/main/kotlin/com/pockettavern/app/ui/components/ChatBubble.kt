@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
@@ -22,12 +24,14 @@ import androidx.compose.ui.unit.dp
 import com.pockettavern.app.domain.model.ChatMessage
 import com.pockettavern.app.ui.theme.*
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChatBubble(
     message: ChatMessage,
     characterName: String,
     modifier: Modifier = Modifier,
-    header: String? = null
+    header: String? = null,
+    onHeaderLongPress: (() -> Unit)? = null
 ) {
     // Narrator/system messages render as full-width centered italic text
     if (message.isNarrator) {
@@ -73,7 +77,15 @@ fun ChatBubble(
             Surface(
                 modifier = Modifier
                     .widthIn(max = 320.dp)
-                    .padding(bottom = 4.dp),
+                    .padding(bottom = 4.dp)
+                    .then(
+                        if (onHeaderLongPress != null) {
+                            Modifier.combinedClickable(
+                                onClick = { },
+                                onLongClick = onHeaderLongPress
+                            )
+                        } else Modifier
+                    ),
                 shape = RoundedCornerShape(8.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant
             ) {

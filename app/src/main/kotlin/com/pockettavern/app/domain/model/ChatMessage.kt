@@ -19,7 +19,9 @@ data class ChatMessage(
     // Raw content before output filters stripped extension tags (null if no filtering happened)
     val rawContent: String? = null,
     // Header text set by extensions (persisted so it survives chat reload)
-    val extensionHeader: String? = null
+    val extensionHeader: String? = null,
+    // Extension that owns this header (for long-press dispatch)
+    val extensionHeaderOwner: String? = null
 )
 
 // Per-chat metadata stored in the first message

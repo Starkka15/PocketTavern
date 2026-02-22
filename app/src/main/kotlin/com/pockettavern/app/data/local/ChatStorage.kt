@@ -224,7 +224,8 @@ class ChatStorage @Inject constructor(
                         timestamp = parseDate(chatLine.send_date) ?: Instant.now(),
                         senderName = if (!chatLine.isUser && !chatLine.isSystem) chatLine.name else null,
                         rawContent = extra["raw_content"]?.jsonPrimitive?.contentOrNull,
-                        extensionHeader = extra["extension_header"]?.jsonPrimitive?.contentOrNull
+                        extensionHeader = extra["extension_header"]?.jsonPrimitive?.contentOrNull,
+                        extensionHeaderOwner = extra["extension_header_owner"]?.jsonPrimitive?.contentOrNull
                     )
                 } catch (e: Exception) { null }
             }
@@ -252,6 +253,9 @@ class ChatStorage @Inject constructor(
         }
         if (message.extensionHeader != null) {
             map["extension_header"] = JsonPrimitive(message.extensionHeader)
+        }
+        if (message.extensionHeaderOwner != null) {
+            map["extension_header_owner"] = JsonPrimitive(message.extensionHeaderOwner)
         }
         return JsonObject(map)
     }

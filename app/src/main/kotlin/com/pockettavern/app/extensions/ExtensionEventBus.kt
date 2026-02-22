@@ -15,7 +15,8 @@ enum class ExtensionEvent {
     CHAT_CHANGED,
     CHARACTER_CHANGED,
     PROMPT_ABOUT_TO_BUILD,
-    BUTTON_CLICKED
+    BUTTON_CLICKED,
+    HEADER_LONG_PRESSED
 }
 
 /**

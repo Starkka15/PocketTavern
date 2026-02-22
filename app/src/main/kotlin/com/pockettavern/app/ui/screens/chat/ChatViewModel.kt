@@ -334,11 +334,15 @@ class ChatViewModel @Inject constructor(
         when (val result = localRepository.getChat(character.name, fileName)) {
             is Result.Success -> {
                 val messages = result.data.messages
-                // Restore persisted extension headers
+                // Restore persisted extension headers and their owners
                 val restoredHeaders = mutableMapOf<Int, String>()
+                val restoredOwners = mutableMapOf<Int, String>()
                 messages.forEachIndexed { index, msg ->
                     if (!msg.extensionHeader.isNullOrBlank()) {
                         restoredHeaders[index] = msg.extensionHeader
+                    }
+                    if (!msg.extensionHeaderOwner.isNullOrBlank()) {
+                        restoredOwners[index] = msg.extensionHeaderOwner
                     }
                 }
                 _uiState.update {
@@ -351,7 +355,7 @@ class ChatViewModel @Inject constructor(
                 }
                 pushExtensionContext()
                 extensionManager.emit(ExtensionEvent.CHAT_CHANGED, fileName)
-                extensionManager.restoreMessageHeaders(restoredHeaders)
+                extensionManager.restoreMessageHeaders(restoredHeaders, restoredOwners)
             }
             is Result.Error -> createNewChat()
         }
@@ -877,8 +881,9 @@ class ChatViewModel @Inject constructor(
         headers.forEach { (index, headerText) ->
             if (index in messages.indices) {
                 val msg = messages[index]
-                if (msg.extensionHeader != headerText) {
-                    messages[index] = msg.copy(extensionHeader = headerText)
+                val owner = extensionManager.getHeaderOwner(index)
+                if (msg.extensionHeader != headerText || msg.extensionHeaderOwner != owner) {
+                    messages[index] = msg.copy(extensionHeader = headerText, extensionHeaderOwner = owner)
                     changed = true
                 }
             }
@@ -887,6 +892,14 @@ class ChatViewModel @Inject constructor(
             _uiState.update { it.copy(messages = messages) }
         }
         return changed
+    }
+
+    // ── Header long-press ─────────────────────────────────────────────────
+
+    fun onHeaderLongPressed(messageIndex: Int) {
+        val owner = extensionManager.getHeaderOwner(messageIndex) ?: return
+        val jsonData = "{\"messageIndex\":$messageIndex,\"extensionId\":\"${owner.replace("\"", "\\\"")}\"}"
+        extensionManager.emitJson(ExtensionEvent.HEADER_LONG_PRESSED, jsonData)
     }
 
     // ── Edit dialog (JS extension) ─────────────────────────────────────────

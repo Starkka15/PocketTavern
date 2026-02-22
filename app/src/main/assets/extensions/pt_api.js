@@ -91,7 +91,8 @@
             GENERATION_STOPPED: 'GENERATION_STOPPED',
             CHAT_CHANGED:       'CHAT_CHANGED',
             CHARACTER_CHANGED:  'CHARACTER_CHANGED',
-            BUTTON_CLICKED:     'BUTTON_CLICKED'
+            BUTTON_CLICKED:       'BUTTON_CLICKED',
+            HEADER_LONG_PRESSED:  'HEADER_LONG_PRESSED'
         },
 
         /** Where to inject prompt text relative to the character definition. */
@@ -223,16 +224,17 @@
          *
          * @param {number} messageIndex  Index of the message to attach the header to.
          * @param {string} text          Text to display in the header box.
+         * @param {string} [extensionId] Your extension's id (used for long-press ownership).
          *
          * @example
          *   PT.eventSource.on(PT.events.MESSAGE_RECEIVED, function(data) {
          *       var thinking = data.text.match(/<thinking>([\s\S]*?)<\/thinking>/);
-         *       if (thinking) PT.setMessageHeader(data.index, '🤔 ' + thinking[1].trim());
+         *       if (thinking) PT.setMessageHeader(data.index, '🤔 ' + thinking[1].trim(), 'my-ext');
          *   });
          */
-        setMessageHeader: function (messageIndex, text) {
+        setMessageHeader: function (messageIndex, text, extensionId) {
             if (window.PtBridge) {
-                PtBridge.setMessageHeader(messageIndex, text || '');
+                PtBridge.setMessageHeader(messageIndex, text || '', extensionId || '');
             }
         },
 

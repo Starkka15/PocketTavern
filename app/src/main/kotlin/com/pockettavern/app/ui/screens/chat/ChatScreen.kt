@@ -388,6 +388,9 @@ fun ChatScreen(
                                 isLastAssistantMessage = isLastAsstMsg,
                                 header = uiState.messageHeaders[index],
                                 onLongPress = { viewModel.showMessageActions(index) },
+                                onHeaderLongPress = if (uiState.messageHeaders.containsKey(index)) {
+                                    { viewModel.onHeaderLongPressed(index) }
+                                } else null,
                                 onSwipeLeft = { viewModel.swipeLeft(index) },
                                 onSwipeRight = {
                                     val info = viewModel.getSwipeInfo(index)
@@ -678,6 +681,7 @@ private fun MessageWithActions(
     isLastAssistantMessage: Boolean,
     header: String? = null,
     onLongPress: () -> Unit,
+    onHeaderLongPress: (() -> Unit)? = null,
     onSwipeLeft: () -> Unit,
     onSwipeRight: () -> Unit
 ) {
@@ -711,7 +715,8 @@ private fun MessageWithActions(
             ChatBubble(
                 message = message,
                 characterName = characterName,
-                header = header
+                header = header,
+                onHeaderLongPress = onHeaderLongPress
             )
         }
 
