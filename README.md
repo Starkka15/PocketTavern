@@ -475,9 +475,145 @@ The following SillyTavern fields exist in `.json` exports but are not applicable
 
 ---
 
-### Example PocketTavern theme
+### Included Themes
 
-Save this as `midnight-plum.json` and import it via the Appearance screen:
+PocketTavern ships with four built-in themes, each with animated particle effects on the main screen:
+
+- **PocketTavern** (default) — Fire & Ice (hardcoded)
+- **Fire & Ice** — The default theme exported as an editable JSON (same look, fully customizable)
+- **Midnight Plum** — Purple stars rising + slow-falling diamonds
+- **Ember** — Warm embers with bright spark accents
+
+### Particle Effects
+
+Themes can include a `particle_effect` field that defines animated background particles on the main screen. Use a preset name for convenience or define custom layers for full control.
+
+**Preset names:** `embers`, `snow`, `bubbles`, `rain`, `sparkles`, `fireAndIce`, `none`
+
+Preset shorthand:
+```json
+{ "particle_effect": "rain" }
+```
+
+Preset with overrides:
+```json
+{ "particle_effect": { "preset": "embers", "layers": [{ "count": 50 }] } }
+```
+
+Fully custom multi-layer (this is what Midnight Plum uses):
+```json
+{
+  "particle_effect": {
+    "layers": [
+      {
+        "count": 40,
+        "shape": "star",
+        "direction": "up",
+        "size_min": 1.5, "size_max": 4.0,
+        "speed_min": 0.1, "speed_max": 0.4,
+        "opacity_min": 0.15, "opacity_max": 0.6,
+        "glow": true, "glow_radius": 3.0, "glow_opacity": 0.2,
+        "rotation": true,
+        "colors": ["#BE96FF", "#9B59B6", "#E0C0FF", "#7B68EE"]
+      },
+      {
+        "count": 15,
+        "shape": "diamond",
+        "direction": "down",
+        "size_min": 1.0, "size_max": 3.0,
+        "speed_min": 0.08, "speed_max": 0.25,
+        "opacity_min": 0.1, "opacity_max": 0.35,
+        "glow": true,
+        "rotation": true,
+        "colors": ["#6A5ACD", "#483D8B", "#9370DB"]
+      }
+    ],
+    "animation_duration": 12000,
+    "background_glow": true,
+    "background_glow_opacity": 0.06
+  }
+}
+```
+
+**Available shapes:** `circle`, `square`, `diamond`, `star`, `snowflake`, `raindrop`
+
+**Available directions:** `up`, `down`, `left`, `right`, `random`
+
+**Layer properties:**
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `count` | int | 35 | Number of particles |
+| `shape` | string | circle | Particle shape |
+| `direction` | string | up | Drift direction |
+| `size_min` / `size_max` | float | 2 / 7 | Size range in dp |
+| `speed_min` / `speed_max` | float | 0.3 / 0.7 | Speed range |
+| `wobble_amplitude` | float | 0.5 | Horizontal sway amount |
+| `wobble_frequency` | float | 1.0 | Sway frequency |
+| `opacity_min` / `opacity_max` | float | 0.25 / 0.7 | Opacity range |
+| `glow` | bool | true | Render soft glow ring |
+| `glow_radius` | float | 2.8 | Glow ring size multiplier |
+| `glow_opacity` | float | 0.25 | Glow ring opacity |
+| `rotation` | bool | false | Spin particles |
+| `colors` | string[] | [] | Hex colors (empty = use theme accent) |
+
+### Default Theme — Fire & Ice
+
+This is the built-in PocketTavern default exported as JSON. Use it as a starting point for your own themes:
+
+```json
+{
+  "name": "Fire & Ice",
+
+  "shadow_color":             "rgba(10, 10, 15, 1)",
+  "blur_tint_color":          "rgba(18, 18, 26, 1)",
+  "border_color":             "rgba(26, 26, 37, 1)",
+
+  "underline_text_color":     "rgba(255, 107, 0, 1)",
+  "main_text_color":          "rgba(238, 238, 238, 1)",
+  "quote_text_color":         "rgba(136, 136, 136, 1)",
+
+  "user_mes_blur_tint_color": "rgba(255, 107, 0, 1)",
+  "bot_mes_blur_tint_color":  "rgba(26, 42, 58, 1)",
+  "chat_tint_color":          "rgba(26, 42, 58, 1)",
+
+  "avatar_style": 0,
+
+  "particle_effect": {
+    "layers": [
+      {
+        "count": 25,
+        "shape": "circle",
+        "direction": "up",
+        "size_min": 2.0, "size_max": 6.0,
+        "speed_min": 0.3, "speed_max": 0.7,
+        "wobble_amplitude": 0.5, "wobble_frequency": 1.0,
+        "opacity_min": 0.25, "opacity_max": 0.6,
+        "glow": true, "glow_radius": 2.8, "glow_opacity": 0.25,
+        "colors": ["#FF6B00", "#FFB347", "#E84A1B"]
+      },
+      {
+        "count": 15,
+        "shape": "snowflake",
+        "direction": "down",
+        "size_min": 3.0, "size_max": 7.0,
+        "speed_min": 0.15, "speed_max": 0.35,
+        "wobble_amplitude": 0.6, "wobble_frequency": 0.8,
+        "opacity_min": 0.2, "opacity_max": 0.5,
+        "glow": false,
+        "rotation": true,
+        "colors": ["#00BFFF", "#4DD0E1", "#E0F0FF"]
+      }
+    ],
+    "animation_duration": 10000,
+    "background_glow": true,
+    "background_glow_opacity": 0.10
+  }
+}
+```
+
+### More Examples
+
+Save as a `.json` file and import via the Appearance screen:
 
 ```json
 {
@@ -495,11 +631,12 @@ Save this as `midnight-plum.json` and import it via the Appearance screen:
   "bot_mes_blur_tint_color":  "rgba(35, 28, 60, 0.85)",
   "chat_tint_color":          "rgba(35, 28, 60, 0.8)",
 
-  "avatar_style": 0
+  "avatar_style": 0,
+  "particle_effect": "sparkles"
 }
 ```
 
-A second example with rounded-square avatars and a warm amber accent:
+A second example with rounded-square avatars, a warm amber accent, and ember particles:
 
 ```json
 {
@@ -517,7 +654,8 @@ A second example with rounded-square avatars and a warm amber accent:
   "bot_mes_blur_tint_color":  "rgba(32, 22, 14, 0.9)",
   "chat_tint_color":          "rgba(32, 22, 14, 0.85)",
 
-  "avatar_style": 1
+  "avatar_style": 1,
+  "particle_effect": "embers"
 }
 ```
 

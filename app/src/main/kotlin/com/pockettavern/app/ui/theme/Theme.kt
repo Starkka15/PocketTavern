@@ -155,6 +155,7 @@ private val AppTypography = Typography(
 @Composable
 fun SillyTavernTheme(
     colors: PocketTavernColors = PocketTavernColors.Default,
+    particleEffect: ParticleEffectConfig = ParticleEffectConfig.Default,
     content: @Composable () -> Unit
 ) {
     val colorScheme = buildColorScheme(colors)
@@ -172,7 +173,10 @@ fun SillyTavernTheme(
         }
     }
 
-    CompositionLocalProvider(LocalPocketTavernColors provides colors) {
+    CompositionLocalProvider(
+        LocalPocketTavernColors provides colors,
+        LocalParticleEffect provides particleEffect
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography  = AppTypography,

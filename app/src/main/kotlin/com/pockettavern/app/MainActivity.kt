@@ -28,7 +28,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val themeColors by themeManager.colors.collectAsStateWithLifecycle()
-            SillyTavernTheme(colors = themeColors) {
+            val particleEffect by themeManager.particleEffect.collectAsStateWithLifecycle()
+            SillyTavernTheme(colors = themeColors, particleEffect = particleEffect) {
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()

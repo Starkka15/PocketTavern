@@ -1,0 +1,59 @@
+{
+  "name": "Ember",
+
+  "shadow_color":             "rgba(14, 10, 8, 1)",
+  "blur_tint_color":          "rgba(38, 28, 20, 0.95)",
+  "border_color":             "rgba(180, 100, 30, 0.6)",
+
+  "underline_text_color":     "rgba(255, 165, 60, 1)",
+  "main_text_color":          "rgba(240, 228, 210, 1)",
+  "quote_text_color":         "rgba(185, 158, 120, 1)",
+
+  "user_mes_blur_tint_color": "rgba(180, 90, 20, 0.9)",
+  "bot_mes_blur_tint_color":  "rgba(32, 22, 14, 0.9)",
+  "chat_tint_color":          "rgba(32, 22, 14, 0.85)",
+
+  "avatar_style": 1,
+
+  "particle_effect": {
+    "layers": [
+      {
+        "count": 35,
+        "shape": "circle",
+        "direction": "up",
+        "size_min": 2.0,
+        "size_max": 7.0,
+        "speed_min": 0.25,
+        "speed_max": 0.65,
+        "wobble_amplitude": 0.5,
+        "wobble_frequency": 1.0,
+        "opacity_min": 0.2,
+        "opacity_max": 0.65,
+        "glow": true,
+        "glow_radius": 3.0,
+        "glow_opacity": 0.3,
+        "colors": ["#FFA53C", "#FF6B00", "#E84A1B", "#FFD700"]
+      },
+      {
+        "count": 10,
+        "shape": "circle",
+        "direction": "up",
+        "size_min": 1.0,
+        "size_max": 3.0,
+        "speed_min": 0.5,
+        "speed_max": 1.0,
+        "wobble_amplitude": 0.3,
+        "wobble_frequency": 1.5,
+        "opacity_min": 0.4,
+        "opacity_max": 0.9,
+        "glow": true,
+        "glow_radius": 2.0,
+        "glow_opacity": 0.4,
+        "colors": ["#FFCC00", "#FFFFFF", "#FFE4B5"]
+      }
+    ],
+    "animation_duration": 10000,
+    "background_glow": true,
+    "background_glow_opacity": 0.08
+  }
+}

@@ -2,6 +2,8 @@ package com.pockettavern.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import com.pockettavern.app.util.DebugLogger
+import kotlinx.serialization.json.*
 
 /**
  * Parses a SillyTavern theme JSON string into [PocketTavernColors].
@@ -122,5 +124,89 @@ object StThemeParser {
             result[m.groupValues[1]] = m.groupValues[2]
         }
         return result
+    }
+
+    // ── Particle effect parsing ─────────────────────────────────────────────
+
+    private val jsonParser = Json { ignoreUnknownKeys = true; isLenient = true }
+
+    fun parseParticleEffect(json: String, isDefault: Boolean = false): ParticleEffectConfig {
+        return try {
+            val root = jsonParser.parseToJsonElement(json).jsonObject
+            val effectElement = root["particle_effect"]
+                ?: return if (isDefault) ParticleEffectConfig.Default else ParticleEffectConfig.None
+
+            when (effectElement) {
+                is JsonPrimitive -> ParticlePresets.resolve(effectElement.content)
+                is JsonObject -> parseEffectObject(effectElement)
+                else -> ParticleEffectConfig.None
+            }
+        } catch (e: Exception) {
+            DebugLogger.log("[StThemeParser] Failed to parse particle_effect: ${e.message}")
+            if (isDefault) ParticleEffectConfig.Default else ParticleEffectConfig.None
+        }
+    }
+
+    private fun parseEffectObject(obj: JsonObject): ParticleEffectConfig {
+        val presetName = obj["preset"]?.jsonPrimitive?.contentOrNull
+        val base = if (presetName != null) ParticlePresets.resolve(presetName) else ParticleEffectConfig()
+
+        val layers = obj["layers"]?.jsonArray?.mapIndexed { i, elem ->
+            val baseLayer = base.layers.getOrElse(i) { ParticleLayerConfig() }
+            parseLayerObject(elem.jsonObject, baseLayer)
+        } ?: base.layers
+
+        return base.copy(
+            layers = layers.ifEmpty { base.layers },
+            animationDuration = obj["animation_duration"]?.jsonPrimitive?.intOrNull
+                ?: base.animationDuration,
+            fadeEdgePercent = obj["fade_edge_percent"]?.jsonPrimitive?.floatOrNull
+                ?: base.fadeEdgePercent,
+            backgroundGlow = obj["background_glow"]?.jsonPrimitive?.booleanOrNull
+                ?: base.backgroundGlow,
+            backgroundGlowOpacity = obj["background_glow_opacity"]?.jsonPrimitive?.floatOrNull
+                ?: base.backgroundGlowOpacity,
+            enabled = obj["enabled"]?.jsonPrimitive?.booleanOrNull ?: base.enabled
+        )
+    }
+
+    private fun parseLayerObject(obj: JsonObject, base: ParticleLayerConfig): ParticleLayerConfig {
+        return base.copy(
+            count = obj["count"]?.jsonPrimitive?.intOrNull ?: base.count,
+            shape = obj["shape"]?.jsonPrimitive?.contentOrNull?.let { parseShape(it) } ?: base.shape,
+            direction = obj["direction"]?.jsonPrimitive?.contentOrNull?.let { parseDirection(it) } ?: base.direction,
+            sizeMin = obj["size_min"]?.jsonPrimitive?.floatOrNull ?: base.sizeMin,
+            sizeMax = obj["size_max"]?.jsonPrimitive?.floatOrNull ?: base.sizeMax,
+            speedMin = obj["speed_min"]?.jsonPrimitive?.floatOrNull ?: base.speedMin,
+            speedMax = obj["speed_max"]?.jsonPrimitive?.floatOrNull ?: base.speedMax,
+            wobbleAmplitude = obj["wobble_amplitude"]?.jsonPrimitive?.floatOrNull ?: base.wobbleAmplitude,
+            wobbleFrequency = obj["wobble_frequency"]?.jsonPrimitive?.floatOrNull ?: base.wobbleFrequency,
+            opacityMin = obj["opacity_min"]?.jsonPrimitive?.floatOrNull ?: base.opacityMin,
+            opacityMax = obj["opacity_max"]?.jsonPrimitive?.floatOrNull ?: base.opacityMax,
+            glow = obj["glow"]?.jsonPrimitive?.booleanOrNull ?: base.glow,
+            glowRadius = obj["glow_radius"]?.jsonPrimitive?.floatOrNull ?: base.glowRadius,
+            glowOpacity = obj["glow_opacity"]?.jsonPrimitive?.floatOrNull ?: base.glowOpacity,
+            rotation = obj["rotation"]?.jsonPrimitive?.booleanOrNull ?: base.rotation,
+            colors = obj["colors"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: base.colors
+        )
+    }
+
+    private fun parseShape(s: String): ParticleShape? = when (s.lowercase()) {
+        "circle"    -> ParticleShape.CIRCLE
+        "square"    -> ParticleShape.SQUARE
+        "diamond"   -> ParticleShape.DIAMOND
+        "star"      -> ParticleShape.STAR
+        "snowflake" -> ParticleShape.SNOWFLAKE
+        "raindrop"  -> ParticleShape.RAINDROP
+        else        -> null
+    }
+
+    private fun parseDirection(s: String): ParticleDirection? = when (s.lowercase()) {
+        "up"     -> ParticleDirection.UP
+        "down"   -> ParticleDirection.DOWN
+        "left"   -> ParticleDirection.LEFT
+        "right"  -> ParticleDirection.RIGHT
+        "random" -> ParticleDirection.RANDOM
+        else     -> null
     }
 }

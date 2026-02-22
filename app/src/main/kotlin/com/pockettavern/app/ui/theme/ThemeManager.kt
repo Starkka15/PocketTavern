@@ -13,7 +13,8 @@ import javax.inject.Singleton
 data class ThemeEntry(
     val id: String,
     val name: String,
-    val isDefault: Boolean
+    val isDefault: Boolean,
+    val effectName: String = "None"
 )
 
 @Singleton
@@ -26,23 +27,44 @@ class ThemeManager @Inject constructor(
     private val _colors  = MutableStateFlow(PocketTavernColors.Default)
     val colors: StateFlow<PocketTavernColors> = _colors.asStateFlow()
 
+    private val _particleEffect = MutableStateFlow(ParticlePresets.fireAndIce())
+    val particleEffect: StateFlow<ParticleEffectConfig> = _particleEffect.asStateFlow()
+
     private val _activeId = MutableStateFlow(prefs.getString(KEY_ACTIVE, THEME_DEFAULT) ?: THEME_DEFAULT)
     val activeId: StateFlow<String> = _activeId.asStateFlow()
 
     init {
         val savedId = _activeId.value
-        if (savedId != THEME_DEFAULT) loadFromDisk(savedId)
+        if (savedId != THEME_DEFAULT) {
+            if (savedId in BUNDLED_THEMES) loadBundled(savedId) else loadFromDisk(savedId)
+        }
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
 
     fun listThemes(): List<ThemeEntry> {
-        val list = mutableListOf(ThemeEntry(THEME_DEFAULT, "PocketTavern", isDefault = true))
+        val list = mutableListOf(
+            ThemeEntry(THEME_DEFAULT, "PocketTavern", isDefault = true, effectName = "Fire & Ice")
+        )
+        // Bundled themes from assets
+        for (id in BUNDLED_THEMES) {
+            val json = readBundledJson(id) ?: continue
+            val name = extractName(json) ?: id
+            val effectName = try {
+                effectDisplayName(StThemeParser.parseParticleEffect(json, isDefault = false))
+            } catch (_: Exception) { "None" }
+            list += ThemeEntry(id, name, isDefault = true, effectName = effectName)
+        }
+        // User-imported themes from disk
         themesDir.listFiles { f -> f.extension == "json" }
             ?.sortedBy { it.nameWithoutExtension }
             ?.forEach { f ->
-                val name = extractName(f.readText()) ?: f.nameWithoutExtension
-                list += ThemeEntry(f.nameWithoutExtension, name, isDefault = false)
+                val json = f.readText()
+                val name = extractName(json) ?: f.nameWithoutExtension
+                val effectName = try {
+                    effectDisplayName(StThemeParser.parseParticleEffect(json, isDefault = false))
+                } catch (_: Exception) { "None" }
+                list += ThemeEntry(f.nameWithoutExtension, name, isDefault = false, effectName = effectName)
             }
         return list
     }
@@ -50,8 +72,11 @@ class ThemeManager @Inject constructor(
     fun applyTheme(id: String) {
         if (id == THEME_DEFAULT) {
             _colors.value  = PocketTavernColors.Default
+            _particleEffect.value = ParticlePresets.fireAndIce()
             _activeId.value = THEME_DEFAULT
             prefs.edit().putString(KEY_ACTIVE, THEME_DEFAULT).apply()
+        } else if (id in BUNDLED_THEMES) {
+            loadBundled(id)
         } else {
             loadFromDisk(id)
         }
@@ -71,7 +96,7 @@ class ThemeManager @Inject constructor(
     }
 
     fun deleteTheme(id: String) {
-        if (id == THEME_DEFAULT) return
+        if (id == THEME_DEFAULT || id in BUNDLED_THEMES) return
         File(themesDir, "$id.json").delete()
         if (_activeId.value == id) applyTheme(THEME_DEFAULT)
         DebugLogger.log("[ThemeManager] Deleted '$id'")
@@ -79,16 +104,45 @@ class ThemeManager @Inject constructor(
 
     // ── Private ───────────────────────────────────────────────────────────────
 
+    private fun loadBundled(id: String) {
+        val json = readBundledJson(id)
+        if (json == null) { applyTheme(THEME_DEFAULT); return }
+        try {
+            _colors.value = StThemeParser.parse(json)
+            _particleEffect.value = StThemeParser.parseParticleEffect(json, isDefault = false)
+            _activeId.value = id
+            prefs.edit().putString(KEY_ACTIVE, id).apply()
+        } catch (e: Exception) {
+            DebugLogger.log("[ThemeManager] Failed to load bundled '$id': ${e.message}")
+            applyTheme(THEME_DEFAULT)
+        }
+    }
+
+    private fun readBundledJson(id: String): String? = try {
+        context.assets.open("themes/$id.json").bufferedReader().readText()
+    } catch (_: Exception) { null }
+
     private fun loadFromDisk(id: String) {
         val f = File(themesDir, "$id.json")
         if (!f.exists()) { applyTheme(THEME_DEFAULT); return }
         try {
-            _colors.value   = StThemeParser.parse(f.readText())
+            val json = f.readText()
+            _colors.value   = StThemeParser.parse(json)
+            _particleEffect.value = StThemeParser.parseParticleEffect(json, isDefault = false)
             _activeId.value = id
             prefs.edit().putString(KEY_ACTIVE, id).apply()
         } catch (e: Exception) {
             DebugLogger.log("[ThemeManager] Failed to load '$id': ${e.message}")
             applyTheme(THEME_DEFAULT)
+        }
+    }
+
+    private fun effectDisplayName(effect: ParticleEffectConfig): String {
+        if (!effect.enabled) return "None"
+        return when (effect.preset?.lowercase()) {
+            "fireandice" -> "Fire & Ice"
+            null -> if (effect.layers.isNotEmpty()) "Custom" else "None"
+            else -> effect.preset.replaceFirstChar { it.uppercase() }
         }
     }
 
@@ -98,5 +152,6 @@ class ThemeManager @Inject constructor(
     companion object {
         const val THEME_DEFAULT = "pockettavern"
         private const val KEY_ACTIVE = "active_theme_id"
+        private val BUNDLED_THEMES = setOf("fire_and_ice", "midnight_plum", "ember")
     }
 }

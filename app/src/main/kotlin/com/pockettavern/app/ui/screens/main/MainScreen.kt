@@ -33,6 +33,7 @@ import com.pockettavern.app.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pockettavern.app.ui.components.ConnectionStatusBar
+import com.pockettavern.app.ui.components.ParticleBackground
 import com.pockettavern.app.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,11 +49,15 @@ fun MainScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    Box(modifier = Modifier.fillMaxSize()) {
+    ParticleBackground()
+
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             // Taller top bar
             Surface(
-                color = MaterialTheme.colorScheme.background,
+                color = Color.Transparent,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(80.dp)
@@ -208,6 +213,7 @@ fun MainScreen(
             textContentColor = MaterialTheme.colorScheme.onSurface
         )
     }
+    } // Box
 }
 
 @Composable
