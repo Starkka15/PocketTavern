@@ -257,6 +257,68 @@
             }
         },
 
+        // ── Header buttons & menus ───────────────────────────────────────────
+
+        /**
+         * Register inline buttons that render inside the header box.
+         * Hidden by default; user long-presses the header to toggle show/hide.
+         * Clicking a button dispatches BUTTON_CLICKED with { action, label }.
+         *
+         * @param {string} extensionId  Your extension's unique id.
+         * @param {Array}  buttons      Array of { label: string, action: string }
+         *
+         * @example
+         *   PT.registerHeaderButtons('my-ext', [
+         *       { label: 'Edit',   action: 'edit_header' },
+         *       { label: 'Regen',  action: 'regen_header' }
+         *   ]);
+         */
+        registerHeaderButtons: function (extensionId, buttons) {
+            if (window.PtBridge) {
+                PtBridge.registerHeaderButtons(extensionId, JSON.stringify(buttons || []));
+            }
+        },
+
+        /**
+         * Remove inline header buttons for this extension.
+         * @param {string} extensionId
+         */
+        clearHeaderButtons: function (extensionId) {
+            if (window.PtBridge) {
+                PtBridge.clearHeaderButtons(extensionId);
+            }
+        },
+
+        /**
+         * Pre-register a context menu shown as a popup when the user
+         * long-presses a header owned by this extension.
+         * Selecting an item dispatches BUTTON_CLICKED with { action, label }.
+         *
+         * @param {string} extensionId  Your extension's unique id.
+         * @param {Array}  items        Array of { label: string, action: string }
+         *
+         * @example
+         *   PT.registerHeaderMenu('my-ext', [
+         *       { label: 'Review Notes',  action: 'review' },
+         *       { label: 'Clear Notes',   action: 'clear' }
+         *   ]);
+         */
+        registerHeaderMenu: function (extensionId, items) {
+            if (window.PtBridge) {
+                PtBridge.registerHeaderMenu(extensionId, JSON.stringify(items || []));
+            }
+        },
+
+        /**
+         * Remove the header context menu for this extension.
+         * @param {string} extensionId
+         */
+        clearHeaderMenu: function (extensionId) {
+            if (window.PtBridge) {
+                PtBridge.clearHeaderMenu(extensionId);
+            }
+        },
+
         // ── Output filters ───────────────────────────────────────────────────
 
         /**

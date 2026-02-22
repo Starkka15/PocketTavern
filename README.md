@@ -240,7 +240,27 @@ Display custom header boxes above AI messages (e.g. mood trackers, metadata).
 | `PT.clearMessageHeader(index)` | Remove the header at a specific message index. |
 | `PT.clearAllHeaders()` | Remove all message headers (typically called on `CHAT_CHANGED`). |
 
-Headers are persisted to disk automatically. When a user long-presses a header, the `HEADER_LONG_PRESSED` event fires with `{ messageIndex, extensionId }` so the owning extension can show its own edit UI.
+Headers are persisted to disk automatically. Multiple extensions can each set their own header on the same message -- they stack vertically.
+
+#### UI: Header Inline Buttons
+
+Register clickable buttons that render inside the header box. Hidden by default; user long-presses the header to toggle show/hide.
+
+| API | Description |
+|-----|-------------|
+| `PT.registerHeaderButtons(extensionId, buttons)` | Register inline buttons. Each: `{ label, action }`. Clicking dispatches `BUTTON_CLICKED`. |
+| `PT.clearHeaderButtons(extensionId)` | Remove inline buttons for this extension. |
+
+#### UI: Header Context Menu
+
+Pre-register a popup context menu shown when the user long-presses a header.
+
+| API | Description |
+|-----|-------------|
+| `PT.registerHeaderMenu(extensionId, items)` | Register menu items. Each: `{ label, action }`. Selecting dispatches `BUTTON_CLICKED`. |
+| `PT.clearHeaderMenu(extensionId)` | Remove the context menu for this extension. |
+
+**Long-press priority:** If inline buttons are registered, long-press toggles them. Otherwise if a menu is registered, long-press shows the popup. Otherwise `HEADER_LONG_PRESSED` event fires as a fallback.
 
 #### UI: Quick Reply Buttons
 

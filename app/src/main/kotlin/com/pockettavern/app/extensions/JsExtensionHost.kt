@@ -57,6 +57,15 @@ class JsExtensionHost @Inject constructor(
     private val _jsButtonSets = MutableStateFlow<Map<String, List<QuickReplyButton>>>(emptyMap())
     val jsButtonSets: StateFlow<Map<String, List<QuickReplyButton>>> = _jsButtonSets.asStateFlow()
 
+    // Inline header buttons: extensionId → list of actions rendered inside the header box
+    data class HeaderAction(val label: String, val action: String)
+    private val _headerButtons = MutableStateFlow<Map<String, List<HeaderAction>>>(emptyMap())
+    val headerButtons: StateFlow<Map<String, List<HeaderAction>>> = _headerButtons.asStateFlow()
+
+    // Header context menus: extensionId → list of actions shown as a popup on long-press
+    private val _headerMenus = MutableStateFlow<Map<String, List<HeaderAction>>>(emptyMap())
+    val headerMenus: StateFlow<Map<String, List<HeaderAction>>> = _headerMenus.asStateFlow()
+
     // Output filters registered by JS extensions: extensionId → regex pattern
     private val _outputFilters = mutableMapOf<String, Regex>()
 
@@ -114,6 +123,8 @@ class JsExtensionHost @Inject constructor(
         _outputFilters.clear()
         _messageHeaders.value = emptyMap()
         _jsButtonSets.value = emptyMap()
+        _headerButtons.value = emptyMap()
+        _headerMenus.value = emptyMap()
         scope.launch {
             webView?.loadData("<html><body></body></html>", "text/html", "utf-8")
         }
@@ -360,6 +371,63 @@ class JsExtensionHost @Inject constructor(
         @JavascriptInterface
         fun clearOutputFilter(extensionId: String) {
             _outputFilters.remove(extensionId)
+        }
+
+        // ── Header buttons & menus ──────────────────────────────────────────
+
+        /**
+         * Called by PT.registerHeaderButtons(extensionId, buttonsJson).
+         * Registers inline buttons rendered inside the header box.
+         * Long-press toggles their visibility.
+         */
+        @JavascriptInterface
+        fun registerHeaderButtons(extensionId: String, buttonsJson: String) {
+            try {
+                val arr = JSONArray(buttonsJson)
+                val buttons = (0 until arr.length()).map { i ->
+                    val obj = arr.getJSONObject(i)
+                    HeaderAction(
+                        label  = obj.optString("label", "?"),
+                        action = obj.optString("action", "")
+                    )
+                }
+                _headerButtons.value = _headerButtons.value + (extensionId to buttons)
+            } catch (e: Exception) {
+                DebugLogger.log("[JsExt] registerHeaderButtons parse error: ${e.message}")
+            }
+        }
+
+        /** Called by PT.clearHeaderButtons(extensionId). */
+        @JavascriptInterface
+        fun clearHeaderButtons(extensionId: String) {
+            _headerButtons.value = _headerButtons.value - extensionId
+        }
+
+        /**
+         * Called by PT.registerHeaderMenu(extensionId, menuJson).
+         * Pre-registers a context menu shown as a popup on header long-press.
+         */
+        @JavascriptInterface
+        fun registerHeaderMenu(extensionId: String, menuJson: String) {
+            try {
+                val arr = JSONArray(menuJson)
+                val items = (0 until arr.length()).map { i ->
+                    val obj = arr.getJSONObject(i)
+                    HeaderAction(
+                        label  = obj.optString("label", "?"),
+                        action = obj.optString("action", "")
+                    )
+                }
+                _headerMenus.value = _headerMenus.value + (extensionId to items)
+            } catch (e: Exception) {
+                DebugLogger.log("[JsExt] registerHeaderMenu parse error: ${e.message}")
+            }
+        }
+
+        /** Called by PT.clearHeaderMenu(extensionId). */
+        @JavascriptInterface
+        fun clearHeaderMenu(extensionId: String) {
+            _headerMenus.value = _headerMenus.value - extensionId
         }
 
         /**

@@ -383,16 +383,24 @@ fun ChatScreen(
                             val lastAsstIndex = uiState.messages.indexOfLast { !it.isUser }
                             val isLastAsstMsg = !message.isUser && index == lastAsstIndex
                             val msgHeaders = uiState.messageHeaders[index] ?: emptyList()
+                            val visibleBtns = uiState.visibleHeaderButtons
+                                .filter { it.first == index }
+                                .map { it.second }
+                                .toSet()
                             MessageWithActions(
                                 message = message,
                                 characterName = uiState.character?.name ?: "Assistant",
                                 swipeInfo = swipeInfo,
                                 isLastAssistantMessage = isLastAsstMsg,
                                 headers = msgHeaders,
+                                headerButtons = uiState.headerButtons,
+                                visibleButtonExtensions = visibleBtns,
+                                headerMenus = uiState.headerMenus,
                                 onLongPress = { viewModel.showMessageActions(index) },
                                 onHeaderLongPress = if (msgHeaders.isNotEmpty()) {
                                     { extensionId -> viewModel.onHeaderLongPressed(index, extensionId) }
                                 } else null,
+                                onHeaderActionClick = { action, label -> viewModel.onHeaderActionClicked(action, label) },
                                 onSwipeLeft = { viewModel.swipeLeft(index) },
                                 onSwipeRight = {
                                     val info = viewModel.getSwipeInfo(index)
@@ -682,8 +690,12 @@ private fun MessageWithActions(
     swipeInfo: Pair<Int, Int>?,
     isLastAssistantMessage: Boolean,
     headers: List<MessageHeaderEntry> = emptyList(),
+    headerButtons: Map<String, List<JsExtensionHost.HeaderAction>> = emptyMap(),
+    visibleButtonExtensions: Set<String> = emptySet(),
+    headerMenus: Map<String, List<JsExtensionHost.HeaderAction>> = emptyMap(),
     onLongPress: () -> Unit,
     onHeaderLongPress: ((String) -> Unit)? = null,
+    onHeaderActionClick: ((String, String) -> Unit)? = null,
     onSwipeLeft: () -> Unit,
     onSwipeRight: () -> Unit
 ) {
@@ -718,7 +730,11 @@ private fun MessageWithActions(
                 message = message,
                 characterName = characterName,
                 headers = headers,
-                onHeaderLongPress = onHeaderLongPress
+                headerButtons = headerButtons,
+                visibleButtonExtensions = visibleButtonExtensions,
+                headerMenus = headerMenus,
+                onHeaderLongPress = onHeaderLongPress,
+                onHeaderActionClick = onHeaderActionClick
             )
         }
 

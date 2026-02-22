@@ -91,6 +91,12 @@ data class ChatUiState(
     val showTokenCount: Boolean = false,
     // Message headers set by JS extensions via PT.setMessageHeader(index, text, extensionId)
     val messageHeaders: Map<Int, List<MessageHeaderEntry>> = emptyMap(),
+    // Inline header buttons registered by extensions (extensionId → actions)
+    val headerButtons: Map<String, List<JsExtensionHost.HeaderAction>> = emptyMap(),
+    // Header context menus registered by extensions (extensionId → actions)
+    val headerMenus: Map<String, List<JsExtensionHost.HeaderAction>> = emptyMap(),
+    // Which (messageIndex, extensionId) pairs have visible inline buttons
+    val visibleHeaderButtons: Set<Pair<Int, String>> = emptySet(),
     // Edit dialog requested by JS extension via PT.showEditDialog()
     val editDialogRequest: JsExtensionHost.EditDialogRequest? = null
 )
@@ -146,6 +152,18 @@ class ChatViewModel @Inject constructor(
                 if (headers.isNotEmpty() && persistExtensionHeaders()) {
                     saveCurrentChat()
                 }
+            }
+        }
+        // Observe inline header buttons registered by JS extensions
+        viewModelScope.launch {
+            extensionManager.headerButtons.collect { buttons ->
+                _uiState.update { it.copy(headerButtons = buttons) }
+            }
+        }
+        // Observe header context menus registered by JS extensions
+        viewModelScope.launch {
+            extensionManager.headerMenus.collect { menus ->
+                _uiState.update { it.copy(headerMenus = menus) }
             }
         }
         // Observe edit dialog requests from JS extensions
@@ -892,11 +910,44 @@ class ChatViewModel @Inject constructor(
 
     // ── Header long-press ─────────────────────────────────────────────────
 
+    /**
+     * Priority: inline buttons → context menu → HEADER_LONG_PRESSED event.
+     * Returns "buttons" or "menu" so ChatBubble knows which UX to show,
+     * or null if neither is registered (fallback to event).
+     */
     fun onHeaderLongPressed(messageIndex: Int, extensionId: String) {
         if (extensionId.isBlank()) return
+        val state = _uiState.value
+
+        // Priority 1: toggle inline buttons
+        if (state.headerButtons.containsKey(extensionId)) {
+            val key = messageIndex to extensionId
+            val current = state.visibleHeaderButtons
+            _uiState.update {
+                it.copy(visibleHeaderButtons = if (key in current) current - key else current + key)
+            }
+            return
+        }
+
+        // Priority 2: context menu — handled in ChatBubble via headerMenus state
+        if (state.headerMenus.containsKey(extensionId)) {
+            // Menu popup is managed by ChatBubble's local state.
+            // Returning here means we don't fire the event.
+            return
+        }
+
+        // Priority 3: fallback — dispatch HEADER_LONG_PRESSED event
         val safeId = extensionId.replace("\"", "\\\"")
         val jsonData = "{\"messageIndex\":$messageIndex,\"extensionId\":\"$safeId\"}"
         extensionManager.emitJson(ExtensionEvent.HEADER_LONG_PRESSED, jsonData)
+    }
+
+    /** Dispatch BUTTON_CLICKED when an inline header button or menu item is tapped. */
+    fun onHeaderActionClicked(action: String, label: String) {
+        val safeAction = action.replace("\"", "\\\"")
+        val safeLabel = label.replace("\"", "\\\"")
+        val jsonData = "{\"action\":\"$safeAction\",\"label\":\"$safeLabel\"}"
+        extensionManager.emitJson(ExtensionEvent.BUTTON_CLICKED, jsonData)
     }
 
     // ── Edit dialog (JS extension) ─────────────────────────────────────────

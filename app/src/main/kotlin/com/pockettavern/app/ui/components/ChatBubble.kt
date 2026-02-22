@@ -4,11 +4,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,16 +20,21 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.pockettavern.app.domain.model.ChatMessage
 import com.pockettavern.app.domain.model.MessageHeaderEntry
+import com.pockettavern.app.extensions.JsExtensionHost
 import com.pockettavern.app.ui.theme.*
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ChatBubble(
     message: ChatMessage,
     characterName: String,
     modifier: Modifier = Modifier,
     headers: List<MessageHeaderEntry> = emptyList(),
-    onHeaderLongPress: ((String) -> Unit)? = null
+    headerButtons: Map<String, List<JsExtensionHost.HeaderAction>> = emptyMap(),
+    visibleButtonExtensions: Set<String> = emptySet(),
+    headerMenus: Map<String, List<JsExtensionHost.HeaderAction>> = emptyMap(),
+    onHeaderLongPress: ((String) -> Unit)? = null,
+    onHeaderActionClick: ((String, String) -> Unit)? = null
 ) {
     // Narrator/system messages render as full-width centered italic text
     if (message.isNarrator) {
@@ -76,27 +78,80 @@ fun ChatBubble(
         // Header boxes set by JS extensions via PT.setMessageHeader()
         if (!message.isUser && headers.isNotEmpty()) {
             headers.forEach { entry ->
-                Surface(
-                    modifier = Modifier
-                        .widthIn(max = 320.dp)
-                        .padding(bottom = 4.dp)
-                        .then(
-                            if (onHeaderLongPress != null) {
-                                Modifier.combinedClickable(
-                                    onClick = { },
-                                    onLongClick = { onHeaderLongPress(entry.extensionId) }
+                val extId = entry.extensionId
+                val inlineButtons = headerButtons[extId]
+                val buttonsVisible = extId in visibleButtonExtensions
+                val menuItems = headerMenus[extId]
+                var menuExpanded by remember { mutableStateOf(false) }
+
+                Box {
+                    Surface(
+                        modifier = Modifier
+                            .widthIn(max = 320.dp)
+                            .padding(bottom = 4.dp)
+                            .then(
+                                if (onHeaderLongPress != null) {
+                                    Modifier.combinedClickable(
+                                        onClick = { },
+                                        onLongClick = {
+                                            // If menu registered (and no inline buttons), show popup
+                                            if (inlineButtons.isNullOrEmpty() && !menuItems.isNullOrEmpty()) {
+                                                menuExpanded = true
+                                            }
+                                            onHeaderLongPress(extId)
+                                        }
+                                    )
+                                } else Modifier
+                            ),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                            Text(
+                                text = entry.text,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            // Inline buttons (toggled by long-press)
+                            if (buttonsVisible && !inlineButtons.isNullOrEmpty()) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    inlineButtons.forEach { btn ->
+                                        AssistChip(
+                                            onClick = { onHeaderActionClick?.invoke(btn.action, btn.label) },
+                                            label = {
+                                                Text(
+                                                    text = btn.label,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // Context menu (shown on long-press if no inline buttons)
+                    if (!menuItems.isNullOrEmpty()) {
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false }
+                        ) {
+                            menuItems.forEach { item ->
+                                DropdownMenuItem(
+                                    text = { Text(item.label) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onHeaderActionClick?.invoke(item.action, item.label)
+                                    }
                                 )
-                            } else Modifier
-                        ),
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant
-                ) {
-                    Text(
-                        text = entry.text,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                            }
+                        }
+                    }
                 }
             }
         }

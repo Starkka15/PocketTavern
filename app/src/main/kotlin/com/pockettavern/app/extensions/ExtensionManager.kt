@@ -34,6 +34,12 @@ class ExtensionManager @Inject constructor(
      */
     val jsButtonSets: StateFlow<Map<String, List<QuickReplyButton>>> get() = jsHost.jsButtonSets
 
+    /** Inline header buttons registered by extensions. extensionId → action list. */
+    val headerButtons: StateFlow<Map<String, List<JsExtensionHost.HeaderAction>>> get() = jsHost.headerButtons
+
+    /** Header context menus registered by extensions. extensionId → action list. */
+    val headerMenus: StateFlow<Map<String, List<JsExtensionHost.HeaderAction>>> get() = jsHost.headerMenus
+
     /** Load persisted settings and initialise the JS sandbox. Call once at app start. */
     fun load() {
         quickReply.load()
