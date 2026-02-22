@@ -1008,22 +1008,32 @@ class ChatViewModel @Inject constructor(
             }
             val preset = localRepository.getCurrentTextGenPreset()
 
-            // Build a context-aware prompt: include recent chat history so the LLM
-            // has scene context even though this is a standalone generation.
+            // Build a context-aware prompt: include character info and recent chat
+            // history so the LLM has full scene context for hidden generation.
             val messages = _uiState.value.messages
             val character = _uiState.value.character
             val contextPrompt = buildString {
                 if (character != null) {
                     append("Character: ").append(character.name).append("\n")
+                    if (character.description.isNotBlank()) {
+                        append("Description: ").append(character.description.take(1000)).append("\n")
+                    }
+                    if (character.personality.isNotBlank()) {
+                        append("Personality: ").append(character.personality.take(500)).append("\n")
+                    }
+                    if (character.scenario.isNotBlank()) {
+                        append("Scenario: ").append(character.scenario.take(500)).append("\n")
+                    }
+                    append("\n")
                 }
-                // Include last few messages for context (max 6 to stay concise)
-                val recent = if (messages.size > 6) messages.takeLast(6) else messages
+                // Include recent messages for context (up to 20, 2000 chars each)
+                val recent = if (messages.size > 20) messages.takeLast(20) else messages
                 if (recent.isNotEmpty()) {
                     append("Recent conversation:\n")
                     for (msg in recent) {
                         val role = if (msg.isUser) _currentUserName else (character?.name ?: "Assistant")
                         val text = msg.rawContent ?: msg.content
-                        append(role).append(": ").append(text.take(500)).append("\n")
+                        append(role).append(": ").append(text.take(2000)).append("\n")
                     }
                     append("\n")
                 }
