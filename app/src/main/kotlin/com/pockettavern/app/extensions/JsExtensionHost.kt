@@ -8,6 +8,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.pockettavern.app.data.local.JsExtensionStorage
+import com.pockettavern.app.domain.model.MessageHeaderEntry
 import com.pockettavern.app.domain.model.QuickReplyButton
 import com.pockettavern.app.util.DebugLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -48,19 +49,41 @@ class JsExtensionHost @Inject constructor(
     // Context JSON updated before each generation by ExtensionManager.updateContext()
     @Volatile private var _contextJson: String = "{}"
 
-    // Message headers: messageIndex → header text (set by JS via PT.setMessageHeader)
-    private val _messageHeaders = MutableStateFlow<Map<Int, String>>(emptyMap())
-    val messageHeaders: StateFlow<Map<Int, String>> = _messageHeaders.asStateFlow()
+    // Message headers: messageIndex → list of headers (multiple extensions can each set one)
+    private val _messageHeaders = MutableStateFlow<Map<Int, List<MessageHeaderEntry>>>(emptyMap())
+    val messageHeaders: StateFlow<Map<Int, List<MessageHeaderEntry>>> = _messageHeaders.asStateFlow()
 
     // Buttons registered by JS extensions: extensionId → button list
     private val _jsButtonSets = MutableStateFlow<Map<String, List<QuickReplyButton>>>(emptyMap())
     val jsButtonSets: StateFlow<Map<String, List<QuickReplyButton>>> = _jsButtonSets.asStateFlow()
+
+    // Inline header buttons: extensionId → list of actions rendered inside the header box
+    data class HeaderAction(val label: String, val action: String)
+    private val _headerButtons = MutableStateFlow<Map<String, List<HeaderAction>>>(emptyMap())
+    val headerButtons: StateFlow<Map<String, List<HeaderAction>>> = _headerButtons.asStateFlow()
+
+    // Header context menus: extensionId → list of actions shown as a popup on long-press
+    private val _headerMenus = MutableStateFlow<Map<String, List<HeaderAction>>>(emptyMap())
+    val headerMenus: StateFlow<Map<String, List<HeaderAction>>> = _headerMenus.asStateFlow()
 
     // Output filters registered by JS extensions: extensionId → regex pattern
     private val _outputFilters = mutableMapOf<String, Regex>()
 
     // Callback wired by ChatViewModel so JS can send messages as the user
     var sendMessageCallback: ((String) -> Unit)? = null
+
+    // Edit dialog request: JS calls PT.showEditDialog() → Kotlin shows a native dialog
+    data class EditDialogRequest(
+        val title: String,
+        val fields: List<EditField>,
+        val callbackId: String
+    )
+    data class EditField(val key: String, val label: String, val value: String)
+    private val _editDialogRequest = MutableStateFlow<EditDialogRequest?>(null)
+    val editDialogRequest: StateFlow<EditDialogRequest?> = _editDialogRequest.asStateFlow()
+
+    // Hidden generate request: JS calls PT.generateHidden() → Kotlin sends to LLM without adding to chat
+    var hiddenGenerateCallback: ((String, String) -> Unit)? = null  // (prompt, callbackId) -> Unit
 
     // ── Init / reload ─────────────────────────────────────────────────────────
 
@@ -100,6 +123,8 @@ class JsExtensionHost @Inject constructor(
         _outputFilters.clear()
         _messageHeaders.value = emptyMap()
         _jsButtonSets.value = emptyMap()
+        _headerButtons.value = emptyMap()
+        _headerMenus.value = emptyMap()
         scope.launch {
             webView?.loadData("<html><body></body></html>", "text/html", "utf-8")
         }
@@ -139,7 +164,36 @@ class JsExtensionHost @Inject constructor(
     }
 
     /** Clear all message headers without reloading the sandbox (e.g. on chat change). */
-    fun clearMessageHeaders() { _messageHeaders.value = emptyMap() }
+    fun clearMessageHeaders() {
+        _messageHeaders.value = emptyMap()
+    }
+
+    /** Replace the entire message headers map (e.g. after index shifts from deleting a message). */
+    fun replaceMessageHeaders(headers: Map<Int, List<MessageHeaderEntry>>) {
+        _messageHeaders.value = headers
+    }
+
+    /**
+     * Restore persisted message headers when loading a chat from disk.
+     *
+     * Deferred via a queued no-op JS eval so that any CHAT_CHANGED handlers
+     * (which typically call PT.clearAllHeaders()) execute first.  The callback
+     * fires on Main after all previously queued evaluateJavascript calls —
+     * including bridge calls like clearAllHeaders() — have completed.
+     */
+    fun restoreMessageHeaders(headers: Map<Int, List<MessageHeaderEntry>>) {
+        if (headers.isEmpty()) return
+        if (!ready || webView == null) {
+            _messageHeaders.value = headers
+            return
+        }
+        scope.launch {
+            webView?.evaluateJavascript("0") { _ ->
+                DebugLogger.log("[JsExtensionHost] Restoring headers for ${headers.size} message(s) after JS event queue drained")
+                _messageHeaders.value = headers
+            }
+        }
+    }
 
     /** Apply all registered output filters to strip extension metadata from displayed text. */
     fun applyOutputFilters(text: String): String {
@@ -235,19 +289,24 @@ class JsExtensionHost @Inject constructor(
         // ── New APIs ──────────────────────────────────────────────────────────
 
         /**
-         * Called by PT.setMessageHeader(index, text).
-         * Sets a header box that appears above the AI message at [messageIndex].
-         * Pass empty string to clear it.
+         * Called by PT.setMessageHeader(index, text, extensionId).
+         * Each extension gets its own header entry per message.
+         * Pass empty text to remove this extension's header at that index.
          */
         @JavascriptInterface
-        fun setMessageHeader(messageIndex: Int, text: String) {
+        fun setMessageHeader(messageIndex: Int, text: String, extensionId: String) {
             val current = _messageHeaders.value.toMutableMap()
-            if (text.isBlank()) current.remove(messageIndex)
-            else current[messageIndex] = text
+            val list = current[messageIndex]?.toMutableList() ?: mutableListOf()
+            // Remove any existing entry for this extension
+            list.removeAll { it.extensionId == extensionId }
+            if (text.isNotBlank()) {
+                list.add(MessageHeaderEntry(text = text, extensionId = extensionId))
+            }
+            if (list.isEmpty()) current.remove(messageIndex) else current[messageIndex] = list
             _messageHeaders.value = current
         }
 
-        /** Called by PT.clearMessageHeader(index). */
+        /** Called by PT.clearMessageHeader(index). Removes ALL extension headers at this index. */
         @JavascriptInterface
         fun clearMessageHeader(messageIndex: Int) {
             _messageHeaders.value = _messageHeaders.value - messageIndex
@@ -257,6 +316,25 @@ class JsExtensionHost @Inject constructor(
         @JavascriptInterface
         fun clearAllHeaders() {
             _messageHeaders.value = emptyMap()
+        }
+
+        /**
+         * Called by PT.getMessageHeaders(messageIndex).
+         * Returns a JSON array of header entries for the given message:
+         * [{"text":"...","extensionId":"..."}]
+         * Returns "[]" if no headers exist for that index.
+         */
+        @JavascriptInterface
+        fun getMessageHeaders(messageIndex: Int): String {
+            val entries = _messageHeaders.value[messageIndex] ?: return "[]"
+            val arr = org.json.JSONArray()
+            entries.forEach { entry ->
+                val obj = org.json.JSONObject()
+                obj.put("text", entry.text)
+                obj.put("extensionId", entry.extensionId)
+                arr.put(obj)
+            }
+            return arr.toString()
         }
 
         /**
@@ -271,7 +349,8 @@ class JsExtensionHost @Inject constructor(
                     val obj = arr.getJSONObject(i)
                     QuickReplyButton(
                         label   = obj.optString("label", "?"),
-                        message = obj.optString("message", "")
+                        message = obj.optString("message", ""),
+                        action  = obj.optString("action", "")
                     )
                 }
                 _jsButtonSets.value = _jsButtonSets.value + (extensionId to buttons)
@@ -316,6 +395,134 @@ class JsExtensionHost @Inject constructor(
         @JavascriptInterface
         fun clearOutputFilter(extensionId: String) {
             _outputFilters.remove(extensionId)
+        }
+
+        // ── Header buttons & menus ──────────────────────────────────────────
+
+        /**
+         * Called by PT.registerHeaderButtons(extensionId, buttonsJson).
+         * Registers inline buttons rendered inside the header box.
+         * Long-press toggles their visibility.
+         */
+        @JavascriptInterface
+        fun registerHeaderButtons(extensionId: String, buttonsJson: String) {
+            try {
+                val arr = JSONArray(buttonsJson)
+                val buttons = (0 until arr.length()).map { i ->
+                    val obj = arr.getJSONObject(i)
+                    HeaderAction(
+                        label  = obj.optString("label", "?"),
+                        action = obj.optString("action", "")
+                    )
+                }
+                _headerButtons.value = _headerButtons.value + (extensionId to buttons)
+            } catch (e: Exception) {
+                DebugLogger.log("[JsExt] registerHeaderButtons parse error: ${e.message}")
+            }
+        }
+
+        /** Called by PT.clearHeaderButtons(extensionId). */
+        @JavascriptInterface
+        fun clearHeaderButtons(extensionId: String) {
+            _headerButtons.value = _headerButtons.value - extensionId
+        }
+
+        /**
+         * Called by PT.registerHeaderMenu(extensionId, menuJson).
+         * Pre-registers a context menu shown as a popup on header long-press.
+         */
+        @JavascriptInterface
+        fun registerHeaderMenu(extensionId: String, menuJson: String) {
+            try {
+                val arr = JSONArray(menuJson)
+                val items = (0 until arr.length()).map { i ->
+                    val obj = arr.getJSONObject(i)
+                    HeaderAction(
+                        label  = obj.optString("label", "?"),
+                        action = obj.optString("action", "")
+                    )
+                }
+                _headerMenus.value = _headerMenus.value + (extensionId to items)
+            } catch (e: Exception) {
+                DebugLogger.log("[JsExt] registerHeaderMenu parse error: ${e.message}")
+            }
+        }
+
+        /** Called by PT.clearHeaderMenu(extensionId). */
+        @JavascriptInterface
+        fun clearHeaderMenu(extensionId: String) {
+            _headerMenus.value = _headerMenus.value - extensionId
+        }
+
+        /**
+         * Called by PT.showEditDialog(title, fieldsJson, callbackId).
+         * Shows a native Android dialog with editable text fields.
+         * Results are returned to JS via __ptEditDialogResult(callbackId, resultsJson).
+         */
+        @JavascriptInterface
+        fun showEditDialog(title: String, fieldsJson: String, callbackId: String) {
+            try {
+                val arr = JSONArray(fieldsJson)
+                val fields = (0 until arr.length()).map { i ->
+                    val obj = arr.getJSONObject(i)
+                    EditField(
+                        key   = obj.optString("key", "field$i"),
+                        label = obj.optString("label", "Field ${i + 1}"),
+                        value = obj.optString("value", "")
+                    )
+                }
+                _editDialogRequest.value = EditDialogRequest(title, fields, callbackId)
+            } catch (e: Exception) {
+                DebugLogger.log("[JsExt] showEditDialog parse error: ${e.message}")
+            }
+        }
+
+        /**
+         * Called by PT.generateHidden(prompt, callbackId).
+         * Sends a prompt to the LLM without adding messages to the chat.
+         * Result is returned to JS via __ptHiddenGenerateResult(callbackId, text).
+         */
+        @JavascriptInterface
+        fun generateHidden(prompt: String, callbackId: String) {
+            if (prompt.isBlank()) return
+            scope.launch(Dispatchers.Main) {
+                hiddenGenerateCallback?.invoke(prompt, callbackId)
+            }
+        }
+    }
+
+    /** Called by ChatViewModel after the user submits the edit dialog. */
+    fun completeEditDialog(callbackId: String, results: Map<String, String>) {
+        _editDialogRequest.value = null
+        val json = JSONObject(results).toString()
+            .replace("\\", "\\\\").replace("'", "\\'")
+        scope.launch {
+            webView?.evaluateJavascript(
+                "if(window.__ptEditDialogResult)__ptEditDialogResult('$callbackId',$json);", null
+            )
+        }
+    }
+
+    /** Called by ChatViewModel when the user cancels the edit dialog. */
+    fun cancelEditDialog() {
+        val callbackId = _editDialogRequest.value?.callbackId
+        _editDialogRequest.value = null
+        if (callbackId != null) {
+            scope.launch {
+                webView?.evaluateJavascript(
+                    "if(window.__ptEditDialogResult)__ptEditDialogResult('$callbackId',null);", null
+                )
+            }
+        }
+    }
+
+    /** Called by ChatViewModel after a hidden generate completes. */
+    fun completeHiddenGenerate(callbackId: String, resultText: String) {
+        val safe = resultText.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
+        scope.launch {
+            webView?.evaluateJavascript(
+                "if(window.__ptHiddenGenerateResult)__ptHiddenGenerateResult('$callbackId','$safe');", null
+            )
         }
     }
 }

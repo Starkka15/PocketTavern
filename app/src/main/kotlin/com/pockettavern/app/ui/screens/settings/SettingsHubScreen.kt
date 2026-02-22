@@ -27,7 +27,6 @@ data class SettingsItem(
     val title: String,
     val subtitle: String,
     val icon: ImageVector,
-    val iconTint: androidx.compose.ui.graphics.Color = AccentGreen,
     val onClick: () -> Unit,
     val requiresConnection: Boolean = true,
     /** If set, item is dimmed when the current API mode differs. */
@@ -50,6 +49,7 @@ fun SettingsHubScreen(
     onNavigateToOaiPresets: () -> Unit = {},
     onNavigateToExtensions: () -> Unit = {},
     onNavigateToConnectionProfiles: () -> Unit = {},
+    onNavigateToTheme: () -> Unit = {},
     viewModel: SettingsHubViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -62,7 +62,7 @@ fun SettingsHubScreen(
         viewModel.refresh()
     }
 
-    val settingsItems = remember(isConnected, currentPersonaName, usesChatCompletions, onNavigateToOaiPresets, onNavigateToExtensions, onNavigateToConnectionProfiles) {
+    val settingsItems = remember(isConnected, currentPersonaName, usesChatCompletions, onNavigateToOaiPresets, onNavigateToExtensions, onNavigateToConnectionProfiles, onNavigateToTheme) {
         listOf(
             SettingsItem(
                 title = "Stable Diffusion Forge",
@@ -81,7 +81,6 @@ fun SettingsHubScreen(
                 title = "Connection Profiles",
                 subtitle = "Save and switch between API configurations",
                 icon = Icons.Default.SwitchAccount,
-                iconTint = AccentBlue,
                 onClick = onNavigateToConnectionProfiles,
                 requiresConnection = false
             ),
@@ -97,7 +96,6 @@ fun SettingsHubScreen(
                 title = "Chat Completion Presets",
                 subtitle = "Sampling presets for OpenAI-compatible APIs",
                 icon = Icons.Default.AutoAwesome,
-                iconTint = AccentGreen,
                 onClick = onNavigateToOaiPresets,
                 requiresConnection = false,
                 mode = SettingsMode.CHAT_COMPLETION
@@ -114,28 +112,24 @@ fun SettingsHubScreen(
                 title = "World Info / Lorebooks",
                 subtitle = "View and manage lorebook entries",
                 icon = Icons.AutoMirrored.Filled.MenuBook,
-                iconTint = AccentBlue,
                 onClick = onNavigateToWorldInfo
             ),
             SettingsItem(
                 title = "Context Settings",
                 subtitle = "Author's note configuration",
                 icon = Icons.AutoMirrored.Filled.StickyNote2,
-                iconTint = AccentBlue,
                 onClick = onNavigateToContextSettings
             ),
             SettingsItem(
                 title = "Personas",
                 subtitle = currentPersonaName?.let { "Current: $it" } ?: "Manage user personas and avatars",
                 icon = Icons.Default.Person,
-                iconTint = AccentPurple,
                 onClick = onNavigateToPersonas
             ),
             SettingsItem(
                 title = "Setup Guide",
                 subtitle = "Help with setup and troubleshooting",
                 icon = Icons.Default.Help,
-                iconTint = IceCyan,
                 onClick = onNavigateToSetupGuide,
                 requiresConnection = false
             ),
@@ -143,7 +137,6 @@ fun SettingsHubScreen(
                 title = "Extensions",
                 subtitle = "Quick reply, regex rules, token counter and more",
                 icon = Icons.Default.Extension,
-                iconTint = AccentGreen,
                 onClick = onNavigateToExtensions,
                 requiresConnection = false
             ),
@@ -151,8 +144,14 @@ fun SettingsHubScreen(
                 title = "Import from SillyTavern",
                 subtitle = "Migrate characters, chats, and lorebooks",
                 icon = Icons.Default.Download,
-                iconTint = AccentPurple,
                 onClick = onNavigateToStImport,
+                requiresConnection = false
+            ),
+            SettingsItem(
+                title = "Appearance",
+                subtitle = "Import and apply SillyTavern themes",
+                icon = Icons.Default.Palette,
+                onClick = onNavigateToTheme,
                 requiresConnection = false
             )
         )
@@ -168,7 +167,7 @@ fun SettingsHubScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkSurface
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
@@ -206,14 +205,14 @@ fun SettingsHubScreen(
                     Icon(
                         if (isConnected) Icons.Default.CheckCircle else Icons.Default.Error,
                         contentDescription = null,
-                        tint = if (isConnected) AccentGreen else ErrorRed,
+                        tint = if (isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = if (isConnected) "Connected" else "Not connected",
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (isConnected) AccentGreen else ErrorRed
+                        color = if (isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                     )
                 }
             }
@@ -248,7 +247,7 @@ private fun SettingsListItem(
                 Icon(
                     imageVector = item.icon,
                     contentDescription = null,
-                    tint = if (fullyActive) item.iconTint else TextTertiary,
+                    tint = if (fullyActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -261,7 +260,7 @@ private fun SettingsListItem(
                     text = item.title,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
-                    color = if (fullyActive) TextPrimary else TextTertiary
+                    color = if (fullyActive) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
                 )
                 val subtitleText = if (!modeActive && item.mode != null) {
                     val modeLabel = if (item.mode == SettingsMode.CHAT_COMPLETION) "chat completion" else "text generation"
@@ -272,7 +271,7 @@ private fun SettingsListItem(
                 Text(
                     text = subtitleText,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (fullyActive) TextSecondary else TextTertiary
+                    color = if (fullyActive) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline
                 )
             }
 
@@ -280,13 +279,13 @@ private fun SettingsListItem(
             Icon(
                 Icons.Default.ChevronRight,
                 contentDescription = null,
-                tint = if (fullyActive) TextSecondary else TextTertiary
+                tint = if (fullyActive) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline
             )
         }
     }
 
     HorizontalDivider(
         modifier = Modifier.padding(start = 72.dp),
-        color = DarkSurfaceVariant
+        color = MaterialTheme.colorScheme.surfaceVariant
     )
 }

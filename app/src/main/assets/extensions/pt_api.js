@@ -90,7 +90,9 @@
             GENERATION_STARTED: 'GENERATION_STARTED',
             GENERATION_STOPPED: 'GENERATION_STOPPED',
             CHAT_CHANGED:       'CHAT_CHANGED',
-            CHARACTER_CHANGED:  'CHARACTER_CHANGED'
+            CHARACTER_CHANGED:  'CHARACTER_CHANGED',
+            BUTTON_CLICKED:       'BUTTON_CLICKED',
+            HEADER_LONG_PRESSED:  'HEADER_LONG_PRESSED'
         },
 
         /** Where to inject prompt text relative to the character definition. */
@@ -168,14 +170,22 @@
          * Register quick reply buttons above the chat input.
          * Replaces any buttons previously registered under the same id.
          *
+         * Buttons can either send a message or trigger a callback action:
+         *   - { label, message } — sends the message as a user chat message
+         *   - { label, action }  — dispatches BUTTON_CLICKED event with { action, label }
+         *
          * @param {string} extensionId  Unique id for this set of buttons.
-         * @param {Array}  buttons      Array of { label: string, message: string }
+         * @param {Array}  buttons      Array of { label: string, message?: string, action?: string }
          *
          * @example
          *   PT.registerButtons('my-ext', [
          *       { label: 'Continue', message: 'Please continue.' },
-         *       { label: 'Shorter',  message: 'Keep it brief.' }
+         *       { label: 'Edit',     action:  'edit' }
          *   ]);
+         *
+         *   PT.eventSource.on(PT.events.BUTTON_CLICKED, function(data) {
+         *       if (data.action === 'edit') { // handle edit }
+         *   });
          */
         registerButtons: function (extensionId, buttons) {
             if (window.PtBridge) {
@@ -214,16 +224,17 @@
          *
          * @param {number} messageIndex  Index of the message to attach the header to.
          * @param {string} text          Text to display in the header box.
+         * @param {string} [extensionId] Your extension's id (used for long-press ownership).
          *
          * @example
          *   PT.eventSource.on(PT.events.MESSAGE_RECEIVED, function(data) {
          *       var thinking = data.text.match(/<thinking>([\s\S]*?)<\/thinking>/);
-         *       if (thinking) PT.setMessageHeader(data.index, '🤔 ' + thinking[1].trim());
+         *       if (thinking) PT.setMessageHeader(data.index, '🤔 ' + thinking[1].trim(), 'my-ext');
          *   });
          */
-        setMessageHeader: function (messageIndex, text) {
+        setMessageHeader: function (messageIndex, text, extensionId) {
             if (window.PtBridge) {
-                PtBridge.setMessageHeader(messageIndex, text || '');
+                PtBridge.setMessageHeader(messageIndex, text || '', extensionId || '');
             }
         },
 
@@ -243,6 +254,88 @@
         clearAllHeaders: function () {
             if (window.PtBridge) {
                 PtBridge.clearAllHeaders();
+            }
+        },
+
+        /**
+         * Get the persisted header entries for a specific message.
+         * Returns an array of { text, extensionId } objects, or an empty array.
+         *
+         * Useful for reading back header data set by any extension (including
+         * manual edits) without having to re-parse the raw message text.
+         *
+         * @param {number} messageIndex  Index of the message.
+         * @returns {Array<{text: string, extensionId: string}>}
+         *
+         * @example
+         *   var headers = PT.getMessageHeaders(3);
+         *   var myHeader = headers.find(function(h) { return h.extensionId === 'my-ext'; });
+         *   if (myHeader) console.log('Header text:', myHeader.text);
+         */
+        getMessageHeaders: function (messageIndex) {
+            if (!window.PtBridge) return [];
+            try { return JSON.parse(PtBridge.getMessageHeaders(messageIndex)); } catch (e) { return []; }
+        },
+
+        // ── Header buttons & menus ───────────────────────────────────────────
+
+        /**
+         * Register inline buttons that render inside the header box.
+         * Hidden by default; user long-presses the header to toggle show/hide.
+         * Clicking a button dispatches BUTTON_CLICKED with { action, label }.
+         *
+         * @param {string} extensionId  Your extension's unique id.
+         * @param {Array}  buttons      Array of { label: string, action: string }
+         *
+         * @example
+         *   PT.registerHeaderButtons('my-ext', [
+         *       { label: 'Edit',   action: 'edit_header' },
+         *       { label: 'Regen',  action: 'regen_header' }
+         *   ]);
+         */
+        registerHeaderButtons: function (extensionId, buttons) {
+            if (window.PtBridge) {
+                PtBridge.registerHeaderButtons(extensionId, JSON.stringify(buttons || []));
+            }
+        },
+
+        /**
+         * Remove inline header buttons for this extension.
+         * @param {string} extensionId
+         */
+        clearHeaderButtons: function (extensionId) {
+            if (window.PtBridge) {
+                PtBridge.clearHeaderButtons(extensionId);
+            }
+        },
+
+        /**
+         * Pre-register a context menu shown as a popup when the user
+         * long-presses a header owned by this extension.
+         * Selecting an item dispatches BUTTON_CLICKED with { action, label }.
+         *
+         * @param {string} extensionId  Your extension's unique id.
+         * @param {Array}  items        Array of { label: string, action: string }
+         *
+         * @example
+         *   PT.registerHeaderMenu('my-ext', [
+         *       { label: 'Review Notes',  action: 'review' },
+         *       { label: 'Clear Notes',   action: 'clear' }
+         *   ]);
+         */
+        registerHeaderMenu: function (extensionId, items) {
+            if (window.PtBridge) {
+                PtBridge.registerHeaderMenu(extensionId, JSON.stringify(items || []));
+            }
+        },
+
+        /**
+         * Remove the header context menu for this extension.
+         * @param {string} extensionId
+         */
+        clearHeaderMenu: function (extensionId) {
+            if (window.PtBridge) {
+                PtBridge.clearHeaderMenu(extensionId);
             }
         },
 
@@ -274,6 +367,84 @@
             if (window.PtBridge) {
                 PtBridge.clearOutputFilter(extensionId);
             }
+        },
+
+        // ── Dialogs ──────────────────────────────────────────────────────────
+
+        /**
+         * Show a native edit dialog with editable text fields.
+         * Returns a Promise that resolves with { key: value } or null if cancelled.
+         *
+         * @param {string} title   Dialog title.
+         * @param {Array}  fields  Array of { key: string, label: string, value: string }
+         * @returns {Promise<object|null>}
+         *
+         * @example
+         *   var result = await PT.showEditDialog('Edit Tracker', [
+         *       { key: 'time',     label: 'Time',     value: '10:00:00' },
+         *       { key: 'location', label: 'Location', value: 'Town Square' }
+         *   ]);
+         *   if (result) { console.log(result.time, result.location); }
+         */
+        showEditDialog: function (title, fields) {
+            return new Promise(function (resolve) {
+                var cbId = '__editCb_' + (++_callbackCounter);
+                _pendingCallbacks[cbId] = resolve;
+                if (window.PtBridge) {
+                    PtBridge.showEditDialog(title || 'Edit', JSON.stringify(fields || []), cbId);
+                } else {
+                    resolve(null);
+                }
+            });
+        },
+
+        // ── Hidden generation ─────────────────────────────────────────────────
+
+        /**
+         * Send a prompt to the LLM without adding messages to the chat.
+         * Useful for regenerating extension metadata (headers, tags) without
+         * creating a new user/assistant message pair.
+         *
+         * @param {string} prompt  The prompt text to send.
+         * @returns {Promise<string>}  The AI's response text.
+         *
+         * @example
+         *   var tags = await PT.generateHidden('Re-output tracker tags for the current scene.');
+         *   var parsed = parseTags(tags);
+         */
+        generateHidden: function (prompt) {
+            return new Promise(function (resolve) {
+                var cbId = '__genCb_' + (++_callbackCounter);
+                _pendingCallbacks[cbId] = resolve;
+                if (window.PtBridge) {
+                    PtBridge.generateHidden(prompt || '', cbId);
+                } else {
+                    resolve('');
+                }
+            });
+        }
+    };
+
+    // ── Callback infrastructure for async bridge results ──────────────────
+
+    var _callbackCounter = 0;
+    var _pendingCallbacks = {};
+
+    /** Called by Kotlin when the edit dialog is submitted or cancelled. */
+    window.__ptEditDialogResult = function (callbackId, result) {
+        var cb = _pendingCallbacks[callbackId];
+        if (cb) {
+            delete _pendingCallbacks[callbackId];
+            cb(result);
+        }
+    };
+
+    /** Called by Kotlin when a hidden generation completes. */
+    window.__ptHiddenGenerateResult = function (callbackId, text) {
+        var cb = _pendingCallbacks[callbackId];
+        if (cb) {
+            delete _pendingCallbacks[callbackId];
+            cb(text || '');
         }
     };
 

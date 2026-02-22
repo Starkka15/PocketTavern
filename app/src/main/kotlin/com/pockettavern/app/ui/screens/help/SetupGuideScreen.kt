@@ -27,7 +27,7 @@ fun SetupGuideScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkSurface
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
@@ -48,19 +48,19 @@ fun SetupGuideScreen(
 
             // Content disclaimer
             Surface(
-                color = DarkSurfaceVariant,
+                color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = MaterialTheme.shapes.small,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
                     text = "PocketTavern does not host or provide any AI models or content. You connect to your own LLM backends. Character cards are stored on your device.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(12.dp)
                 )
             }
 
-            HorizontalDivider(color = DarkSurfaceVariant)
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
             // Step 1 — Characters
             GuideSection(
@@ -86,7 +86,7 @@ fun SetupGuideScreen(
                 content = "If you run a CharaVault server, enter its URL in Settings → CharaVault to browse and import cards directly."
             )
 
-            HorizontalDivider(color = DarkSurfaceVariant)
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
             // Step 2 — LLM Backend
             GuideSection(
@@ -118,7 +118,7 @@ fun SetupGuideScreen(
                 content = "Tap Test Connection to verify. A green 'Connected' indicator appears at the bottom of the Settings screen when successful."
             )
 
-            HorizontalDivider(color = DarkSurfaceVariant)
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
             // Step 3 — Start Chatting
             GuideSection(
@@ -144,7 +144,7 @@ fun SetupGuideScreen(
                 content = "Your chat is saved automatically. Find it again under Recent Chats or by tapping the character."
             )
 
-            HorizontalDivider(color = DarkSurfaceVariant)
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
             // Features
             GuideSection(
@@ -182,7 +182,7 @@ fun SetupGuideScreen(
                 description = "Add an Author's Note that gets injected into every conversation at a configurable depth — useful for steering tone, style, or scenario."
             )
 
-            HorizontalDivider(color = DarkSurfaceVariant)
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
             // Optional Features
             GuideSection(
@@ -210,7 +210,7 @@ fun SetupGuideScreen(
                 description = "Save multiple API configurations and switch between them instantly — useful if you use both a local model and a cloud API."
             )
 
-            HorizontalDivider(color = DarkSurfaceVariant)
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
             // Troubleshooting
             GuideSection(
@@ -274,14 +274,14 @@ private fun GuideSection(
             text = title,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = AccentGreen
+            color = MaterialTheme.colorScheme.primary
         )
         if (content != null) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = content,
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -299,7 +299,7 @@ private fun GuideStep(
     ) {
         Surface(
             shape = MaterialTheme.shapes.small,
-            color = AccentGreen.copy(alpha = 0.2f),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
             modifier = Modifier.size(32.dp)
         ) {
             Box(
@@ -310,7 +310,7 @@ private fun GuideStep(
                     text = number.toString(),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = AccentGreen
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -319,13 +319,13 @@ private fun GuideStep(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = content,
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -341,13 +341,13 @@ private fun FeatureItem(
             text = title,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-            color = TextPrimary
+            color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = description,
             style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -362,14 +362,14 @@ private fun TroubleshootItem(
             text = problem,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-            color = FireOrange
+            color = MaterialTheme.colorScheme.primary
         )
         Spacer(modifier = Modifier.height(4.dp))
         solutions.forEach { solution ->
             Text(
                 text = "• $solution",
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 8.dp)
             )
         }

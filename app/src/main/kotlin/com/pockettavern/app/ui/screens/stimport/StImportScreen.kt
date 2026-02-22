@@ -62,7 +62,7 @@ fun StImportScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkSurface)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
     ) { padding ->
@@ -74,8 +74,8 @@ fun StImportScreen(
             // Tab row
             TabRow(
                 selectedTabIndex = selectedTab,
-                containerColor = DarkSurface,
-                contentColor = AccentGreen
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.primary
             ) {
                 tabs.forEachIndexed { index, title ->
                     Tab(
@@ -84,7 +84,7 @@ fun StImportScreen(
                         text = {
                             Text(
                                 text = title,
-                                color = if (selectedTab == index) AccentGreen else TextSecondary
+                                color = if (selectedTab == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     )
@@ -127,14 +127,14 @@ private fun FolderImportTab(
             text = "Select your SillyTavern data folder. The app will import characters (PNG cards), " +
                     "lorebooks (world info), and chat histories.",
             style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         // Folder structure hint
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, DarkSurfaceVariant, RoundedCornerShape(8.dp))
+                .border(1.dp, MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
                 .padding(12.dp)
         ) {
             Text(
@@ -145,7 +145,7 @@ private fun FolderImportTab(
                         "  └── chats/{character}/*.jsonl",
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
         }
@@ -154,7 +154,7 @@ private fun FolderImportTab(
             Button(
                 onClick = onPickFolder,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentGreen)
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Icon(Icons.Default.FolderOpen, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
@@ -188,7 +188,7 @@ private fun ServerImportTab(
             text = "Connect to a running SillyTavern server to pull all characters and lorebooks. " +
                     "This is a one-time migration — no server needed afterward.",
             style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         OutlinedTextField(
@@ -226,7 +226,7 @@ private fun ServerImportTab(
                     Icon(
                         if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                         contentDescription = if (showPassword) "Hide password" else "Show password",
-                        tint = TextSecondary
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             },
@@ -238,7 +238,7 @@ private fun ServerImportTab(
                 onClick = onImport,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = uiState.serverUrl.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentGreen)
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Icon(Icons.Default.Download, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
@@ -269,27 +269,27 @@ private fun ImportProgressSection(
                         Text(
                             text = progress.currentItem.take(40),
                             style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             text = "${progress.current}/${progress.total}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     LinearProgressIndicator(
                         progress = { progress.current.toFloat() / progress.total },
                         modifier = Modifier.fillMaxWidth(),
-                        color = AccentGreen,
-                        trackColor = DarkSurfaceVariant
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 }
             } else {
                 LinearProgressIndicator(
                     modifier = Modifier.fillMaxWidth(),
-                    color = AccentGreen,
-                    trackColor = DarkSurfaceVariant
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             }
         }
@@ -313,18 +313,18 @@ private fun ResultsSummaryCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(8.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Import Complete", style = MaterialTheme.typography.titleMedium, color = AccentGreen, fontWeight = FontWeight.Bold)
+            Text("Import Complete", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
 
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                StatItem(label = "Characters", value = uiState.charactersImported, color = AccentGreen)
-                StatItem(label = "Lorebooks", value = uiState.lorebooksImported, color = AccentBlue)
-                StatItem(label = "Chats", value = uiState.chatsImported, color = AccentPurple)
+                StatItem(label = "Characters", value = uiState.charactersImported, color = MaterialTheme.colorScheme.primary)
+                StatItem(label = "Lorebooks", value = uiState.lorebooksImported, color = MaterialTheme.colorScheme.primary)
+                StatItem(label = "Chats", value = uiState.chatsImported, color = MaterialTheme.colorScheme.primary)
                 if (uiState.errors > 0) {
-                    StatItem(label = "Errors", value = uiState.errors, color = ErrorRed)
+                    StatItem(label = "Errors", value = uiState.errors, color = MaterialTheme.colorScheme.error)
                 }
             }
 
@@ -333,7 +333,7 @@ private fun ResultsSummaryCard(
             OutlinedButton(
                 onClick = onReset,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
             ) {
                 Text("Import Again")
             }
@@ -353,7 +353,7 @@ private fun StatItem(label: String, value: Int, color: Color) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -372,24 +372,24 @@ private fun LogSection(log: List<String>) {
     Text(
         text = "Log",
         style = MaterialTheme.typography.labelMedium,
-        color = TextSecondary
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(220.dp)
-            .background(DarkBackground, RoundedCornerShape(8.dp))
-            .border(1.dp, DarkSurfaceVariant, RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.background, RoundedCornerShape(8.dp))
+            .border(1.dp, MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
         LazyColumn(state = listState) {
             items(log) { line ->
                 val color = when {
-                    line.startsWith("ERROR") -> ErrorRed
-                    line.startsWith("Done.") -> AccentGreen
-                    line.startsWith("Imported") -> AccentGreen.copy(alpha = 0.85f)
-                    else -> TextSecondary
+                    line.startsWith("ERROR") -> MaterialTheme.colorScheme.error
+                    line.startsWith("Done.") -> MaterialTheme.colorScheme.primary
+                    line.startsWith("Imported") -> MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
                 }
                 Text(
                     text = line,
@@ -406,11 +406,11 @@ private fun LogSection(log: List<String>) {
 
 @Composable
 private fun outlinedTextFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = AccentGreen,
-    unfocusedBorderColor = DarkSurfaceVariant,
-    focusedLabelColor = AccentGreen,
-    unfocusedLabelColor = TextSecondary,
-    focusedTextColor = TextPrimary,
-    unfocusedTextColor = TextPrimary,
-    cursorColor = AccentGreen
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+    focusedLabelColor = MaterialTheme.colorScheme.primary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    cursorColor = MaterialTheme.colorScheme.primary
 )

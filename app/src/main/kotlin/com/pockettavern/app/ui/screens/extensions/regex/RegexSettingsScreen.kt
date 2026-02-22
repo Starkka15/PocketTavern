@@ -17,8 +17,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pockettavern.app.domain.model.RegexRule
-import com.pockettavern.app.ui.theme.AccentGreen
-import com.pockettavern.app.ui.theme.DarkSurface
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,7 +97,7 @@ private fun RegexRuleCard(
     onDelete: () -> Unit
 ) {
     Surface(
-        color = DarkSurface,
+        color = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.medium,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -187,7 +185,7 @@ private fun RegexRuleDialog(
                 )
 
                 // Apply to toggles
-                Text("Apply to:", style = MaterialTheme.typography.labelMedium, color = AccentGreen)
+                Text("Apply to:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = uiState.applyToOutputField, onCheckedChange = viewModel::toggleApplyToOutput)
                     Text("AI output", modifier = Modifier.padding(start = 4.dp))

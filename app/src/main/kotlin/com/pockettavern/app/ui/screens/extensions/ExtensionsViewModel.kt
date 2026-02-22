@@ -1,5 +1,6 @@
 package com.pockettavern.app.ui.screens.extensions
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pockettavern.app.data.local.JsExtensionStorage
@@ -80,6 +81,22 @@ class ExtensionsViewModel @Inject constructor(
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(isInstalling = false, installError = e.message ?: "Install failed")
+                }
+            }
+        }
+    }
+
+    fun installFromFile(uri: Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isInstalling = true, installError = null) }
+            try {
+                jsExtensionStorage.installFromFile(uri)
+                extensionManager.jsHost.reload()
+                refreshJsExtensions()
+                _uiState.update { it.copy(isInstalling = false) }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(isInstalling = false, installError = e.message ?: "Import failed")
                 }
             }
         }

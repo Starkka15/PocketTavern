@@ -16,9 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pockettavern.app.domain.model.Character
-import com.pockettavern.app.ui.theme.AccentGreen
-import com.pockettavern.app.ui.theme.TextSecondary
-import com.pockettavern.app.ui.theme.TextTertiary
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -74,7 +71,7 @@ fun CharacterListItem(
                             }
                         },
                         modifier = Modifier.size(16.dp),
-                        tint = AccentGreen
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -83,7 +80,7 @@ fun CharacterListItem(
                 Text(
                     text = character.description.take(100),
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -94,7 +91,7 @@ fun CharacterListItem(
                 Text(
                     text = "Lorebook: ${character.attachedWorldInfo}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = TextTertiary,
+                    color = MaterialTheme.colorScheme.outline,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

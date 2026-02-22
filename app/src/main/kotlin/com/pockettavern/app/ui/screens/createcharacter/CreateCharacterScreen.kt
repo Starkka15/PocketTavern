@@ -112,7 +112,7 @@ fun CreateCharacterScreen(
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkSurface)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
     ) { padding ->
@@ -132,8 +132,8 @@ fun CreateCharacterScreen(
                 // Tab row
                 ScrollableTabRow(
                     selectedTabIndex = selectedTab.ordinal,
-                    containerColor = DarkSurface,
-                    contentColor = TextPrimary,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
                     edgePadding = 8.dp
                 ) {
                     CharacterTab.entries.forEach { tab ->
@@ -142,8 +142,8 @@ fun CreateCharacterScreen(
                             onClick = { selectedTab = tab },
                             text = { Text(tab.title) },
                             icon = tab.icon,
-                            selectedContentColor = AccentGreen,
-                            unselectedContentColor = TextSecondary
+                            selectedContentColor = MaterialTheme.colorScheme.primary,
+                            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -258,13 +258,13 @@ private fun BasicTab(
                     Text(
                         "Configure Stable Diffusion Forge in Settings to enable AI avatar generation",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         }
 
-        HorizontalDivider(color = DarkSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
     }
 
     // Name field
@@ -281,7 +281,7 @@ private fun BasicTab(
     // Card import notice
     if (uiState.isCardImport) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = AccentGreen.copy(alpha = 0.1f)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
             shape = RoundedCornerShape(8.dp)
         ) {
             Row(
@@ -289,12 +289,12 @@ private fun BasicTab(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Check, null, tint = AccentGreen)
+                Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
                 Column {
-                    Text("Character Card Detected", color = AccentGreen, style = MaterialTheme.typography.titleSmall)
+                    Text("Character Card Detected", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
                     Text(
                         "All data will be imported including ${if (uiState.hasCharacterBook) "${uiState.characterBookEntryCount} lorebook entries" else "metadata"}",
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -309,7 +309,7 @@ private fun PersonalityTab(uiState: CreateCharacterUiState, viewModel: CreateCha
     Text(
         "Physical appearance, background, and general information about the character.",
         style = MaterialTheme.typography.bodySmall,
-        color = TextSecondary
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     CharacterTextField(
         value = uiState.description,
@@ -324,7 +324,7 @@ private fun PersonalityTab(uiState: CreateCharacterUiState, viewModel: CreateCha
     Text(
         "Character traits, demeanor, and how they behave.",
         style = MaterialTheme.typography.bodySmall,
-        color = TextSecondary
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     CharacterTextField(
         value = uiState.personality,
@@ -339,7 +339,7 @@ private fun PersonalityTab(uiState: CreateCharacterUiState, viewModel: CreateCha
     Text(
         "The setting or situation for the conversation.",
         style = MaterialTheme.typography.bodySmall,
-        color = TextSecondary
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     CharacterTextField(
         value = uiState.scenario,
@@ -357,7 +357,7 @@ private fun MessagesTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
     Text(
         "The opening message when starting a new chat.",
         style = MaterialTheme.typography.bodySmall,
-        color = TextSecondary
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     CharacterTextField(
         value = uiState.firstMessage,
@@ -373,7 +373,7 @@ private fun MessagesTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
     Text(
         "Additional first messages that can be swiped through.",
         style = MaterialTheme.typography.bodySmall,
-        color = TextSecondary
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 
     uiState.alternateGreetings.forEachIndexed { index, greeting ->
@@ -395,7 +395,7 @@ private fun MessagesTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
                 onClick = { viewModel.removeAlternateGreeting(index) },
                 modifier = Modifier.padding(top = 8.dp)
             ) {
-                Icon(Icons.Default.Delete, "Remove", tint = ErrorRed)
+                Icon(Icons.Default.Delete, "Remove", tint = MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -409,13 +409,13 @@ private fun MessagesTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
         Text("Add Alternate Greeting")
     }
 
-    HorizontalDivider(color = DarkSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
+    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
 
     SectionHeader("Example Dialogue")
     Text(
         "Example conversations to guide the AI's writing style.",
         style = MaterialTheme.typography.bodySmall,
-        color = TextSecondary
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     CharacterTextField(
         value = uiState.messageExample,
@@ -433,7 +433,7 @@ private fun AdvancedTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
     Text(
         "Overrides the default system prompt. Use {{original}} to include the user's default.",
         style = MaterialTheme.typography.bodySmall,
-        color = TextSecondary
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     CharacterTextField(
         value = uiState.systemPrompt,
@@ -448,7 +448,7 @@ private fun AdvancedTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
     Text(
         "Injected after the chat history (like a jailbreak). Use {{original}} to include default.",
         style = MaterialTheme.typography.bodySmall,
-        color = TextSecondary
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     CharacterTextField(
         value = uiState.postHistoryInstructions,
@@ -460,10 +460,10 @@ private fun AdvancedTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
     )
 
     if (uiState.hasCharacterBook) {
-        HorizontalDivider(color = DarkSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
 
         Card(
-            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(8.dp)
         ) {
             Row(
@@ -471,13 +471,13 @@ private fun AdvancedTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Book, null, tint = AccentGreen)
+                Icon(Icons.Default.Book, null, tint = MaterialTheme.colorScheme.primary)
                 Column(Modifier.weight(1f)) {
                     Text("Character Lorebook", style = MaterialTheme.typography.titleSmall)
                     Text(
                         "${uiState.characterBookEntryCount} entries will be imported",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -500,7 +500,7 @@ private fun MetaTab(uiState: CreateCharacterUiState, viewModel: CreateCharacterV
     Text(
         "Keywords for categorizing the character.",
         style = MaterialTheme.typography.bodySmall,
-        color = TextSecondary
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 
     // Tag input
@@ -559,13 +559,13 @@ private fun MetaTab(uiState: CreateCharacterUiState, viewModel: CreateCharacterV
         }
     }
 
-    HorizontalDivider(color = DarkSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
+    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
 
     SectionHeader("Creator Notes")
     Text(
         "Notes for users about the character (not used in prompts).",
         style = MaterialTheme.typography.bodySmall,
-        color = TextSecondary
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     CharacterTextField(
         value = uiState.creatorNotes,
@@ -582,7 +582,7 @@ private fun SectionHeader(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.titleMedium,
-        color = AccentGreen,
+        color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(top = 8.dp)
     )
 }
@@ -605,7 +605,7 @@ private fun CharacterTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
-        placeholder = { Text(placeholder, color = TextTertiary) },
+        placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.outline) },
         modifier = modifier.fillMaxWidth(),
         singleLine = singleLine,
         minLines = if (singleLine) 1 else minLines,
@@ -614,15 +614,15 @@ private fun CharacterTextField(
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = DarkInputBackground,
-            unfocusedContainerColor = DarkInputBackground,
-            focusedBorderColor = AccentGreen,
-            unfocusedBorderColor = DarkSurfaceVariant,
-            focusedTextColor = TextPrimary,
-            unfocusedTextColor = TextPrimary,
-            focusedLabelColor = AccentGreen,
-            unfocusedLabelColor = TextSecondary,
-            cursorColor = AccentGreen
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+            focusedLabelColor = MaterialTheme.colorScheme.primary,
+            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            cursorColor = MaterialTheme.colorScheme.primary
         )
     )
 }
@@ -640,7 +640,7 @@ private fun AvatarPreview(
         modifier = Modifier
             .size(120.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(DarkSurface)
+            .background(MaterialTheme.colorScheme.surface)
             .clickable(enabled = !isGenerating, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -665,20 +665,20 @@ private fun AvatarPreview(
                     CircularProgressIndicator(
                         progress = { progress },
                         modifier = Modifier.size(48.dp),
-                        color = AccentGreen
+                        color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(Modifier.height(4.dp))
-                    Text("${(progress * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    Text("${(progress * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             generationState is GenerationState.Starting -> {
-                CircularProgressIndicator(color = AccentGreen)
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
             else -> {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.AddPhotoAlternate, null, Modifier.size(32.dp), tint = TextSecondary)
+                    Icon(Icons.Default.AddPhotoAlternate, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(4.dp))
-                    Text("Add Avatar", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    Text("Add Avatar", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -716,7 +716,7 @@ private fun AvatarOptionsDialog(
                     TextButton(
                         onClick = onClear,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.textButtonColors(contentColor = ErrorRed)
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                     ) {
                         Icon(Icons.Default.Delete, null, Modifier.size(24.dp))
                         Spacer(Modifier.width(12.dp))

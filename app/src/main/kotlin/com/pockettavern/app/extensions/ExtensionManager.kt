@@ -1,5 +1,6 @@
 package com.pockettavern.app.extensions
 
+import com.pockettavern.app.domain.model.MessageHeaderEntry
 import com.pockettavern.app.domain.model.QuickReplyButton
 import com.pockettavern.app.extensions.builtin.QuickReplyExtension
 import com.pockettavern.app.extensions.builtin.RegexExtension
@@ -23,15 +24,21 @@ class ExtensionManager @Inject constructor(
 
     /**
      * Message headers set by JS extensions via PT.setMessageHeader().
-     * Map of messageIndex → header text string.
+     * Map of messageIndex → list of headers (multiple extensions can each set one).
      */
-    val messageHeaders: StateFlow<Map<Int, String>> get() = jsHost.messageHeaders
+    val messageHeaders: StateFlow<Map<Int, List<MessageHeaderEntry>>> get() = jsHost.messageHeaders
 
     /**
      * Buttons registered by JS extensions via PT.registerButtons().
      * Map of extensionId → button list. Combine with native quick reply for the full set.
      */
     val jsButtonSets: StateFlow<Map<String, List<QuickReplyButton>>> get() = jsHost.jsButtonSets
+
+    /** Inline header buttons registered by extensions. extensionId → action list. */
+    val headerButtons: StateFlow<Map<String, List<JsExtensionHost.HeaderAction>>> get() = jsHost.headerButtons
+
+    /** Header context menus registered by extensions. extensionId → action list. */
+    val headerMenus: StateFlow<Map<String, List<JsExtensionHost.HeaderAction>>> get() = jsHost.headerMenus
 
     /** Load persisted settings and initialise the JS sandbox. Call once at app start. */
     fun load() {
@@ -78,4 +85,13 @@ class ExtensionManager @Inject constructor(
 
     /** Clear all JS message headers without reloading the sandbox (call when changing chat). */
     fun clearMessageHeaders() = jsHost.clearMessageHeaders()
+
+    /** Restore persisted message headers when loading an existing chat. */
+    fun restoreMessageHeaders(headers: Map<Int, List<MessageHeaderEntry>>) =
+        jsHost.restoreMessageHeaders(headers)
+
+    /** Replace the entire message headers map (e.g. after deleting/shifting messages). */
+    fun replaceMessageHeaders(headers: Map<Int, List<MessageHeaderEntry>>) {
+        jsHost.replaceMessageHeaders(headers)
+    }
 }

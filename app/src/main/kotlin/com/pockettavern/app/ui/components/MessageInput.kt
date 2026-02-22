@@ -13,10 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import com.pockettavern.app.ui.theme.AccentGreen
-import com.pockettavern.app.ui.theme.DarkInputBackground
-import com.pockettavern.app.ui.theme.DarkSurface
-import com.pockettavern.app.ui.theme.TextPrimary
 
 @Composable
 fun MessageInput(
@@ -29,7 +25,7 @@ fun MessageInput(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = DarkSurface
+        color = MaterialTheme.colorScheme.surface
     ) {
         Row(
             modifier = Modifier
@@ -46,13 +42,13 @@ fun MessageInput(
                     Text(placeholder)
                 },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = DarkInputBackground,
-                    unfocusedContainerColor = DarkInputBackground,
-                    disabledContainerColor = DarkInputBackground.copy(alpha = 0.5f),
-                    focusedBorderColor = AccentGreen,
-                    unfocusedBorderColor = DarkInputBackground,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                 ),
                 shape = RoundedCornerShape(24.dp),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
@@ -68,8 +64,8 @@ fun MessageInput(
                 onClick = onSend,
                 enabled = enabled && value.isNotBlank(),
                 colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = AccentGreen,
-                    disabledContainerColor = AccentGreen.copy(alpha = 0.3f)
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
                 )
             ) {
                 Icon(

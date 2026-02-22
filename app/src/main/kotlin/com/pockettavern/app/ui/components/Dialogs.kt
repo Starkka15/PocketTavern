@@ -9,7 +9,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.pockettavern.app.ui.theme.ErrorRed
 
 @Composable
 fun ConfirmDialog(
@@ -29,7 +28,7 @@ fun ConfirmDialog(
             TextButton(
                 onClick = onConfirm,
                 colors = if (isDestructive) {
-                    ButtonDefaults.textButtonColors(contentColor = ErrorRed)
+                    ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 } else {
                     ButtonDefaults.textButtonColors()
                 }

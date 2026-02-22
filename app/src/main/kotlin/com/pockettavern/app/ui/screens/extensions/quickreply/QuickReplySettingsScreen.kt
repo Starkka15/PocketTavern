@@ -19,8 +19,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pockettavern.app.domain.model.QuickReplyButton
 import com.pockettavern.app.domain.model.QuickReplyPreset
-import com.pockettavern.app.ui.theme.AccentGreen
-import com.pockettavern.app.ui.theme.DarkSurface
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -126,7 +124,7 @@ private fun PresetCard(
     onDeleteButton: (QuickReplyButton) -> Unit
 ) {
     Surface(
-        color = DarkSurface,
+        color = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.medium,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -190,7 +188,7 @@ private fun ButtonRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(button.label, style = MaterialTheme.typography.bodyMedium, color = AccentGreen)
+            Text(button.label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
             Text(
                 button.message,
                 style = MaterialTheme.typography.bodySmall,
@@ -284,7 +282,7 @@ private fun ButtonDialog(
                 Text(
                     "Auto-triggers",
                     style = MaterialTheme.typography.labelMedium,
-                    color = AccentGreen
+                    color = MaterialTheme.colorScheme.primary
                 )
                 triggerOptions.forEach { (event, label) ->
                     Row(

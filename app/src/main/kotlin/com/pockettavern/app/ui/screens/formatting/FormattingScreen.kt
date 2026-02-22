@@ -43,7 +43,7 @@ fun FormattingScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkSurface
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
@@ -75,7 +75,7 @@ fun FormattingScreen(
                     onPresetSelected = { viewModel.selectInstructPreset(it) }
                 )
 
-                HorizontalDivider(color = DarkSurfaceVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // Context Template Section
                 FormattingSection(
@@ -86,19 +86,19 @@ fun FormattingScreen(
                     onPresetSelected = { viewModel.selectContextPreset(it) }
                 )
 
-                HorizontalDivider(color = DarkSurfaceVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // System Prompt Section
                 Text(
                     text = "SYSTEM PROMPT",
                     style = MaterialTheme.typography.titleMedium,
-                    color = AccentGreen
+                    color = MaterialTheme.colorScheme.primary
                 )
 
                 Text(
                     text = "Instructions given to the AI about how to behave",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 // System Prompt Preset Dropdown
@@ -191,7 +191,7 @@ fun FormattingScreen(
                     Text(
                         text = "Bundled preset — Save to create an editable copy",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -218,7 +218,7 @@ fun FormattingScreen(
                 if (uiState.saveSuccess) {
                     Text(
                         text = "Settings saved successfully!",
-                        color = AccentGreen,
+                        color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -277,20 +277,20 @@ private fun FormattingSection(
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
-            color = AccentGreen
+            color = MaterialTheme.colorScheme.primary
         )
 
         Text(
             text = description,
             style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         if (presets.isEmpty()) {
             Text(
                 text = "No presets available (loaded: ${presets.size})",
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextTertiary
+                color = MaterialTheme.colorScheme.outline
             )
         } else {
             var expanded by remember { mutableStateOf(false) }
@@ -330,28 +330,28 @@ private fun FormattingSection(
 
 @Composable
 private fun textFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedContainerColor = DarkInputBackground,
-    unfocusedContainerColor = DarkInputBackground,
-    focusedBorderColor = AccentGreen,
-    unfocusedBorderColor = DarkSurfaceVariant,
-    focusedTextColor = TextPrimary,
-    unfocusedTextColor = TextPrimary,
-    focusedLabelColor = AccentGreen,
-    unfocusedLabelColor = TextSecondary,
-    focusedPlaceholderColor = TextTertiary,
-    unfocusedPlaceholderColor = TextTertiary
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedLabelColor = MaterialTheme.colorScheme.primary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    focusedPlaceholderColor = MaterialTheme.colorScheme.outline,
+    unfocusedPlaceholderColor = MaterialTheme.colorScheme.outline
 )
 
 @Composable
 private fun dropdownTextFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedContainerColor = DarkInputBackground,
-    unfocusedContainerColor = DarkInputBackground,
-    focusedBorderColor = AccentGreen,
-    unfocusedBorderColor = DarkSurfaceVariant,
-    focusedTextColor = TextPrimary,
-    unfocusedTextColor = TextPrimary,
-    focusedLabelColor = AccentGreen,
-    unfocusedLabelColor = TextSecondary,
-    focusedTrailingIconColor = AccentGreen,
-    unfocusedTrailingIconColor = TextSecondary
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedLabelColor = MaterialTheme.colorScheme.primary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    focusedTrailingIconColor = MaterialTheme.colorScheme.primary,
+    unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
 )

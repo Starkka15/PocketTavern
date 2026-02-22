@@ -7,20 +7,28 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pockettavern.app.ui.navigation.SillyTavernNavGraph
 import com.pockettavern.app.ui.theme.SillyTavernTheme
+import com.pockettavern.app.ui.theme.ThemeManager
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var themeManager: ThemeManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            SillyTavernTheme {
+            val themeColors by themeManager.colors.collectAsStateWithLifecycle()
+            SillyTavernTheme(colors = themeColors) {
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()

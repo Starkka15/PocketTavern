@@ -45,7 +45,7 @@ fun ContextSettingsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkSurface
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
@@ -115,7 +115,7 @@ fun ContextSettingsScreen(
                 if (uiState.saveSuccess) {
                     Text(
                         text = "Settings saved successfully!",
-                        color = AccentGreen,
+                        color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -154,20 +154,20 @@ private fun AuthorsNoteSection(
             Icon(
                 Icons.AutoMirrored.Filled.StickyNote2,
                 contentDescription = null,
-                tint = AccentBlue
+                tint = MaterialTheme.colorScheme.primary
             )
             Text(
                 text = "AUTHOR'S NOTE",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = AccentBlue
+                color = MaterialTheme.colorScheme.primary
             )
         }
 
         Text(
             text = "A note injected into the context to guide the AI's response style or focus.",
             style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         // Author's Note Content
@@ -228,7 +228,7 @@ private fun AuthorsNoteSection(
                 Text(
                     text = "Depth: $depth messages from bottom",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = TextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Slider(
                     value = depth.toFloat(),
@@ -236,8 +236,8 @@ private fun AuthorsNoteSection(
                     valueRange = 0f..10f,
                     steps = 9,
                     colors = SliderDefaults.colors(
-                        thumbColor = AccentBlue,
-                        activeTrackColor = AccentBlue
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary
                     )
                 )
             }
@@ -252,7 +252,7 @@ private fun AuthorsNoteSection(
             Text(
                 text = "Interval:",
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
             OutlinedTextField(
                 value = interval.toString(),
@@ -269,7 +269,7 @@ private fun AuthorsNoteSection(
             Text(
                 text = if (interval == 0) "every message" else "every $interval messages",
                 style = MaterialTheme.typography.bodySmall,
-                color = TextTertiary
+                color = MaterialTheme.colorScheme.outline
             )
         }
 
@@ -329,20 +329,20 @@ private fun AutoContinueSection(
             Icon(
                 Icons.Default.Autorenew,
                 contentDescription = null,
-                tint = AccentGreen
+                tint = MaterialTheme.colorScheme.primary
             )
             Text(
                 text = "AUTO-CONTINUE",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = AccentGreen
+                color = MaterialTheme.colorScheme.primary
             )
         }
 
         Text(
             text = "Automatically request more when the AI stops before the minimum response length.",
             style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Row(
@@ -352,7 +352,7 @@ private fun AutoContinueSection(
             Text(
                 text = "Enable Auto-Continue",
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
             )
             Switch(checked = enabled, onCheckedChange = onEnabledChange)
@@ -367,7 +367,7 @@ private fun AutoContinueSection(
                 Text(
                     text = "Min length:",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = TextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 OutlinedTextField(
                     value = minLength.toString(),
@@ -380,13 +380,13 @@ private fun AutoContinueSection(
                 Text(
                     text = "tokens",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
                 text = "Max 3 auto-continues per message.",
                 style = MaterialTheme.typography.labelSmall,
-                color = TextTertiary
+                color = MaterialTheme.colorScheme.outline
             )
         }
     }
@@ -394,28 +394,28 @@ private fun AutoContinueSection(
 
 @Composable
 private fun textFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedContainerColor = DarkInputBackground,
-    unfocusedContainerColor = DarkInputBackground,
-    focusedBorderColor = AccentGreen,
-    unfocusedBorderColor = DarkSurfaceVariant,
-    focusedTextColor = TextPrimary,
-    unfocusedTextColor = TextPrimary,
-    focusedLabelColor = AccentGreen,
-    unfocusedLabelColor = TextSecondary,
-    focusedPlaceholderColor = TextTertiary,
-    unfocusedPlaceholderColor = TextTertiary
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedLabelColor = MaterialTheme.colorScheme.primary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    focusedPlaceholderColor = MaterialTheme.colorScheme.outline,
+    unfocusedPlaceholderColor = MaterialTheme.colorScheme.outline
 )
 
 @Composable
 private fun dropdownColors() = OutlinedTextFieldDefaults.colors(
-    focusedContainerColor = DarkInputBackground,
-    unfocusedContainerColor = DarkInputBackground,
-    focusedBorderColor = AccentGreen,
-    unfocusedBorderColor = DarkSurfaceVariant,
-    focusedTextColor = TextPrimary,
-    unfocusedTextColor = TextPrimary,
-    focusedLabelColor = AccentGreen,
-    unfocusedLabelColor = TextSecondary,
-    focusedTrailingIconColor = AccentGreen,
-    unfocusedTrailingIconColor = TextSecondary
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedLabelColor = MaterialTheme.colorScheme.primary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    focusedTrailingIconColor = MaterialTheme.colorScheme.primary,
+    unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
 )

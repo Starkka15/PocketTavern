@@ -54,7 +54,7 @@ fun SettingsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkSurface
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
@@ -81,7 +81,7 @@ fun SettingsScreen(
                 Text(
                     text = "Stable Diffusion Forge (optional)",
                     style = MaterialTheme.typography.titleMedium,
-                    color = AccentGreen
+                    color = MaterialTheme.colorScheme.primary
                 )
 
                 OutlinedTextField(
@@ -98,22 +98,22 @@ fun SettingsScreen(
                 Text(
                     text = "Used for generating character avatars",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                HorizontalDivider(color = DarkSurfaceVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // CharaVault Server Section
                 Text(
                     text = "Card Server (optional)",
                     style = MaterialTheme.typography.titleMedium,
-                    color = AccentGreen
+                    color = MaterialTheme.colorScheme.primary
                 )
 
                 Text(
                     text = if (uiState.charavaultMode == "charavault") "Mode: CharaVault.net" else "Mode: Local CharaVault",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 if (uiState.charavaultMode == "local") {
@@ -131,13 +131,13 @@ fun SettingsScreen(
                     Text(
                         text = "Your local character card index server",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
                     Text(
                         text = "Configure login via the CharaVault screen",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -160,19 +160,19 @@ fun SettingsScreen(
                     Text("Save Settings")
                 }
 
-                HorizontalDivider(color = DarkSurfaceVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // Debug Section
                 Text(
                     text = "Debugging",
                     style = MaterialTheme.typography.titleMedium,
-                    color = AccentGreen
+                    color = MaterialTheme.colorScheme.primary
                 )
 
                 Text(
                     text = "Share debug logs to help diagnose issues with prompt building, World Info, and API requests.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 val context = LocalContext.current
@@ -237,14 +237,14 @@ fun SettingsScreen(
 
 @Composable
 private fun settingsTextFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedContainerColor = DarkInputBackground,
-    unfocusedContainerColor = DarkInputBackground,
-    focusedBorderColor = AccentGreen,
-    unfocusedBorderColor = DarkSurfaceVariant,
-    focusedTextColor = TextPrimary,
-    unfocusedTextColor = TextPrimary,
-    focusedLabelColor = AccentGreen,
-    unfocusedLabelColor = TextSecondary,
-    focusedPlaceholderColor = TextTertiary,
-    unfocusedPlaceholderColor = TextTertiary
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedLabelColor = MaterialTheme.colorScheme.primary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    focusedPlaceholderColor = MaterialTheme.colorScheme.outline,
+    unfocusedPlaceholderColor = MaterialTheme.colorScheme.outline
 )

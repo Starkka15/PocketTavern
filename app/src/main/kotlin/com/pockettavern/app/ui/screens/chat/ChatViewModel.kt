@@ -15,12 +15,14 @@ import com.pockettavern.app.data.repository.LocalRepository
 import com.pockettavern.app.data.repository.LlmRepository
 import com.pockettavern.app.extensions.ExtensionEvent
 import com.pockettavern.app.extensions.ExtensionManager
+import com.pockettavern.app.extensions.JsExtensionHost
 import com.pockettavern.app.domain.model.ApiConfiguration
 import com.pockettavern.app.domain.model.Chat
 import com.pockettavern.app.domain.model.Character
 import com.pockettavern.app.domain.model.ChatInfo
 import com.pockettavern.app.domain.model.ChatMessage
 import com.pockettavern.app.domain.model.ChatMessageMetadata
+import com.pockettavern.app.domain.model.MessageHeaderEntry
 import com.pockettavern.app.domain.model.ForgeGenerationParams
 import com.pockettavern.app.domain.model.GenerationState
 import com.pockettavern.app.domain.model.QuickReplyButton
@@ -87,8 +89,16 @@ data class ChatUiState(
     // Token counter (shown when extension is enabled)
     val tokenCount: Int = 0,
     val showTokenCount: Boolean = false,
-    // Message headers set by JS extensions via PT.setMessageHeader(index, text)
-    val messageHeaders: Map<Int, String> = emptyMap()
+    // Message headers set by JS extensions via PT.setMessageHeader(index, text, extensionId)
+    val messageHeaders: Map<Int, List<MessageHeaderEntry>> = emptyMap(),
+    // Inline header buttons registered by extensions (extensionId → actions)
+    val headerButtons: Map<String, List<JsExtensionHost.HeaderAction>> = emptyMap(),
+    // Header context menus registered by extensions (extensionId → actions)
+    val headerMenus: Map<String, List<JsExtensionHost.HeaderAction>> = emptyMap(),
+    // Which (messageIndex, extensionId) pairs have visible inline buttons
+    val visibleHeaderButtons: Set<Pair<Int, String>> = emptySet(),
+    // Edit dialog requested by JS extension via PT.showEditDialog()
+    val editDialogRequest: JsExtensionHost.EditDialogRequest? = null
 )
 
 enum class ImageGenType {
@@ -134,11 +144,38 @@ class ChatViewModel @Inject constructor(
                 _uiState.update { it.copy(quickReplyButtons = nativeButtons + jsButtons) }
             }
         }
-        // Observe JS message headers
+        // Observe JS message headers — persist onto messages and save to disk
         viewModelScope.launch {
             extensionManager.messageHeaders.collect { headers ->
                 _uiState.update { it.copy(messageHeaders = headers) }
+                // Persist headers onto message objects and save so they survive chat reload
+                // Only persist if we actually have messages in the current chat
+                if (_uiState.value.messages.isNotEmpty() && persistExtensionHeaders()) {
+                    saveCurrentChat()
+                }
             }
+        }
+        // Observe inline header buttons registered by JS extensions
+        viewModelScope.launch {
+            extensionManager.headerButtons.collect { buttons ->
+                _uiState.update { it.copy(headerButtons = buttons) }
+            }
+        }
+        // Observe header context menus registered by JS extensions
+        viewModelScope.launch {
+            extensionManager.headerMenus.collect { menus ->
+                _uiState.update { it.copy(headerMenus = menus) }
+            }
+        }
+        // Observe edit dialog requests from JS extensions
+        viewModelScope.launch {
+            extensionManager.jsHost.editDialogRequest.collect { request ->
+                _uiState.update { it.copy(editDialogRequest = request) }
+            }
+        }
+        // Wire hidden generate callback so PT.generateHidden() works
+        extensionManager.jsHost.hiddenGenerateCallback = { prompt, callbackId ->
+            viewModelScope.launch { doHiddenGenerate(prompt, callbackId) }
         }
         // Observe token counter enabled state
         _uiState.update { it.copy(showTokenCount = extensionManager.tokenCounter.enabled) }
@@ -175,6 +212,57 @@ class ChatViewModel @Inject constructor(
     @Volatile private var _currentConfig: ApiConfiguration = ApiConfiguration.DEFAULT
     // Last known persona name — updated when generation starts, used for multi-turn trimming
     @Volatile private var _currentUserName: String = "User"
+
+    /**
+     * Rebuild the context JSON that JS extensions see via PT.getContext().
+     * Includes the current character, recent messages (with index, text, isUser),
+     * persona name, and API type.  Called whenever messages or character change.
+     */
+    private fun pushExtensionContext() {
+        val state = _uiState.value
+        val character = state.character
+        val messages = state.messages
+
+        val sb = StringBuilder()
+        sb.append("{")
+        // character
+        if (character != null) {
+            sb.append("\"character\":{")
+            sb.append("\"name\":").append(jsonString(character.name)).append(",")
+            sb.append("\"description\":").append(jsonString(character.description)).append(",")
+            sb.append("\"personality\":").append(jsonString(character.personality)).append(",")
+            sb.append("\"scenario\":").append(jsonString(character.scenario))
+            sb.append("},")
+        }
+        // recentMessages — include raw text (before output filter) so extensions can parse tags
+        sb.append("\"recentMessages\":[")
+        for (i in messages.indices) {
+            if (i > 0) sb.append(",")
+            val msg = messages[i]
+            val text = msg.rawContent ?: msg.content
+            sb.append("{\"index\":").append(i)
+            sb.append(",\"text\":").append(jsonString(text))
+            sb.append(",\"isUser\":").append(msg.isUser)
+            sb.append("}")
+        }
+        sb.append("],")
+        sb.append("\"personaName\":").append(jsonString(_currentUserName)).append(",")
+        sb.append("\"apiType\":").append(jsonString(_currentConfig.displayName))
+        sb.append("}")
+
+        extensionManager.updateContext(sb.toString())
+    }
+
+    /** JSON-escape a string value (with surrounding quotes). */
+    private fun jsonString(value: String): String {
+        val escaped = value
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
+        return "\"$escaped\""
+    }
 
     // The PNG filename of the current character (e.g. "seraphina.png")
     private var currentAvatarUrl: String = ""
@@ -265,15 +353,28 @@ class ChatViewModel @Inject constructor(
     private suspend fun loadExistingChat(character: Character, fileName: String) {
         when (val result = localRepository.getChat(character.name, fileName)) {
             is Result.Success -> {
+                val messages = result.data.messages
+                // Restore persisted extension headers
+                val restoredHeaders = mutableMapOf<Int, List<MessageHeaderEntry>>()
+                messages.forEachIndexed { index, msg ->
+                    if (msg.extensionHeaders.isNotEmpty()) {
+                        restoredHeaders[index] = msg.extensionHeaders
+                    }
+                }
+                // Clear stale state from previous chat before loading new one
+                extensionManager.clearMessageHeaders()
                 _uiState.update {
                     it.copy(
-                        messages = result.data.messages,
+                        messages = messages,
                         currentChatFileName = fileName,
-                        isLoading = false
+                        isLoading = false,
+                        messageHeaders = restoredHeaders,
+                        visibleHeaderButtons = emptySet()
                     )
                 }
+                pushExtensionContext()
                 extensionManager.emit(ExtensionEvent.CHAT_CHANGED, fileName)
-                extensionManager.clearMessageHeaders()
+                extensionManager.restoreMessageHeaders(restoredHeaders)
             }
             is Result.Error -> createNewChat()
         }
@@ -317,9 +418,19 @@ class ChatViewModel @Inject constructor(
             val messages = if (!greeting.isNullOrBlank()) {
                 listOf(ChatMessage(content = greeting, isUser = false))
             } else emptyList()
+            // Clear stale headers from previous chat
+            extensionManager.clearMessageHeaders()
             _uiState.update {
-                it.copy(messages = messages, currentChatFileName = fileName, isLoading = false)
+                it.copy(
+                    messages = messages,
+                    currentChatFileName = fileName,
+                    isLoading = false,
+                    messageHeaders = emptyMap(),
+                    visibleHeaderButtons = emptySet()
+                )
             }
+            pushExtensionContext()
+            extensionManager.emit(ExtensionEvent.CHAT_CHANGED, fileName)
             if (messages.isNotEmpty()) {
                 saveCurrentChat()
                 refreshChatsList()
@@ -344,6 +455,16 @@ class ChatViewModel @Inject constructor(
     /** Send a quick-reply button message directly (bypasses inputText). */
     fun sendQuickReply(button: QuickReplyButton) {
         if (_uiState.value.character == null) return
+        // Action buttons dispatch BUTTON_CLICKED event to JS instead of sending a message
+        if (button.action.isNotBlank()) {
+            val safeAction = button.action.replace("\\", "\\\\").replace("\"", "\\\"")
+            val safeLabel = button.label.replace("\\", "\\\\").replace("\"", "\\\"")
+            extensionManager.emitJson(
+                ExtensionEvent.BUTTON_CLICKED,
+                "{\"action\":\"$safeAction\",\"label\":\"$safeLabel\"}"
+            )
+            return
+        }
         val text = button.message.trim()
         if (text.isBlank()) return
         sendMessageText(text)
@@ -380,6 +501,7 @@ class ChatViewModel @Inject constructor(
                 streamingContent = ""
             )
         }
+        pushExtensionContext()
         extensionManager.emit(ExtensionEvent.MESSAGE_SENT, message)
 
         if (_uiState.value.currentChatFileName == null) {
@@ -410,7 +532,8 @@ class ChatViewModel @Inject constructor(
                                 streamingContent = ""
                             )
                         }
-                        // Step 3: emit MESSAGE_RECEIVED with raw text so extensions can parse tags
+                        // Step 3: update extension context, then emit MESSAGE_RECEIVED
+                        pushExtensionContext()
                         val msgIndex = _uiState.value.messages.lastIndex
                         val safeText = processed
                             .replace("\\", "\\\\")
@@ -424,9 +547,15 @@ class ChatViewModel @Inject constructor(
                         val displayText = extensionManager.applyOutputFilters(processed)
                         if (displayText != processed) {
                             val messages = _uiState.value.messages.toMutableList()
-                            messages[msgIndex] = messages[msgIndex].copy(content = displayText)
+                            messages[msgIndex] = messages[msgIndex].copy(
+                                content = displayText,
+                                rawContent = processed
+                            )
                             _uiState.update { it.copy(messages = messages) }
                         }
+                        // Step 5: refresh context (rawContent now set), persist headers
+                        pushExtensionContext()
+                        persistExtensionHeaders()
                         extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
                         generationJob = null
                         saveCurrentChat()
@@ -556,8 +685,30 @@ class ChatViewModel @Inject constructor(
         val messages = _uiState.value.messages.toMutableList()
         if (index in messages.indices) {
             messages.removeAt(index)
+            // Shift headers: remove deleted index, shift higher indices down by 1
+            val oldHeaders = _uiState.value.messageHeaders
+            val newHeaders = mutableMapOf<Int, List<MessageHeaderEntry>>()
+            oldHeaders.forEach { (idx, entries) ->
+                when {
+                    idx < index -> newHeaders[idx] = entries
+                    idx > index -> newHeaders[idx - 1] = entries
+                    // idx == index: dropped (deleted message)
+                }
+            }
+            // Also shift visibleHeaderButtons
+            val newVisibleBtns = _uiState.value.visibleHeaderButtons
+                .filter { it.first != index }
+                .map { if (it.first > index) (it.first - 1) to it.second else it }
+                .toSet()
+            extensionManager.replaceMessageHeaders(newHeaders)
             _uiState.update {
-                it.copy(messages = messages, showMessageActions = false, selectedMessageIndex = null)
+                it.copy(
+                    messages = messages,
+                    showMessageActions = false,
+                    selectedMessageIndex = null,
+                    messageHeaders = newHeaders,
+                    visibleHeaderButtons = newVisibleBtns
+                )
             }
             viewModelScope.launch { saveCurrentChat() }
         }
@@ -771,6 +922,167 @@ class ChatViewModel @Inject constructor(
         localRepository.saveChat(chat)
     }
 
+    /** Snapshot current extension headers onto the corresponding ChatMessage objects. Returns true if anything changed. */
+    private fun persistExtensionHeaders(): Boolean {
+        val headers = _uiState.value.messageHeaders
+        val messages = _uiState.value.messages.toMutableList()
+        var changed = false
+
+        // Apply current headers to messages, and clear headers from messages
+        // that no longer have entries (e.g. after clearing or shifting)
+        for (index in messages.indices) {
+            val msg = messages[index]
+            val entries = headers[index] ?: emptyList()
+            if (msg.extensionHeaders != entries) {
+                messages[index] = msg.copy(extensionHeaders = entries)
+                changed = true
+            }
+        }
+
+        if (changed) {
+            _uiState.update { it.copy(messages = messages) }
+        }
+        return changed
+    }
+
+    // ── Header long-press ─────────────────────────────────────────────────
+
+    /**
+     * Priority: inline buttons → context menu → HEADER_LONG_PRESSED event.
+     * Returns "buttons" or "menu" so ChatBubble knows which UX to show,
+     * or null if neither is registered (fallback to event).
+     */
+    fun onHeaderLongPressed(messageIndex: Int, extensionId: String) {
+        if (extensionId.isBlank()) return
+        val state = _uiState.value
+
+        // Priority 1: toggle inline buttons
+        if (state.headerButtons.containsKey(extensionId)) {
+            val key = messageIndex to extensionId
+            val current = state.visibleHeaderButtons
+            _uiState.update {
+                it.copy(visibleHeaderButtons = if (key in current) current - key else current + key)
+            }
+            return
+        }
+
+        // Priority 2: context menu — handled in ChatBubble via headerMenus state
+        if (state.headerMenus.containsKey(extensionId)) {
+            // Menu popup is managed by ChatBubble's local state.
+            // Returning here means we don't fire the event.
+            return
+        }
+
+        // Priority 3: fallback — dispatch HEADER_LONG_PRESSED event
+        val safeId = extensionId.replace("\"", "\\\"")
+        val jsonData = "{\"messageIndex\":$messageIndex,\"extensionId\":\"$safeId\"}"
+        extensionManager.emitJson(ExtensionEvent.HEADER_LONG_PRESSED, jsonData)
+    }
+
+    /** Dispatch BUTTON_CLICKED when an inline header button or menu item is tapped. */
+    fun onHeaderActionClicked(action: String, label: String) {
+        val safeAction = action.replace("\"", "\\\"")
+        val safeLabel = label.replace("\"", "\\\"")
+        val jsonData = "{\"action\":\"$safeAction\",\"label\":\"$safeLabel\"}"
+        extensionManager.emitJson(ExtensionEvent.BUTTON_CLICKED, jsonData)
+    }
+
+    // ── Edit dialog (JS extension) ─────────────────────────────────────────
+
+    fun submitEditDialog(results: Map<String, String>) {
+        val request = _uiState.value.editDialogRequest ?: return
+        extensionManager.jsHost.completeEditDialog(request.callbackId, results)
+    }
+
+    fun cancelEditDialog() {
+        extensionManager.jsHost.cancelEditDialog()
+    }
+
+    // ── Hidden generation (JS extension) ─────────────────────────────────
+
+    private suspend fun doHiddenGenerate(prompt: String, callbackId: String) {
+        try {
+            val config = when (val r = localRepository.getApiConfiguration()) {
+                is Result.Success -> r.data
+                is Result.Error -> ApiConfiguration.DEFAULT
+            }
+            val preset = localRepository.getCurrentTextGenPreset()
+
+            // Build a context-aware prompt: include character info and recent chat
+            // history so the LLM has full scene context for hidden generation.
+            val messages = _uiState.value.messages
+            val character = _uiState.value.character
+            val contextPrompt = buildString {
+                if (character != null) {
+                    append("Character: ").append(character.name).append("\n")
+                    if (character.description.isNotBlank()) {
+                        append("Description: ").append(character.description.take(1000)).append("\n")
+                    }
+                    if (character.personality.isNotBlank()) {
+                        append("Personality: ").append(character.personality.take(500)).append("\n")
+                    }
+                    if (character.scenario.isNotBlank()) {
+                        append("Scenario: ").append(character.scenario.take(500)).append("\n")
+                    }
+                    append("\n")
+                }
+                // Include recent messages for context (up to 20, 2000 chars each)
+                val recent = if (messages.size > 20) messages.takeLast(20) else messages
+                if (recent.isNotEmpty()) {
+                    append("Recent conversation:\n")
+                    for (msg in recent) {
+                        val role = if (msg.isUser) _currentUserName else (character?.name ?: "Assistant")
+                        val text = msg.rawContent ?: msg.content
+                        append(role).append(": ").append(text.take(2000)).append("\n")
+                    }
+                    append("\n")
+                }
+                append(prompt)
+            }
+
+            // For text completion backends (KoboldAI), wrap the prompt with the
+            // instruct template so the model knows it needs to generate a response.
+            // Without this, the model sees a completed document and immediately
+            // outputs EOS.  Chat completion backends handle this automatically.
+            val finalPrompt = if (!config.usesChatCompletions) {
+                val charFileName = character?.avatar ?: "${character?.name ?: "char"}.png"
+                val instructTemplate = when (val r = localRepository.loadChatContext(
+                    characterFileName = charFileName,
+                    chatFileName = _uiState.value.currentChatFileName
+                )) {
+                    is Result.Success -> r.data.instructTemplate
+                    is Result.Error -> null
+                }
+                if (instructTemplate != null) {
+                    buildString {
+                        // Wrap as: [input_sequence]prompt[input_suffix][output_sequence]
+                        append(instructTemplate.inputSequence)
+                        append(contextPrompt)
+                        append(instructTemplate.inputSuffix)
+                        append(instructTemplate.outputSequence)
+                    }
+                } else {
+                    // No instruct template — add a generic response marker
+                    contextPrompt + "\n\nResponse:\n"
+                }
+            } else {
+                contextPrompt
+            }
+
+            var resultText = ""
+            llmRepository.generate(finalPrompt, config, preset).collect { event ->
+                when (event) {
+                    is StreamEvent.Complete -> resultText = event.fullText
+                    is StreamEvent.Error -> resultText = ""
+                    is StreamEvent.Token -> { /* ignore streaming tokens */ }
+                }
+            }
+            extensionManager.jsHost.completeHiddenGenerate(callbackId, resultText)
+        } catch (e: Exception) {
+            extensionManager.jsHost.completeHiddenGenerate(callbackId, "")
+        }
+    }
+
     fun updateAuthorsNote(
         content: String,
         depth: Int = 4,
@@ -873,6 +1185,7 @@ class ChatViewModel @Inject constructor(
             _uiState.update {
                 it.copy(messages = messages, editingMessageIndex = null, editingMessageText = "")
             }
+            pushExtensionContext()
             viewModelScope.launch { saveCurrentChat() }
         }
     }
@@ -919,9 +1232,15 @@ class ChatViewModel @Inject constructor(
                         val displayContent = extensionManager.applyOutputFilters(fullContent)
                         if (displayContent != fullContent) {
                             val msgs = _uiState.value.messages.toMutableList()
-                            msgs[lastAssistantIndex] = msgs[lastAssistantIndex].copy(content = displayContent)
+                            msgs[lastAssistantIndex] = msgs[lastAssistantIndex].copy(
+                                content = displayContent,
+                                rawContent = fullContent
+                            )
                             _uiState.update { it.copy(messages = msgs) }
                         }
+                        // Refresh context and persist extension headers
+                        pushExtensionContext()
+                        persistExtensionHeaders()
                         extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
                         generationJob = null
                         saveCurrentChat()

@@ -9,7 +9,9 @@ data class QuickReplyButton(
     /** Message sent when button is tapped. Supports {{user}}, {{char}} macros. */
     val message: String,
     /** ExtensionEvent names that auto-fire this button (e.g. "CHAT_CHANGED"). */
-    val autoTriggers: Set<String> = emptySet()
+    val autoTriggers: Set<String> = emptySet(),
+    /** Action identifier for JS callback buttons. When set, dispatches BUTTON_CLICKED instead of sending a message. */
+    val action: String = ""
 )
 
 data class QuickReplyPreset(

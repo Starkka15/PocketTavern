@@ -46,7 +46,7 @@ fun TextGenSettingsScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkSurface)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
     ) { padding ->
@@ -74,7 +74,7 @@ fun TextGenSettingsScreen(
                     onSelect = { viewModel.selectPreset(it) }
                 )
 
-                HorizontalDivider(color = DarkSurfaceVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // Basic Settings
                 SectionHeader("Basic Settings")
@@ -86,7 +86,7 @@ fun TextGenSettingsScreen(
 
                 IntInputField("Max New Tokens", uiState.maxTokens) { viewModel.updateMaxTokens(it) }
 
-                HorizontalDivider(color = DarkSurfaceVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // Advanced Settings Toggle
                 OutlinedButton(
@@ -109,7 +109,7 @@ fun TextGenSettingsScreen(
                         IntInputField("Min Tokens", uiState.minTokens) { viewModel.updateMinTokens(it) }
                         IntInputField("Context Length", uiState.truncationLength) { viewModel.updateTruncationLength(it) }
 
-                        HorizontalDivider(color = DarkSurfaceVariant)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                         // Sampling
                         SectionHeader("Sampling")
@@ -118,7 +118,7 @@ fun TextGenSettingsScreen(
                         SliderSetting("Typical P", uiState.typicalP, 0f..1f, "%.2f") { viewModel.updateTypicalP(it) }
                         SliderSetting("TFS", uiState.tfs, 0f..1f, "%.2f") { viewModel.updateTfs(it) }
 
-                        HorizontalDivider(color = DarkSurfaceVariant)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                         // Repetition
                         SectionHeader("Repetition Penalty")
@@ -127,7 +127,7 @@ fun TextGenSettingsScreen(
                         SliderSetting("Frequency Penalty", uiState.frequencyPenalty, 0f..2f, "%.2f") { viewModel.updateFrequencyPenalty(it) }
                         SliderSetting("Presence Penalty", uiState.presencePenalty, 0f..2f, "%.2f") { viewModel.updatePresencePenalty(it) }
 
-                        HorizontalDivider(color = DarkSurfaceVariant)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                         // DRY Sampler
                         SectionHeader("DRY Sampler")
@@ -136,7 +136,7 @@ fun TextGenSettingsScreen(
                         IntInputField("DRY Allowed Length", uiState.dryAllowedLength) { viewModel.updateDryAllowedLength(it) }
                         IntInputField("DRY Penalty Last N", uiState.dryPenaltyLastN) { viewModel.updateDryPenaltyLastN(it) }
 
-                        HorizontalDivider(color = DarkSurfaceVariant)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                         // Mirostat
                         SectionHeader("Mirostat")
@@ -144,14 +144,14 @@ fun TextGenSettingsScreen(
                         SliderSetting("Mirostat Tau", uiState.mirostatTau, 0f..10f, "%.1f") { viewModel.updateMirostatTau(it) }
                         SliderSetting("Mirostat Eta", uiState.mirostatEta, 0f..1f, "%.2f") { viewModel.updateMirostatEta(it) }
 
-                        HorizontalDivider(color = DarkSurfaceVariant)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                         // XTC
                         SectionHeader("XTC")
                         SliderSetting("XTC Threshold", uiState.xtcThreshold, 0f..1f, "%.2f") { viewModel.updateXtcThreshold(it) }
                         SliderSetting("XTC Probability", uiState.xtcProbability, 0f..1f, "%.2f") { viewModel.updateXtcProbability(it) }
 
-                        HorizontalDivider(color = DarkSurfaceVariant)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                         // Other
                         SectionHeader("Other")
@@ -160,7 +160,7 @@ fun TextGenSettingsScreen(
                         SliderSetting("Smoothing Curve", uiState.smoothingCurve, 0f..10f, "%.2f") { viewModel.updateSmoothingCurve(it) }
                         SliderSetting("Guidance Scale (CFG)", uiState.guidanceScale, 0f..3f, "%.2f") { viewModel.updateGuidanceScale(it) }
 
-                        HorizontalDivider(color = DarkSurfaceVariant)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                         // Token Handling
                         SectionHeader("Token Handling")
@@ -170,7 +170,7 @@ fun TextGenSettingsScreen(
                     }
                 }
 
-                HorizontalDivider(color = DarkSurfaceVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // Action Buttons
                 Row(
@@ -191,7 +191,7 @@ fun TextGenSettingsScreen(
                         onClick = { viewModel.showDeleteConfirm() },
                         modifier = Modifier.weight(1f),
                         enabled = !uiState.isSaving && uiState.presets.isNotEmpty(),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorRed)
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                     ) {
                         Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
@@ -218,7 +218,7 @@ fun TextGenSettingsScreen(
                 if (uiState.saveSuccess) {
                     Text(
                         text = "Settings applied successfully!",
-                        color = AccentGreen,
+                        color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -285,7 +285,7 @@ private fun SectionHeader(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.titleMedium,
-        color = AccentGreen
+        color = MaterialTheme.colorScheme.primary
     )
 }
 
@@ -340,17 +340,17 @@ private fun SliderSetting(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
-            Text(format.format(value), style = MaterialTheme.typography.bodyMedium, color = AccentGreen)
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+            Text(format.format(value), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
         }
         Slider(
             value = value,
             onValueChange = onValueChange,
             valueRange = range,
             colors = SliderDefaults.colors(
-                thumbColor = AccentGreen,
-                activeTrackColor = AccentGreen,
-                inactiveTrackColor = DarkSurfaceVariant
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         )
     }
@@ -391,13 +391,13 @@ private fun SwitchSetting(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = AccentGreen,
-                checkedTrackColor = AccentGreen.copy(alpha = 0.5f)
+                checkedThumbColor = MaterialTheme.colorScheme.primary,
+                checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
             )
         )
     }
@@ -405,24 +405,24 @@ private fun SwitchSetting(
 
 @Composable
 private fun textFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedContainerColor = DarkInputBackground,
-    unfocusedContainerColor = DarkInputBackground,
-    focusedBorderColor = AccentGreen,
-    unfocusedBorderColor = DarkSurfaceVariant,
-    focusedTextColor = TextPrimary,
-    unfocusedTextColor = TextPrimary,
-    focusedLabelColor = AccentGreen,
-    unfocusedLabelColor = TextSecondary
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedLabelColor = MaterialTheme.colorScheme.primary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
 )
 
 @Composable
 private fun dropdownColors() = OutlinedTextFieldDefaults.colors(
-    focusedContainerColor = DarkInputBackground,
-    unfocusedContainerColor = DarkInputBackground,
-    focusedBorderColor = AccentGreen,
-    unfocusedBorderColor = DarkSurfaceVariant,
-    focusedTextColor = TextPrimary,
-    unfocusedTextColor = TextPrimary,
-    focusedTrailingIconColor = AccentGreen,
-    unfocusedTrailingIconColor = TextSecondary
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedTrailingIconColor = MaterialTheme.colorScheme.primary,
+    unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
 )

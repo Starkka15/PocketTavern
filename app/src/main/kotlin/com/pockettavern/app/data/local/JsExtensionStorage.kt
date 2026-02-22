@@ -1,6 +1,7 @@
 package com.pockettavern.app.data.local
 
 import android.content.Context
+import android.net.Uri
 import com.pockettavern.app.extensions.JsExtension
 import com.pockettavern.app.util.DebugLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -9,6 +10,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import java.io.File
 import java.net.URL
+import java.util.zip.ZipInputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -95,6 +97,137 @@ class JsExtensionStorage @Inject constructor(
             enabled     = true,
             scriptFile  = File(extDir, "index.js")
         )
+    }
+
+    /**
+     * Install an extension from a file URI (picked via Android file picker).
+     * Supports:
+     *   - A single .js file → treated as index.js, filename becomes the extension id
+     *   - A .zip file → must contain index.js at root or inside a single top-level folder,
+     *     optionally with manifest.json
+     */
+    suspend fun installFromFile(uri: Uri): JsExtension = withContext(Dispatchers.IO) {
+        val cr = context.contentResolver
+        val mimeType = cr.getType(uri) ?: ""
+        val fileName = getDisplayName(uri) ?: "extension"
+
+        if (mimeType == "application/zip" || mimeType == "application/x-zip-compressed"
+            || fileName.endsWith(".zip", ignoreCase = true)
+        ) {
+            installFromZip(uri)
+        } else {
+            installFromJsFile(uri, fileName)
+        }
+    }
+
+    private suspend fun installFromJsFile(uri: Uri, fileName: String): JsExtension =
+        withContext(Dispatchers.IO) {
+            val scriptText = context.contentResolver.openInputStream(uri)
+                ?.bufferedReader()?.readText()
+                ?: throw IllegalStateException("Could not read file")
+
+            val baseName = fileName.removeSuffix(".js")
+                .replace(Regex("[^a-zA-Z0-9_-]"), "_").lowercase()
+                .ifBlank { "ext_${System.currentTimeMillis()}" }
+
+            val extDir = File(jsExtDir, baseName).also { it.mkdirs() }
+            File(extDir, "index.js").writeText(scriptText)
+            File(extDir, "manifest.json").writeText(buildJsonObject {
+                put("id", baseName)
+                put("name", baseName)
+                put("version", "1.0.0")
+                put("description", "Imported from file")
+                put("author", "")
+                put("sourceUrl", "")
+            }.toString())
+
+            DebugLogger.log("[JsExtensionStorage] Installed '$baseName' from file")
+            JsExtension(
+                id = baseName, name = baseName, version = "1.0.0",
+                description = "Imported from file", author = "", sourceUrl = "",
+                enabled = true, scriptFile = File(extDir, "index.js")
+            )
+        }
+
+    private suspend fun installFromZip(uri: Uri): JsExtension = withContext(Dispatchers.IO) {
+        val files = mutableMapOf<String, ByteArray>()
+        context.contentResolver.openInputStream(uri)?.use { inputStream ->
+            ZipInputStream(inputStream).use { zis ->
+                var entry = zis.nextEntry
+                while (entry != null) {
+                    if (!entry.isDirectory) {
+                        files[entry.name] = zis.readBytes()
+                    }
+                    zis.closeEntry()
+                    entry = zis.nextEntry
+                }
+            }
+        } ?: throw IllegalStateException("Could not read zip file")
+
+        // Find index.js — could be at root or inside a single top-level folder
+        val indexPath = files.keys.firstOrNull { it == "index.js" }
+            ?: files.keys.firstOrNull { it.endsWith("/index.js") && it.count { c -> c == '/' } == 1 }
+            ?: throw IllegalStateException("Zip must contain index.js")
+
+        val prefix = if (indexPath == "index.js") "" else indexPath.removeSuffix("index.js")
+
+        // Check for manifest.json
+        val manifestPath = "${prefix}manifest.json"
+        val manifest = files[manifestPath]?.let { bytes ->
+            try {
+                json.parseToJsonElement(String(bytes)).jsonObject
+            } catch (_: Exception) { null }
+        }
+
+        val id = (manifest?.get("id")?.jsonPrimitive?.content
+            ?: prefix.trimEnd('/').ifBlank { getDisplayName(uri)?.removeSuffix(".zip") ?: "ext" }
+                .replace(Regex("[^a-zA-Z0-9_-]"), "_").lowercase())
+            .ifBlank { "ext_${System.currentTimeMillis()}" }
+
+        val extDir = File(jsExtDir, id).also { it.mkdirs() }
+
+        // Write all files under the prefix into the extension directory
+        files.forEach { (path, bytes) ->
+            if (path.startsWith(prefix)) {
+                val relPath = path.removePrefix(prefix)
+                if (relPath.isNotBlank()) {
+                    val outFile = File(extDir, relPath)
+                    outFile.parentFile?.mkdirs()
+                    outFile.writeBytes(bytes)
+                }
+            }
+        }
+
+        val name = manifest?.get("name")?.jsonPrimitive?.content ?: id
+        val version = manifest?.get("version")?.jsonPrimitive?.content ?: "1.0.0"
+        val description = manifest?.get("description")?.jsonPrimitive?.content ?: ""
+        val author = manifest?.get("author")?.jsonPrimitive?.content ?: ""
+
+        // Write/overwrite manifest with standardised fields
+        File(extDir, "manifest.json").writeText(buildJsonObject {
+            put("id", id)
+            put("name", name)
+            put("version", version)
+            put("description", description)
+            put("author", author)
+            put("sourceUrl", "")
+        }.toString())
+
+        DebugLogger.log("[JsExtensionStorage] Installed '$name' ($id) from zip")
+        JsExtension(
+            id = id, name = name, version = version,
+            description = description, author = author, sourceUrl = "",
+            enabled = true, scriptFile = File(extDir, "index.js")
+        )
+    }
+
+    private fun getDisplayName(uri: Uri): String? {
+        return try {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (cursor.moveToFirst() && nameIndex >= 0) cursor.getString(nameIndex) else null
+            }
+        } catch (_: Exception) { null }
     }
 
     fun uninstall(id: String) {

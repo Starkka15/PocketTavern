@@ -32,6 +32,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.pockettavern.app.domain.model.MessageHeaderEntry
+import com.pockettavern.app.extensions.JsExtensionHost
 import com.pockettavern.app.ui.components.*
 import com.pockettavern.app.domain.model.GenerationState
 import com.pockettavern.app.domain.model.QuickReplyButton
@@ -380,13 +382,25 @@ fun ChatScreen(
                             val swipeInfo = viewModel.getSwipeInfo(index)
                             val lastAsstIndex = uiState.messages.indexOfLast { !it.isUser }
                             val isLastAsstMsg = !message.isUser && index == lastAsstIndex
+                            val msgHeaders = uiState.messageHeaders[index] ?: emptyList()
+                            val visibleBtns = uiState.visibleHeaderButtons
+                                .filter { it.first == index }
+                                .map { it.second }
+                                .toSet()
                             MessageWithActions(
                                 message = message,
                                 characterName = uiState.character?.name ?: "Assistant",
                                 swipeInfo = swipeInfo,
                                 isLastAssistantMessage = isLastAsstMsg,
-                                header = uiState.messageHeaders[index],
+                                headers = msgHeaders,
+                                headerButtons = uiState.headerButtons,
+                                visibleButtonExtensions = visibleBtns,
+                                headerMenus = uiState.headerMenus,
                                 onLongPress = { viewModel.showMessageActions(index) },
+                                onHeaderLongPress = if (msgHeaders.isNotEmpty()) {
+                                    { extensionId -> viewModel.onHeaderLongPressed(index, extensionId) }
+                                } else null,
+                                onHeaderActionClick = { action, label -> viewModel.onHeaderActionClicked(action, label) },
                                 onSwipeLeft = { viewModel.swipeLeft(index) },
                                 onSwipeRight = {
                                     val info = viewModel.getSwipeInfo(index)
@@ -549,6 +563,16 @@ fun ChatScreen(
             }
         )
     }
+
+    // Extension edit dialog (PT.showEditDialog)
+    uiState.editDialogRequest?.let { request ->
+        ExtensionEditDialog(
+            title = request.title,
+            fields = request.fields,
+            onSave = { results -> viewModel.submitEditDialog(results) },
+            onDismiss = { viewModel.cancelEditDialog() }
+        )
+    }
 }
 
 @Composable
@@ -665,18 +689,19 @@ private fun MessageWithActions(
     characterName: String,
     swipeInfo: Pair<Int, Int>?,
     isLastAssistantMessage: Boolean,
-    header: String? = null,
+    headers: List<MessageHeaderEntry> = emptyList(),
+    headerButtons: Map<String, List<JsExtensionHost.HeaderAction>> = emptyMap(),
+    visibleButtonExtensions: Set<String> = emptySet(),
+    headerMenus: Map<String, List<JsExtensionHost.HeaderAction>> = emptyMap(),
     onLongPress: () -> Unit,
+    onHeaderLongPress: ((String) -> Unit)? = null,
+    onHeaderActionClick: ((String, String) -> Unit)? = null,
     onSwipeLeft: () -> Unit,
     onSwipeRight: () -> Unit
 ) {
     Column {
         Box(
             modifier = Modifier
-                .combinedClickable(
-                    onClick = { },
-                    onLongClick = onLongPress
-                )
                 .pointerInput(swipeInfo, isLastAssistantMessage) {
                     if (message.isUser) return@pointerInput
                     var accumulated = 0f
@@ -700,7 +725,13 @@ private fun MessageWithActions(
             ChatBubble(
                 message = message,
                 characterName = characterName,
-                header = header
+                headers = headers,
+                headerButtons = headerButtons,
+                visibleButtonExtensions = visibleButtonExtensions,
+                headerMenus = headerMenus,
+                onHeaderLongPress = onHeaderLongPress,
+                onHeaderActionClick = onHeaderActionClick,
+                onBubbleLongPress = onLongPress
             )
         }
 
@@ -1209,4 +1240,44 @@ private fun QuickReplyBar(
             }
         }
     }
+}
+
+@Composable
+private fun ExtensionEditDialog(
+    title: String,
+    fields: List<JsExtensionHost.EditField>,
+    onSave: (Map<String, String>) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val fieldValues = remember(fields) {
+        mutableStateMapOf<String, String>().apply {
+            fields.forEach { put(it.key, it.value) }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                fields.forEach { field ->
+                    OutlinedTextField(
+                        value = fieldValues[field.key] ?: "",
+                        onValueChange = { fieldValues[field.key] = it },
+                        label = { Text(field.label) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(fieldValues.toMap()) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }

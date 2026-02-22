@@ -64,7 +64,7 @@ fun WorldInfoScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkSurface
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
@@ -125,17 +125,17 @@ private fun LorebookList(
                     Icons.AutoMirrored.Filled.MenuBook,
                     contentDescription = null,
                     modifier = Modifier.size(64.dp),
-                    tint = TextTertiary
+                    tint = MaterialTheme.colorScheme.outline
                 )
                 Text(
                     "No lorebooks found",
                     style = MaterialTheme.typography.titleMedium,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     "Create lorebooks in SillyTavern to see them here",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = TextTertiary
+                    color = MaterialTheme.colorScheme.outline
                 )
             }
         }
@@ -165,7 +165,7 @@ private fun LorebookCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = DarkCard
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
     ) {
         Row(
@@ -178,25 +178,25 @@ private fun LorebookCard(
             Icon(
                 Icons.AutoMirrored.Filled.MenuBook,
                 contentDescription = null,
-                tint = AccentGreen,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(32.dp)
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = lorebook.name,
                     style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "Tap to view entries",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextTertiary
+                    color = MaterialTheme.colorScheme.outline
                 )
             }
             Icon(
                 Icons.Default.ChevronRight,
                 contentDescription = null,
-                tint = TextSecondary
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -230,12 +230,12 @@ private fun WorldInfoEntriesList(
                     Icons.AutoMirrored.Filled.Notes,
                     contentDescription = null,
                     modifier = Modifier.size(64.dp),
-                    tint = TextTertiary
+                    tint = MaterialTheme.colorScheme.outline
                 )
                 Text(
                     "No entries in this lorebook",
                     style = MaterialTheme.typography.titleMedium,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -249,7 +249,7 @@ private fun WorldInfoEntriesList(
             item {
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = DarkSurfaceVariant
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 ) {
                     Row(
@@ -283,12 +283,12 @@ private fun StatItem(label: String, value: String) {
             text = value,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = AccentGreen
+            color = MaterialTheme.colorScheme.primary
         )
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -303,7 +303,7 @@ private fun WorldInfoEntryCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (entry.enabled) DarkCard else DarkCard.copy(alpha = 0.5f)
+            containerColor = if (entry.enabled) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.5f)
         )
     ) {
         Column(
@@ -323,13 +323,13 @@ private fun WorldInfoEntryCard(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     if (entry.constant) {
-                        StatusBadge("C", AccentGreen, "Constant")
+                        StatusBadge("C", MaterialTheme.colorScheme.primary, "Constant")
                     }
                     if (entry.selective) {
-                        StatusBadge("S", AccentBlue, "Selective")
+                        StatusBadge("S", MaterialTheme.colorScheme.primary, "Selective")
                     }
                     if (!entry.enabled) {
-                        StatusBadge("D", ErrorRed, "Disabled")
+                        StatusBadge("D", MaterialTheme.colorScheme.error, "Disabled")
                     }
                 }
 
@@ -338,14 +338,14 @@ private fun WorldInfoEntryCard(
                     Text(
                         text = entry.comment.ifBlank { "Entry ${entry.uid}" },
                         style = MaterialTheme.typography.titleSmall,
-                        color = if (entry.enabled) TextPrimary else TextSecondary,
+                        color = if (entry.enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = "Keys: ${entry.key.joinToString(", ")}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextTertiary,
+                        color = MaterialTheme.colorScheme.outline,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -355,13 +355,13 @@ private fun WorldInfoEntryCard(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
-                        .background(DarkSurfaceVariant)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
                         text = "#${entry.order}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -369,7 +369,7 @@ private fun WorldInfoEntryCard(
                 Icon(
                     if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                     contentDescription = if (isExpanded) "Collapse" else "Expand",
-                    tint = TextSecondary
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -382,7 +382,7 @@ private fun WorldInfoEntryCard(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(DarkInputBackground)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -394,7 +394,7 @@ private fun WorldInfoEntryCard(
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 entry.key.forEach { key ->
-                                    KeyChip(key, AccentGreen)
+                                    KeyChip(key, MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
@@ -408,7 +408,7 @@ private fun WorldInfoEntryCard(
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 entry.keysecondary.forEach { key ->
-                                    KeyChip(key, AccentBlue)
+                                    KeyChip(key, MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
@@ -419,12 +419,12 @@ private fun WorldInfoEntryCard(
                         Text(
                             text = entry.content.ifBlank { "(empty)" },
                             style = MaterialTheme.typography.bodyMedium,
-                            color = if (entry.content.isNotBlank()) TextPrimary else TextTertiary
+                            color = if (entry.content.isNotBlank()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
                         )
                     }
 
                     // Settings
-                    HorizontalDivider(color = DarkSurfaceVariant)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
@@ -438,7 +438,7 @@ private fun WorldInfoEntryCard(
                         Text(
                             text = "Group: ${entry.group}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = TextTertiary
+                            color = MaterialTheme.colorScheme.outline
                         )
                     }
                 }
@@ -495,7 +495,7 @@ private fun DetailSection(
             text = title,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         content()
     }
@@ -508,12 +508,12 @@ private fun SettingItem(label: String, value: String) {
             text = value,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold,
-            color = TextPrimary
+            color = MaterialTheme.colorScheme.onSurface
         )
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = TextTertiary
+            color = MaterialTheme.colorScheme.outline
         )
     }
 }
