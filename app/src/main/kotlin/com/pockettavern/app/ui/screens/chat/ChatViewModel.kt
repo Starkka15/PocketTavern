@@ -938,6 +938,15 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(imageGenState = GenerationState.Starting) }
 
+            // Unload KoboldCpp model from VRAM to free GPU for Forge
+            val config = when (val r = localRepository.getApiConfiguration()) {
+                is Result.Success -> r.data
+                is Result.Error -> null
+            }
+            if (config != null) {
+                llmRepository.unloadModel(config)
+            }
+
             val params = ForgeGenerationParams(
                 prompt = prompt,
                 negativePrompt = "blurry, low quality, distorted, deformed, bad anatomy, worst quality, watermark, text",
@@ -946,7 +955,7 @@ class ChatViewModel @Inject constructor(
                 steps = 20,
                 cfgScale = 7f,
                 sourceImageBase64 = avatarBase64,
-                denoisingStrength = if (avatarBase64 != null) 0.5f else 1f
+                denoisingStrength = if (avatarBase64 != null) 0.7f else 1f
             )
 
             forgeRepository.generateImageWithProgress(params).collect { state ->

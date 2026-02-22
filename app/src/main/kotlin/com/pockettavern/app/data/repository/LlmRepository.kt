@@ -150,6 +150,28 @@ class LlmRepository @Inject constructor(
         // For other backends, cancellation is handled via coroutine cancellation
     }
 
+    /**
+     * Unload the model from VRAM (KoboldCpp only).
+     * Frees GPU memory so other apps (e.g. Forge) can use it.
+     * The model auto-reloads with the same settings on the next generation request.
+     */
+    suspend fun unloadModel(config: ApiConfiguration) {
+        if (config.textGenType != "koboldcpp") return
+        try {
+            val url = "${config.apiServer.trimEnd('/')}/api/extra/unload"
+            val response = okHttpClient.newCall(
+                Request.Builder().url(url).post("{}".toRequestBody("application/json".toMediaType())).build()
+            ).execute()
+            if (response.isSuccessful) {
+                DebugLogger.log("LlmRepository: KoboldCpp model unloaded from VRAM")
+            } else {
+                DebugLogger.log("LlmRepository: KoboldCpp unload returned ${response.code}")
+            }
+        } catch (e: Exception) {
+            DebugLogger.logError("LlmRepository", "unload failed", e)
+        }
+    }
+
     // ── KoboldCpp ─────────────────────────────────────────────────────────────
 
     private fun streamKobold(
