@@ -199,6 +199,13 @@ object NetworkModule {
 
         return ImageLoader.Builder(context)
             .okHttpClient(imageHttpClient)
+            .components {
+                if (android.os.Build.VERSION.SDK_INT >= 28) {
+                    add(coil.decode.ImageDecoderDecoder.Factory())
+                } else {
+                    add(coil.decode.GifDecoder.Factory())
+                }
+            }
             .memoryCache {
                 MemoryCache.Builder(context).maxSizePercent(0.25).build()
             }

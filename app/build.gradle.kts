@@ -98,6 +98,7 @@ dependencies {
 
     // Image Loading
     implementation(libs.coil.compose)
+    implementation(libs.coil.gif)
 
     // Chrome Custom Tabs for OAuth
     implementation("androidx.browser:browser:1.8.0")

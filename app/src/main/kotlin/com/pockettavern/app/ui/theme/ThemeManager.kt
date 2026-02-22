@@ -72,7 +72,7 @@ class ThemeManager @Inject constructor(
                 val effectName = try {
                     effectDisplayName(StThemeParser.parseParticleEffect(json, isDefault = false))
                 } catch (_: Exception) { "None" }
-                val hasBackground = listOf("background.png", "background.jpg", "background.webp")
+                val hasBackground = listOf("background.gif", "background.png", "background.jpg", "background.webp")
                     .any { File(dir, it).exists() }
                 list += ThemeEntry(dir.name, name, isDefault = false, effectName = effectName, hasBackground = hasBackground)
             }
@@ -210,7 +210,7 @@ class ThemeManager @Inject constructor(
         val cacheDir = File(context.cacheDir, "bundled_themes/$id")
         if (cacheDir.exists()) return cacheDir
         // Check if asset directory has images by trying to open known files
-        val imageNames = listOf("background.png", "background.jpg", "background.webp", "logo.png")
+        val imageNames = listOf("background.gif", "background.png", "background.jpg", "background.webp", "logo.gif", "logo.png")
         var hasImages = false
         for (img in imageNames) {
             try {

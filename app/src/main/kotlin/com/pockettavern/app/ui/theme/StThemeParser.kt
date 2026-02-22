@@ -159,7 +159,7 @@ object StThemeParser {
             // Background image
             val hasBackground = root["background_image"]?.jsonPrimitive?.booleanOrNull == true
             val backgroundPath = if (hasBackground && themeDir != null) {
-                listOf("background.png", "background.jpg", "background.webp")
+                listOf("background.gif", "background.png", "background.jpg", "background.webp")
                     .map { File(themeDir, it) }
                     .firstOrNull { it.exists() }
                     ?.absolutePath
@@ -176,7 +176,10 @@ object StThemeParser {
             // Logo
             val hasLogo = root["logo_image"]?.jsonPrimitive?.booleanOrNull == true
             val logoPath = if (hasLogo && themeDir != null) {
-                File(themeDir, "logo.png").takeIf { it.exists() }?.absolutePath
+                listOf("logo.gif", "logo.png")
+                    .map { File(themeDir, it) }
+                    .firstOrNull { it.exists() }
+                    ?.absolutePath
             } else null
 
             val logoTint = if (logoPath != null) null else parseRgba(fields["logo_tint"])
