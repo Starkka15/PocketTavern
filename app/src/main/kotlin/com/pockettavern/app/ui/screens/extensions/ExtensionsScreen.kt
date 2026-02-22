@@ -1,5 +1,8 @@
 package com.pockettavern.app.ui.screens.extensions
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,6 +14,8 @@ import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Numbers
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -38,6 +43,15 @@ fun ExtensionsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showInstallDialog by remember { mutableStateOf(false) }
+
+    // File picker for importing .js or .zip files
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.installFromFile(uri)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -127,7 +141,7 @@ fun ExtensionsScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "No JavaScript extensions installed.\nTap + to install from a URL.",
+                                text = "No JavaScript extensions installed.\nTap + to install from a URL or file.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -155,9 +169,13 @@ fun ExtensionsScreen(
         InstallExtensionDialog(
             isInstalling = uiState.isInstalling,
             error = uiState.installError,
-            onInstall = { url ->
+            onInstallUrl = { url ->
                 viewModel.installFromUrl(url)
                 showInstallDialog = false
+            },
+            onImportFile = {
+                showInstallDialog = false
+                filePickerLauncher.launch("*/*")
             },
             onDismiss = {
                 showInstallDialog = false
@@ -426,7 +444,8 @@ private fun camelCaseToLabel(key: String): String {
 private fun InstallExtensionDialog(
     isInstalling: Boolean,
     error: String?,
-    onInstall: (String) -> Unit,
+    onInstallUrl: (String) -> Unit,
+    onImportFile: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var url by remember { mutableStateOf("") }
@@ -435,20 +454,55 @@ private fun InstallExtensionDialog(
         onDismissRequest = { if (!isInstalling) onDismiss() },
         title = { Text("Install Extension") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // URL install
                 Text(
-                    "Enter the URL of the extension's index.js or its parent folder.",
-                    style = MaterialTheme.typography.bodySmall
+                    "From URL",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
                 )
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
                     label = { Text("URL") },
-                    placeholder = { Text("https://example.com/my-extension/index.js") },
+                    placeholder = { Text("https://example.com/extension/index.js") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isInstalling
                 )
+                Button(
+                    onClick = { onInstallUrl(url.trim()) },
+                    enabled = url.isNotBlank() && !isInstalling,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Link, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Install from URL")
+                }
+
+                HorizontalDivider()
+
+                // File import
+                Text(
+                    "From Device",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    "Import a .js file or a .zip containing index.js and manifest.json.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(
+                    onClick = onImportFile,
+                    enabled = !isInstalling,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Browse Files")
+                }
+
                 if (error != null) {
                     Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
@@ -457,12 +511,7 @@ private fun InstallExtensionDialog(
                 }
             }
         },
-        confirmButton = {
-            TextButton(
-                onClick = { onInstall(url.trim()) },
-                enabled = url.isNotBlank() && !isInstalling
-            ) { Text("Install") }
-        },
+        confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss, enabled = !isInstalling) { Text("Cancel") }
         }

@@ -90,7 +90,8 @@
             GENERATION_STARTED: 'GENERATION_STARTED',
             GENERATION_STOPPED: 'GENERATION_STOPPED',
             CHAT_CHANGED:       'CHAT_CHANGED',
-            CHARACTER_CHANGED:  'CHARACTER_CHANGED'
+            CHARACTER_CHANGED:  'CHARACTER_CHANGED',
+            BUTTON_CLICKED:     'BUTTON_CLICKED'
         },
 
         /** Where to inject prompt text relative to the character definition. */
@@ -168,14 +169,22 @@
          * Register quick reply buttons above the chat input.
          * Replaces any buttons previously registered under the same id.
          *
+         * Buttons can either send a message or trigger a callback action:
+         *   - { label, message } — sends the message as a user chat message
+         *   - { label, action }  — dispatches BUTTON_CLICKED event with { action, label }
+         *
          * @param {string} extensionId  Unique id for this set of buttons.
-         * @param {Array}  buttons      Array of { label: string, message: string }
+         * @param {Array}  buttons      Array of { label: string, message?: string, action?: string }
          *
          * @example
          *   PT.registerButtons('my-ext', [
          *       { label: 'Continue', message: 'Please continue.' },
-         *       { label: 'Shorter',  message: 'Keep it brief.' }
+         *       { label: 'Edit',     action:  'edit' }
          *   ]);
+         *
+         *   PT.eventSource.on(PT.events.BUTTON_CLICKED, function(data) {
+         *       if (data.action === 'edit') { // handle edit }
+         *   });
          */
         registerButtons: function (extensionId, buttons) {
             if (window.PtBridge) {
@@ -274,6 +283,84 @@
             if (window.PtBridge) {
                 PtBridge.clearOutputFilter(extensionId);
             }
+        },
+
+        // ── Dialogs ──────────────────────────────────────────────────────────
+
+        /**
+         * Show a native edit dialog with editable text fields.
+         * Returns a Promise that resolves with { key: value } or null if cancelled.
+         *
+         * @param {string} title   Dialog title.
+         * @param {Array}  fields  Array of { key: string, label: string, value: string }
+         * @returns {Promise<object|null>}
+         *
+         * @example
+         *   var result = await PT.showEditDialog('Edit Tracker', [
+         *       { key: 'time',     label: 'Time',     value: '10:00:00' },
+         *       { key: 'location', label: 'Location', value: 'Town Square' }
+         *   ]);
+         *   if (result) { console.log(result.time, result.location); }
+         */
+        showEditDialog: function (title, fields) {
+            return new Promise(function (resolve) {
+                var cbId = '__editCb_' + (++_callbackCounter);
+                _pendingCallbacks[cbId] = resolve;
+                if (window.PtBridge) {
+                    PtBridge.showEditDialog(title || 'Edit', JSON.stringify(fields || []), cbId);
+                } else {
+                    resolve(null);
+                }
+            });
+        },
+
+        // ── Hidden generation ─────────────────────────────────────────────────
+
+        /**
+         * Send a prompt to the LLM without adding messages to the chat.
+         * Useful for regenerating extension metadata (headers, tags) without
+         * creating a new user/assistant message pair.
+         *
+         * @param {string} prompt  The prompt text to send.
+         * @returns {Promise<string>}  The AI's response text.
+         *
+         * @example
+         *   var tags = await PT.generateHidden('Re-output tracker tags for the current scene.');
+         *   var parsed = parseTags(tags);
+         */
+        generateHidden: function (prompt) {
+            return new Promise(function (resolve) {
+                var cbId = '__genCb_' + (++_callbackCounter);
+                _pendingCallbacks[cbId] = resolve;
+                if (window.PtBridge) {
+                    PtBridge.generateHidden(prompt || '', cbId);
+                } else {
+                    resolve('');
+                }
+            });
+        }
+    };
+
+    // ── Callback infrastructure for async bridge results ──────────────────
+
+    var _callbackCounter = 0;
+    var _pendingCallbacks = {};
+
+    /** Called by Kotlin when the edit dialog is submitted or cancelled. */
+    window.__ptEditDialogResult = function (callbackId, result) {
+        var cb = _pendingCallbacks[callbackId];
+        if (cb) {
+            delete _pendingCallbacks[callbackId];
+            cb(result);
+        }
+    };
+
+    /** Called by Kotlin when a hidden generation completes. */
+    window.__ptHiddenGenerateResult = function (callbackId, text) {
+        var cb = _pendingCallbacks[callbackId];
+        if (cb) {
+            delete _pendingCallbacks[callbackId];
+            cb(text || '');
         }
     };
 

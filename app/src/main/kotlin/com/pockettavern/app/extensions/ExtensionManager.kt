@@ -78,4 +78,7 @@ class ExtensionManager @Inject constructor(
 
     /** Clear all JS message headers without reloading the sandbox (call when changing chat). */
     fun clearMessageHeaders() = jsHost.clearMessageHeaders()
+
+    /** Restore persisted message headers when loading an existing chat. */
+    fun restoreMessageHeaders(headers: Map<Int, String>) = jsHost.restoreMessageHeaders(headers)
 }

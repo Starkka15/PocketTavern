@@ -35,6 +35,7 @@ import com.pockettavern.app.ui.screens.extensions.quickreply.QuickReplySettingsS
 import com.pockettavern.app.ui.screens.extensions.regex.RegexSettingsScreen
 import com.pockettavern.app.ui.screens.connectionprofiles.ConnectionProfilesScreen
 import com.pockettavern.app.ui.screens.debug.DebugLogScreen
+import com.pockettavern.app.ui.screens.theme.ThemeScreen
 
 @Composable
 fun SillyTavernNavGraph(
@@ -116,7 +117,8 @@ fun SillyTavernNavGraph(
                 onNavigateToStImport = { navController.navigate(Route.StImport) },
                 onNavigateToOaiPresets = { navController.navigate(Route.OaiPresetSettings) },
                 onNavigateToExtensions = { navController.navigate(Route.Extensions) },
-                onNavigateToConnectionProfiles = { navController.navigate(Route.ConnectionProfiles) }
+                onNavigateToConnectionProfiles = { navController.navigate(Route.ConnectionProfiles) },
+                onNavigateToTheme = { navController.navigate(Route.ThemeSettings) }
             )
         }
 
@@ -271,6 +273,10 @@ fun SillyTavernNavGraph(
             SetupGuideScreen(
                 onBack = { navController.popBackStack() }
             )
+        }
+
+        composable<Route.ThemeSettings> {
+            ThemeScreen(onBack = { navController.popBackStack() })
         }
 
         composable<Route.GroupChat> { backStackEntry ->

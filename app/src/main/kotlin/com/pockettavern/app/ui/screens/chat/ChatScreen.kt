@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.pockettavern.app.extensions.JsExtensionHost
 import com.pockettavern.app.ui.components.*
 import com.pockettavern.app.domain.model.GenerationState
 import com.pockettavern.app.domain.model.QuickReplyButton
@@ -547,6 +548,16 @@ fun ChatScreen(
                 viewModel.clearBackgroundSetSuccess()
                 viewModel.dismissImageGenDialog()
             }
+        )
+    }
+
+    // Extension edit dialog (PT.showEditDialog)
+    uiState.editDialogRequest?.let { request ->
+        ExtensionEditDialog(
+            title = request.title,
+            fields = request.fields,
+            onSave = { results -> viewModel.submitEditDialog(results) },
+            onDismiss = { viewModel.cancelEditDialog() }
         )
     }
 }
@@ -1209,4 +1220,44 @@ private fun QuickReplyBar(
             }
         }
     }
+}
+
+@Composable
+private fun ExtensionEditDialog(
+    title: String,
+    fields: List<JsExtensionHost.EditField>,
+    onSave: (Map<String, String>) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val fieldValues = remember(fields) {
+        mutableStateMapOf<String, String>().apply {
+            fields.forEach { put(it.key, it.value) }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                fields.forEach { field ->
+                    OutlinedTextField(
+                        value = fieldValues[field.key] ?: "",
+                        onValueChange = { fieldValues[field.key] = it },
+                        label = { Text(field.label) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(fieldValues.toMap()) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }

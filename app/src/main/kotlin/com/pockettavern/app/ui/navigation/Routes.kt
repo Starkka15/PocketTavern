@@ -87,4 +87,7 @@ sealed class Route {
 
     @Serializable
     data object DebugLog : Route()
+
+    @Serializable
+    data object ThemeSettings : Route()
 }

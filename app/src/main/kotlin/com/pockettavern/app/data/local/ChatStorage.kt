@@ -215,13 +215,16 @@ class ChatStorage @Inject constructor(
             val messages = lines.drop(1).mapNotNull { line ->
                 try {
                     val chatLine = json.decodeFromString<ChatLine>(line)
+                    val extra = chatLine.extra
                     ChatMessage(
                         id = UUID.randomUUID().toString(),
                         content = chatLine.mes,
                         isUser = chatLine.isUser,
                         isNarrator = chatLine.isSystem,
                         timestamp = parseDate(chatLine.send_date) ?: Instant.now(),
-                        senderName = if (!chatLine.isUser && !chatLine.isSystem) chatLine.name else null
+                        senderName = if (!chatLine.isUser && !chatLine.isSystem) chatLine.name else null,
+                        rawContent = extra["raw_content"]?.jsonPrimitive?.contentOrNull,
+                        extensionHeader = extra["extension_header"]?.jsonPrimitive?.contentOrNull
                     )
                 } catch (e: Exception) { null }
             }
@@ -243,6 +246,12 @@ class ChatStorage @Inject constructor(
         val map = mutableMapOf<String, JsonElement>()
         if (message.integritySlug != null) {
             map["slug"] = JsonPrimitive(message.integritySlug)
+        }
+        if (message.rawContent != null) {
+            map["raw_content"] = JsonPrimitive(message.rawContent)
+        }
+        if (message.extensionHeader != null) {
+            map["extension_header"] = JsonPrimitive(message.extensionHeader)
         }
         return JsonObject(map)
     }

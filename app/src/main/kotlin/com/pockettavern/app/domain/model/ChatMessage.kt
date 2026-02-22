@@ -15,7 +15,11 @@ data class ChatMessage(
     // Full chat metadata (only on first message) - includes author's note per-chat
     val chatMetadata: ChatMessageMetadata? = null,
     // Sender name for group chats - null for 1-on-1 (no behavior change)
-    val senderName: String? = null
+    val senderName: String? = null,
+    // Raw content before output filters stripped extension tags (null if no filtering happened)
+    val rawContent: String? = null,
+    // Header text set by extensions (persisted so it survives chat reload)
+    val extensionHeader: String? = null
 )
 
 // Per-chat metadata stored in the first message

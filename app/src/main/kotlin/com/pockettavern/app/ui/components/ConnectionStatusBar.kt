@@ -17,7 +17,7 @@ fun ConnectionStatusBar(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = DarkSurface
+        color = MaterialTheme.colorScheme.surface
     ) {
         Row(
             modifier = Modifier
@@ -30,7 +30,7 @@ fun ConnectionStatusBar(
                 modifier = Modifier
                     .size(8.dp)
                     .background(
-                        color = if (isConnected) AccentGreen else ErrorRed,
+                        color = if (isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                         shape = androidx.compose.foundation.shape.CircleShape
                     )
             )
@@ -40,7 +40,7 @@ fun ConnectionStatusBar(
             Text(
                 text = statusText,
                 style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

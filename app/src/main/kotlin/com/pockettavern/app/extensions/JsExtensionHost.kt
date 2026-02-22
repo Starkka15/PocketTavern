@@ -62,6 +62,19 @@ class JsExtensionHost @Inject constructor(
     // Callback wired by ChatViewModel so JS can send messages as the user
     var sendMessageCallback: ((String) -> Unit)? = null
 
+    // Edit dialog request: JS calls PT.showEditDialog() → Kotlin shows a native dialog
+    data class EditDialogRequest(
+        val title: String,
+        val fields: List<EditField>,
+        val callbackId: String
+    )
+    data class EditField(val key: String, val label: String, val value: String)
+    private val _editDialogRequest = MutableStateFlow<EditDialogRequest?>(null)
+    val editDialogRequest: StateFlow<EditDialogRequest?> = _editDialogRequest.asStateFlow()
+
+    // Hidden generate request: JS calls PT.generateHidden() → Kotlin sends to LLM without adding to chat
+    var hiddenGenerateCallback: ((String, String) -> Unit)? = null  // (prompt, callbackId) -> Unit
+
     // ── Init / reload ─────────────────────────────────────────────────────────
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -140,6 +153,9 @@ class JsExtensionHost @Inject constructor(
 
     /** Clear all message headers without reloading the sandbox (e.g. on chat change). */
     fun clearMessageHeaders() { _messageHeaders.value = emptyMap() }
+
+    /** Restore persisted message headers when loading a chat from disk. */
+    fun restoreMessageHeaders(headers: Map<Int, String>) { _messageHeaders.value = headers }
 
     /** Apply all registered output filters to strip extension metadata from displayed text. */
     fun applyOutputFilters(text: String): String {
@@ -271,7 +287,8 @@ class JsExtensionHost @Inject constructor(
                     val obj = arr.getJSONObject(i)
                     QuickReplyButton(
                         label   = obj.optString("label", "?"),
-                        message = obj.optString("message", "")
+                        message = obj.optString("message", ""),
+                        action  = obj.optString("action", "")
                     )
                 }
                 _jsButtonSets.value = _jsButtonSets.value + (extensionId to buttons)
@@ -316,6 +333,77 @@ class JsExtensionHost @Inject constructor(
         @JavascriptInterface
         fun clearOutputFilter(extensionId: String) {
             _outputFilters.remove(extensionId)
+        }
+
+        /**
+         * Called by PT.showEditDialog(title, fieldsJson, callbackId).
+         * Shows a native Android dialog with editable text fields.
+         * Results are returned to JS via __ptEditDialogResult(callbackId, resultsJson).
+         */
+        @JavascriptInterface
+        fun showEditDialog(title: String, fieldsJson: String, callbackId: String) {
+            try {
+                val arr = JSONArray(fieldsJson)
+                val fields = (0 until arr.length()).map { i ->
+                    val obj = arr.getJSONObject(i)
+                    EditField(
+                        key   = obj.optString("key", "field$i"),
+                        label = obj.optString("label", "Field ${i + 1}"),
+                        value = obj.optString("value", "")
+                    )
+                }
+                _editDialogRequest.value = EditDialogRequest(title, fields, callbackId)
+            } catch (e: Exception) {
+                DebugLogger.log("[JsExt] showEditDialog parse error: ${e.message}")
+            }
+        }
+
+        /**
+         * Called by PT.generateHidden(prompt, callbackId).
+         * Sends a prompt to the LLM without adding messages to the chat.
+         * Result is returned to JS via __ptHiddenGenerateResult(callbackId, text).
+         */
+        @JavascriptInterface
+        fun generateHidden(prompt: String, callbackId: String) {
+            if (prompt.isBlank()) return
+            scope.launch(Dispatchers.Main) {
+                hiddenGenerateCallback?.invoke(prompt, callbackId)
+            }
+        }
+    }
+
+    /** Called by ChatViewModel after the user submits the edit dialog. */
+    fun completeEditDialog(callbackId: String, results: Map<String, String>) {
+        _editDialogRequest.value = null
+        val json = JSONObject(results).toString()
+            .replace("\\", "\\\\").replace("'", "\\'")
+        scope.launch {
+            webView?.evaluateJavascript(
+                "if(window.__ptEditDialogResult)__ptEditDialogResult('$callbackId',$json);", null
+            )
+        }
+    }
+
+    /** Called by ChatViewModel when the user cancels the edit dialog. */
+    fun cancelEditDialog() {
+        val callbackId = _editDialogRequest.value?.callbackId
+        _editDialogRequest.value = null
+        if (callbackId != null) {
+            scope.launch {
+                webView?.evaluateJavascript(
+                    "if(window.__ptEditDialogResult)__ptEditDialogResult('$callbackId',null);", null
+                )
+            }
+        }
+    }
+
+    /** Called by ChatViewModel after a hidden generate completes. */
+    fun completeHiddenGenerate(callbackId: String, resultText: String) {
+        val safe = resultText.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
+        scope.launch {
+            webView?.evaluateJavascript(
+                "if(window.__ptHiddenGenerateResult)__ptHiddenGenerateResult('$callbackId','$safe');", null
+            )
         }
     }
 }

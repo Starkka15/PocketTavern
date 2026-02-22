@@ -70,7 +70,7 @@ fun CharacterSettingsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkSurface
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
@@ -101,7 +101,7 @@ fun CharacterSettingsScreen(
                     )
                 }
 
-                HorizontalDivider(color = DarkSurfaceVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // World Info Section
                 WorldInfoSection(
@@ -110,7 +110,7 @@ fun CharacterSettingsScreen(
                     onWorldInfoChange = viewModel::updateAttachedWorldInfo
                 )
 
-                HorizontalDivider(color = DarkSurfaceVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // System Prompt Section
                 SystemPromptSection(
@@ -118,7 +118,7 @@ fun CharacterSettingsScreen(
                     onSystemPromptChange = viewModel::updateSystemPrompt
                 )
 
-                HorizontalDivider(color = DarkSurfaceVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // Author's Note Section (Depth Prompt)
                 AuthorsNoteSection(
@@ -132,7 +132,7 @@ fun CharacterSettingsScreen(
                     onPostHistoryChange = viewModel::updatePostHistoryInstructions
                 )
 
-                HorizontalDivider(color = DarkSurfaceVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // Talkativeness (for group chats)
                 TalkativenessSection(
@@ -173,13 +173,13 @@ private fun CharacterHeader(
             Text(
                 text = character.name,
                 style = MaterialTheme.typography.headlineSmall,
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
             if (character.hasCharacterBook) {
                 Text(
                     text = "Has embedded lorebook (${character.characterBookEntryCount} entries)",
                     style = MaterialTheme.typography.bodySmall,
-                    color = AccentGreen
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -199,13 +199,13 @@ private fun WorldInfoSection(
         Text(
             text = "World Info / Lorebook",
             style = MaterialTheme.typography.titleMedium,
-            color = AccentGreen
+            color = MaterialTheme.colorScheme.primary
         )
 
         Text(
             text = "Attach a lorebook to this character. The lorebook entries will be injected into the context when their keywords are detected.",
             style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         ExposedDropdownMenuBox(
@@ -222,10 +222,10 @@ private fun WorldInfoSection(
                 label = { Text("Attached World Info") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = DarkInputBackground,
-                    unfocusedContainerColor = DarkInputBackground,
-                    focusedBorderColor = AccentGreen,
-                    unfocusedBorderColor = DarkSurfaceVariant
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             )
 
@@ -265,13 +265,13 @@ private fun SystemPromptSection(
         Text(
             text = "System Prompt",
             style = MaterialTheme.typography.titleMedium,
-            color = AccentGreen
+            color = MaterialTheme.colorScheme.primary
         )
 
         Text(
             text = "Character-specific system instructions. This overrides the global system prompt when chatting with this character.",
             style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         OutlinedTextField(
@@ -283,10 +283,10 @@ private fun SystemPromptSection(
             label = { Text("System Prompt") },
             placeholder = { Text("Enter character-specific system instructions...") },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = DarkInputBackground,
-                unfocusedContainerColor = DarkInputBackground,
-                focusedBorderColor = AccentGreen,
-                unfocusedBorderColor = DarkSurfaceVariant
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
             ),
             shape = RoundedCornerShape(8.dp)
         )
@@ -312,13 +312,13 @@ private fun AuthorsNoteSection(
         Text(
             text = "Author's Note",
             style = MaterialTheme.typography.titleMedium,
-            color = AccentGreen
+            color = MaterialTheme.colorScheme.primary
         )
 
         Text(
             text = "Instructions injected at a specific depth in the conversation. Use this to guide the AI's behavior mid-conversation.",
             style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         OutlinedTextField(
@@ -330,10 +330,10 @@ private fun AuthorsNoteSection(
             label = { Text("Author's Note Content") },
             placeholder = { Text("Enter author's note...") },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = DarkInputBackground,
-                unfocusedContainerColor = DarkInputBackground,
-                focusedBorderColor = AccentGreen,
-                unfocusedBorderColor = DarkSurfaceVariant
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
             ),
             shape = RoundedCornerShape(8.dp)
         )
@@ -352,10 +352,10 @@ private fun AuthorsNoteSection(
                 label = { Text("Depth") },
                 supportingText = { Text("Messages from end") },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = DarkInputBackground,
-                    unfocusedContainerColor = DarkInputBackground,
-                    focusedBorderColor = AccentGreen,
-                    unfocusedBorderColor = DarkSurfaceVariant
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
                 ),
                 shape = RoundedCornerShape(8.dp)
             )
@@ -374,10 +374,10 @@ private fun AuthorsNoteSection(
                     label = { Text("Role") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = roleExpanded) },
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = DarkInputBackground,
-                        unfocusedContainerColor = DarkInputBackground,
-                        focusedBorderColor = AccentGreen,
-                        unfocusedBorderColor = DarkSurfaceVariant
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
                     ),
                     shape = RoundedCornerShape(8.dp)
                 )
@@ -405,7 +405,7 @@ private fun AuthorsNoteSection(
         Text(
             text = "Post-History Instructions (Legacy)",
             style = MaterialTheme.typography.titleSmall,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         OutlinedTextField(
@@ -417,10 +417,10 @@ private fun AuthorsNoteSection(
             label = { Text("Post-History Instructions") },
             placeholder = { Text("Legacy author's note format...") },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = DarkInputBackground,
-                unfocusedContainerColor = DarkInputBackground,
-                focusedBorderColor = AccentGreen,
-                unfocusedBorderColor = DarkSurfaceVariant
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
             ),
             shape = RoundedCornerShape(8.dp)
         )
@@ -436,13 +436,13 @@ private fun TalkativenessSection(
         Text(
             text = "Talkativeness (Group Chats)",
             style = MaterialTheme.typography.titleMedium,
-            color = AccentGreen
+            color = MaterialTheme.colorScheme.primary
         )
 
         Text(
             text = "How often this character speaks in group conversations. Higher values mean more frequent responses.",
             style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Row(
@@ -453,7 +453,7 @@ private fun TalkativenessSection(
             Text(
                 text = "Quiet",
                 style = MaterialTheme.typography.bodySmall,
-                color = TextTertiary
+                color = MaterialTheme.colorScheme.outline
             )
 
             Slider(
@@ -461,23 +461,23 @@ private fun TalkativenessSection(
                 onValueChange = onTalkativenessChange,
                 modifier = Modifier.weight(1f),
                 colors = SliderDefaults.colors(
-                    thumbColor = AccentGreen,
-                    activeTrackColor = AccentGreen,
-                    inactiveTrackColor = DarkSurfaceVariant
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             )
 
             Text(
                 text = "Talkative",
                 style = MaterialTheme.typography.bodySmall,
-                color = TextTertiary
+                color = MaterialTheme.colorScheme.outline
             )
         }
 
         Text(
             text = "${(talkativeness * 100).toInt()}%",
             style = MaterialTheme.typography.bodyMedium,
-            color = AccentGreen,
+            color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.align(Alignment.CenterHorizontally)
         )
     }

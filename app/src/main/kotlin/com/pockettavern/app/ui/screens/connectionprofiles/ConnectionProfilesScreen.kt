@@ -54,7 +54,7 @@ fun ConnectionProfilesScreen(
                     Text(
                         "Snapshots the current API config, server URL, model, and preset selections.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = uiState.nameField,
@@ -83,7 +83,7 @@ fun ConnectionProfilesScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkSurface)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
         floatingActionButton = {
@@ -91,8 +91,8 @@ fun ConnectionProfilesScreen(
                 onClick = viewModel::showSaveDialog,
                 icon = { Icon(Icons.Default.Save, contentDescription = null) },
                 text = { Text("Save Current") },
-                containerColor = AccentGreen,
-                contentColor = DarkBackground
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.background
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -112,17 +112,17 @@ fun ConnectionProfilesScreen(
                         Icons.Default.SwitchAccount,
                         contentDescription = null,
                         modifier = Modifier.size(48.dp),
-                        tint = TextTertiary
+                        tint = MaterialTheme.colorScheme.outline
                     )
                     Text(
                         "No profiles saved yet",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = TextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         "Tap 'Save Current' to snapshot your API settings",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextTertiary
+                        color = MaterialTheme.colorScheme.outline
                     )
                 }
             }
@@ -157,9 +157,9 @@ private fun ProfileCard(
     onDelete: () -> Unit
 ) {
     Surface(
-        color = if (isActive) DarkSurface.copy(alpha = 1f) else DarkSurface,
+        color = if (isActive) MaterialTheme.colorScheme.surface.copy(alpha = 1f) else MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.medium,
-        border = if (isActive) androidx.compose.foundation.BorderStroke(1.5.dp, AccentGreen) else null,
+        border = if (isActive) androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -177,17 +177,17 @@ private fun ProfileCard(
                         text = profile.name,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = TextPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     if (isActive) {
                         Surface(
-                            color = AccentGreen.copy(alpha = 0.15f),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                             shape = MaterialTheme.shapes.extraSmall
                         ) {
                             Text(
                                 text = "ACTIVE",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = AccentGreen,
+                                color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
@@ -197,21 +197,21 @@ private fun ProfileCard(
                 Text(
                     text = profile.apiLabel,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (isActive) AccentGreen else TextSecondary
+                    color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 val server = profile.customUrl ?: profile.apiServer
                 if (server.isNotBlank()) {
                     Text(
                         text = server,
                         style = MaterialTheme.typography.labelSmall,
-                        color = TextTertiary
+                        color = MaterialTheme.colorScheme.outline
                     )
                 }
                 if (profile.model.isNotBlank()) {
                     Text(
                         text = profile.model,
                         style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -220,8 +220,8 @@ private fun ProfileCard(
                 Button(
                     onClick = onActivate,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = AccentGreen,
-                        contentColor = DarkBackground
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.background
                     ),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                 ) {
@@ -231,13 +231,13 @@ private fun ProfileCard(
                 Icon(
                     Icons.Default.CheckCircle,
                     contentDescription = "Active",
-                    tint = AccentGreen,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp)
                 )
             }
             Spacer(modifier = Modifier.width(4.dp))
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = ErrorRed)
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
             }
         }
     }

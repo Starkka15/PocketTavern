@@ -56,10 +56,10 @@ fun DebugLogScreen(onBack: () -> Unit) {
                         DebugLogger.clearLog()
                         logContent = DebugLogger.getLogContents()
                     }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Clear log", tint = ErrorRed)
+                        Icon(Icons.Default.Delete, contentDescription = "Clear log", tint = MaterialTheme.colorScheme.error)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkSurface)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
     ) { padding ->
@@ -79,7 +79,7 @@ fun DebugLogScreen(onBack: () -> Unit) {
                 Text(
                     "Tap Refresh after generating to see the latest prompt.",
                     style = MaterialTheme.typography.labelSmall,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 TextButton(onClick = { logContent = DebugLogger.getLogContents() }) {
                     Text("Refresh")
@@ -101,7 +101,7 @@ fun DebugLogScreen(onBack: () -> Unit) {
                         text = logContent.ifBlank { "(log is empty)" },
                         fontFamily = FontFamily.Monospace,
                         fontSize = 11.sp,
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         softWrap = false  // horizontal scroll shows long lines unbroken
                     )
                 }

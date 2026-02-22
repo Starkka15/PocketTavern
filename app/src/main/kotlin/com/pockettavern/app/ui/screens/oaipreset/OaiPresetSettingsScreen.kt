@@ -61,10 +61,10 @@ fun OaiPresetSettingsScreen(
                 },
                 actions = {
                     IconButton(onClick = { importLauncher.launch("application/json") }) {
-                        Icon(Icons.Default.Download, "Import from SillyTavern", tint = AccentBlue)
+                        Icon(Icons.Default.Download, "Import from SillyTavern", tint = MaterialTheme.colorScheme.primary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkSurface)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
     ) { padding ->
@@ -89,15 +89,15 @@ fun OaiPresetSettingsScreen(
                     onSelect = { viewModel.selectPreset(it) }
                 )
 
-                HorizontalDivider(color = DarkSurfaceVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 Text(
                     text = "Toggle each parameter on to override the API default. Disabled parameters are omitted from the request.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                HorizontalDivider(color = DarkSurfaceVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // ── Sampling Parameters ──────────────────────────────────────
                 OaiSectionHeader("Sampling")
@@ -158,7 +158,7 @@ fun OaiPresetSettingsScreen(
                     onValueChange = { viewModel.updateTopA(it) }
                 )
 
-                HorizontalDivider(color = DarkSurfaceVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // ── Penalty Parameters ───────────────────────────────────────
                 OaiSectionHeader("Penalties")
@@ -193,7 +193,7 @@ fun OaiPresetSettingsScreen(
                     onValueChange = { viewModel.updateRepetitionPenalty(it) }
                 )
 
-                HorizontalDivider(color = DarkSurfaceVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // ── Context / Misc ───────────────────────────────────────────
                 OaiSectionHeader("Context & Misc")
@@ -215,14 +215,14 @@ fun OaiPresetSettingsScreen(
                     allowNegative = true
                 )
 
-                HorizontalDivider(color = DarkSurfaceVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // ── Prompt Order ─────────────────────────────────────────────
                 OaiSectionHeader("Prompt Order")
                 Text(
                     text = "Control which blocks are included and their order. Tap a content block to edit its text.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 uiState.promptOrder.forEachIndexed { index, item ->
@@ -249,7 +249,7 @@ fun OaiPresetSettingsScreen(
                     Text("Add Custom Prompt")
                 }
 
-                HorizontalDivider(color = DarkSurfaceVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // ── Action Buttons ───────────────────────────────────────────
                 Row(
@@ -269,7 +269,7 @@ fun OaiPresetSettingsScreen(
                         onClick = { viewModel.showDeleteConfirm() },
                         modifier = Modifier.weight(1f),
                         enabled = !uiState.isSaving && uiState.presets.isNotEmpty(),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorRed)
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                     ) {
                         Icon(Icons.Default.Delete, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp))
@@ -278,7 +278,7 @@ fun OaiPresetSettingsScreen(
                 }
 
                 if (uiState.saveSuccess) {
-                    Text("Preset saved!", color = AccentGreen, style = MaterialTheme.typography.bodyMedium)
+                    Text("Preset saved!", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
                 }
 
                 Spacer(Modifier.height(32.dp))
@@ -334,7 +334,7 @@ fun OaiPresetSettingsScreen(
                     Text(
                         "Save imported preset as:",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = uiState.importPresetName,
@@ -405,7 +405,7 @@ fun OaiPresetSettingsScreen(
 
 @Composable
 private fun OaiSectionHeader(text: String) {
-    Text(text, style = MaterialTheme.typography.titleMedium, color = AccentGreen)
+    Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
 }
 
 /** A parameter row with a label + switch, and an animated slider below when enabled. */
@@ -425,17 +425,17 @@ private fun OaiParamWithSlider(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = if (enabled) TextPrimary else TextSecondary)
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (enabled) {
-                    Text(format.format(value), style = MaterialTheme.typography.bodySmall, color = AccentGreen)
+                    Text(format.format(value), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 }
                 Switch(
                     checked = enabled,
                     onCheckedChange = onToggle,
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = AccentGreen,
-                        checkedTrackColor = AccentGreen.copy(alpha = 0.5f)
+                        checkedThumbColor = MaterialTheme.colorScheme.primary,
+                        checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                     )
                 )
             }
@@ -446,9 +446,9 @@ private fun OaiParamWithSlider(
                 onValueChange = onValueChange,
                 valueRange = range,
                 colors = SliderDefaults.colors(
-                    thumbColor = AccentGreen,
-                    activeTrackColor = AccentGreen,
-                    inactiveTrackColor = DarkSurfaceVariant
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             )
         }
@@ -471,17 +471,17 @@ private fun OaiParamWithInput(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = if (enabled) TextPrimary else TextSecondary)
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (enabled) {
-                    Text(value.toString(), style = MaterialTheme.typography.bodySmall, color = AccentGreen)
+                    Text(value.toString(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 }
                 Switch(
                     checked = enabled,
                     onCheckedChange = onToggle,
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = AccentGreen,
-                        checkedTrackColor = AccentGreen.copy(alpha = 0.5f)
+                        checkedThumbColor = MaterialTheme.colorScheme.primary,
+                        checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                     )
                 )
             }
@@ -532,7 +532,7 @@ private fun PromptOrderRow(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (item.enabled) DarkSurface else DarkBackground
+            containerColor = if (item.enabled) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.background
         )
     ) {
         Column {
@@ -548,8 +548,8 @@ private fun PromptOrderRow(
                     checked = item.enabled,
                     onCheckedChange = { onToggle() },
                     colors = CheckboxDefaults.colors(
-                        checkedColor = AccentGreen,
-                        uncheckedColor = TextSecondary
+                        checkedColor = MaterialTheme.colorScheme.primary,
+                        uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
 
@@ -558,7 +558,7 @@ private fun PromptOrderRow(
                     Text(
                         text = item.label,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (item.enabled) TextPrimary else TextSecondary
+                        color = if (item.enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     // Subtitle: show injection/role info at a glance
                     val subtitle = buildString {
@@ -576,7 +576,7 @@ private fun PromptOrderRow(
                         Text(
                             text = subtitle,
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (item.isCustom && item.injectionPosition == 0) AccentGreen.copy(alpha = 0.7f) else TextTertiary
+                            color = if (item.isCustom && item.injectionPosition == 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outline
                         )
                     }
                 }
@@ -584,7 +584,7 @@ private fun PromptOrderRow(
                 // Delete for custom prompts
                 if (item.isCustom) {
                     IconButton(onClick = onDelete, modifier = Modifier.size(30.dp)) {
-                        Icon(Icons.Default.Delete, "Delete", tint = ErrorRed.copy(alpha = 0.8f), modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f), modifier = Modifier.size(16.dp))
                     }
                 }
 
@@ -594,7 +594,7 @@ private fun PromptOrderRow(
                         Icon(
                             if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                             if (expanded) "Collapse" else "Edit content",
-                            tint = if (expanded) AccentGreen else TextSecondary,
+                            tint = if (expanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -604,14 +604,14 @@ private fun PromptOrderRow(
                 IconButton(onClick = onMoveUp, enabled = canMoveUp, modifier = Modifier.size(30.dp)) {
                     Icon(
                         Icons.Default.KeyboardArrowUp, "Move up",
-                        tint = if (canMoveUp) TextPrimary else TextSecondary,
+                        tint = if (canMoveUp) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )
                 }
                 IconButton(onClick = onMoveDown, enabled = canMoveDown, modifier = Modifier.size(30.dp)) {
                     Icon(
                         Icons.Default.KeyboardArrowDown, "Move down",
-                        tint = if (canMoveDown) TextPrimary else TextSecondary,
+                        tint = if (canMoveDown) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -627,7 +627,7 @@ private fun PromptOrderRow(
                 ) {
                     // --- Role row ---
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Role:", style = MaterialTheme.typography.labelMedium, color = TextSecondary,
+                        Text("Role:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.width(60.dp))
                         listOf("system", "user", "assistant").forEach { role ->
                             val selected = item.role == role
@@ -636,10 +636,10 @@ private fun PromptOrderRow(
                                 onClick = { onRoleChange(role) },
                                 label = { Text(role, style = MaterialTheme.typography.labelSmall) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = AccentGreen.copy(alpha = 0.25f),
-                                    selectedLabelColor = AccentGreen,
-                                    containerColor = DarkBackground,
-                                    labelColor = TextSecondary
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                                    selectedLabelColor = MaterialTheme.colorScheme.primary,
+                                    containerColor = MaterialTheme.colorScheme.background,
+                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             )
                         }
@@ -647,7 +647,7 @@ private fun PromptOrderRow(
 
                     // --- Injection mode row ---
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Inject:", style = MaterialTheme.typography.labelMedium, color = TextSecondary,
+                        Text("Inject:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.width(60.dp))
                         val inOrder = item.injectionPosition == 0
                         FilterChip(
@@ -655,10 +655,10 @@ private fun PromptOrderRow(
                             onClick = { onInjectionChange(0, item.injectionDepth) },
                             label = { Text("In order", style = MaterialTheme.typography.labelSmall) },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = AccentGreen.copy(alpha = 0.25f),
-                                selectedLabelColor = AccentGreen,
-                                containerColor = DarkBackground,
-                                labelColor = TextSecondary
+                                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                                selectedLabelColor = MaterialTheme.colorScheme.primary,
+                                containerColor = MaterialTheme.colorScheme.background,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         )
                         FilterChip(
@@ -666,10 +666,10 @@ private fun PromptOrderRow(
                             onClick = { onInjectionChange(1, item.injectionDepth) },
                             label = { Text("In-chat depth", style = MaterialTheme.typography.labelSmall) },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = AccentGreen.copy(alpha = 0.25f),
-                                selectedLabelColor = AccentGreen,
-                                containerColor = DarkBackground,
-                                labelColor = TextSecondary
+                                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                                selectedLabelColor = MaterialTheme.colorScheme.primary,
+                                containerColor = MaterialTheme.colorScheme.background,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         )
                         // Depth number field — only shown when in-chat depth is selected
@@ -697,7 +697,7 @@ private fun PromptOrderRow(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 80.dp),
-                        placeholder = { Text("Enter prompt text. Use {{user}}, {{char}} macros.", color = TextTertiary) },
+                        placeholder = { Text("Enter prompt text. Use {{user}}, {{char}} macros.", color = MaterialTheme.colorScheme.outline) },
                         minLines = 3,
                         colors = oaiTextFieldColors()
                     )
@@ -739,24 +739,24 @@ private fun OaiPresetDropdown(
 
 @Composable
 private fun oaiTextFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedContainerColor = DarkInputBackground,
-    unfocusedContainerColor = DarkInputBackground,
-    focusedBorderColor = AccentGreen,
-    unfocusedBorderColor = DarkSurfaceVariant,
-    focusedTextColor = TextPrimary,
-    unfocusedTextColor = TextPrimary,
-    focusedLabelColor = AccentGreen,
-    unfocusedLabelColor = TextSecondary
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedLabelColor = MaterialTheme.colorScheme.primary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
 )
 
 @Composable
 private fun oaiDropdownColors() = OutlinedTextFieldDefaults.colors(
-    focusedContainerColor = DarkInputBackground,
-    unfocusedContainerColor = DarkInputBackground,
-    focusedBorderColor = AccentGreen,
-    unfocusedBorderColor = DarkSurfaceVariant,
-    focusedTextColor = TextPrimary,
-    unfocusedTextColor = TextPrimary,
-    focusedTrailingIconColor = AccentGreen,
-    unfocusedTrailingIconColor = TextSecondary
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedTrailingIconColor = MaterialTheme.colorScheme.primary,
+    unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
 )
