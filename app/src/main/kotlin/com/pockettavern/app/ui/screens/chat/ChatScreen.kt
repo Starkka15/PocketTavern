@@ -547,6 +547,7 @@ fun ChatScreen(
         ImageGenerationDialog(
             imageGenType = uiState.imageGenType,
             promptPreview = uiState.imagePromptPreview,
+            isGeneratingPrompt = uiState.isGeneratingImagePrompt,
             generationState = uiState.imageGenState,
             generatedImageBase64 = uiState.generatedImageBase64,
             imageSaved = uiState.imageSaved,
@@ -763,6 +764,7 @@ private fun MessageWithActions(
 private fun ImageGenerationDialog(
     imageGenType: ImageGenType,
     promptPreview: String,
+    isGeneratingPrompt: Boolean,
     generationState: GenerationState,
     generatedImageBase64: String?,
     imageSaved: Boolean,
@@ -808,13 +810,23 @@ private fun ImageGenerationDialog(
 
                 // Prompt preview/editor
                 Text("Prompt", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (isGeneratingPrompt) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Text("Generating prompt from message...", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
                 OutlinedTextField(
                     value = promptPreview,
                     onValueChange = onUpdatePrompt,
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 100.dp, max = 150.dp),
-                    enabled = !isGenerating,
+                    enabled = !isGenerating && !isGeneratingPrompt,
                     maxLines = 6,
                     textStyle = MaterialTheme.typography.bodySmall
                 )
@@ -959,7 +971,7 @@ private fun ImageGenerationDialog(
             } else {
                 TextButton(
                     onClick = onGenerate,
-                    enabled = promptPreview.isNotBlank()
+                    enabled = promptPreview.isNotBlank() && !isGeneratingPrompt
                 ) {
                     Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(4.dp))

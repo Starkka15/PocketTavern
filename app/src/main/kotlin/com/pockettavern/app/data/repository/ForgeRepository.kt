@@ -1,6 +1,7 @@
 package com.pockettavern.app.data.repository
 
 import com.pockettavern.app.data.remote.api.ForgeApi
+import com.pockettavern.app.data.remote.dto.forge.Img2ImgRequest
 import com.pockettavern.app.data.remote.dto.forge.Txt2ImgRequest
 import com.pockettavern.app.domain.model.*
 import kotlinx.coroutines.Dispatchers
@@ -58,9 +59,23 @@ class ForgeRepository @Inject constructor(
             var result: String? = null
             var error: Exception? = null
 
-            // Simple approach: just call the API directly
-            // The progress polling would require a more complex setup
-            val response = api.generateImage(request)
+            // Route to img2img or txt2img based on source image
+            val response = if (params.sourceImageBase64 != null) {
+                api.img2img(Img2ImgRequest(
+                    prompt = params.prompt,
+                    negativePrompt = params.negativePrompt,
+                    initImages = listOf(params.sourceImageBase64),
+                    steps = params.steps,
+                    cfgScale = params.cfgScale,
+                    width = params.width,
+                    height = params.height,
+                    samplerName = params.sampler,
+                    denoisingStrength = params.denoisingStrength,
+                    seed = params.seed
+                ))
+            } else {
+                api.generateImage(request)
+            }
             result = response.images?.firstOrNull()
 
             if (error != null) {
@@ -77,18 +92,31 @@ class ForgeRepository @Inject constructor(
 
     suspend fun generateImage(params: ForgeGenerationParams): Result<String> {
         return try {
-            val request = Txt2ImgRequest(
-                prompt = params.prompt,
-                negativePrompt = params.negativePrompt,
-                steps = params.steps,
-                cfgScale = params.cfgScale,
-                width = params.width,
-                height = params.height,
-                samplerName = params.sampler,
-                seed = params.seed
-            )
-
-            val response = api.generateImage(request)
+            val response = if (params.sourceImageBase64 != null) {
+                api.img2img(Img2ImgRequest(
+                    prompt = params.prompt,
+                    negativePrompt = params.negativePrompt,
+                    initImages = listOf(params.sourceImageBase64),
+                    steps = params.steps,
+                    cfgScale = params.cfgScale,
+                    width = params.width,
+                    height = params.height,
+                    samplerName = params.sampler,
+                    denoisingStrength = params.denoisingStrength,
+                    seed = params.seed
+                ))
+            } else {
+                api.generateImage(Txt2ImgRequest(
+                    prompt = params.prompt,
+                    negativePrompt = params.negativePrompt,
+                    steps = params.steps,
+                    cfgScale = params.cfgScale,
+                    width = params.width,
+                    height = params.height,
+                    samplerName = params.sampler,
+                    seed = params.seed
+                ))
+            }
             val image = response.images?.firstOrNull()
                 ?: throw Exception("No image generated")
 

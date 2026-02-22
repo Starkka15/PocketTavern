@@ -34,6 +34,33 @@ data class Txt2ImgResponse(
 )
 
 @Serializable
+data class Img2ImgRequest(
+    val prompt: String,
+    @SerialName("negative_prompt")
+    val negativePrompt: String = "",
+    @SerialName("init_images")
+    val initImages: List<String>,  // Base64 encoded source images
+    val steps: Int = 20,
+    @SerialName("cfg_scale")
+    val cfgScale: Float = 7f,
+    val width: Int = 512,
+    val height: Int = 768,
+    @SerialName("sampler_name")
+    val samplerName: String = "Euler",
+    @SerialName("denoising_strength")
+    val denoisingStrength: Float = 0.5f,
+    val seed: Int = -1,
+    @SerialName("batch_size")
+    val batchSize: Int = 1,
+    @SerialName("n_iter")
+    val nIter: Int = 1,
+    @SerialName("send_images")
+    val sendImages: Boolean = true,
+    @SerialName("save_images")
+    val saveImages: Boolean = false
+)
+
+@Serializable
 data class SamplerDto(
     val name: String,
     val aliases: List<String>? = null,

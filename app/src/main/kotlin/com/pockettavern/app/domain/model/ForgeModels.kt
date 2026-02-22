@@ -8,7 +8,11 @@ data class ForgeGenerationParams(
     val steps: Int = 20,
     val cfgScale: Float = 7f,
     val sampler: String = "Euler",
-    val seed: Int = -1
+    val seed: Int = -1,
+    /** Base64-encoded source image for img2img. Null = txt2img. */
+    val sourceImageBase64: String? = null,
+    /** How much to change the source image (0.0 = identical, 1.0 = ignore source). */
+    val denoisingStrength: Float = 0.5f
 )
 
 data class ForgeProgress(

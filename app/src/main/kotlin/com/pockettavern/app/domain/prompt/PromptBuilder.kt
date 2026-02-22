@@ -195,9 +195,9 @@ class PromptBuilder(
                     is HistoryItem.Message -> {
                         val msg = item.message
                         if (msg.isUser) {
-                            messages.add(PromptMessage("user", substituteMacros(cleanMessageContent(msg.content))))
+                            messages.add(PromptMessage("user", substituteMacros(cleanMessageContent(promptContent(msg)))))
                         } else {
-                            val clean = substituteMacros(cleanMessageContent(msg.content))
+                            val clean = substituteMacros(cleanMessageContent(promptContent(msg)))
                             val content = if (msg.senderName != null && msg.senderName != character.name) {
                                 "${msg.senderName}: $clean"
                             } else {
@@ -349,7 +349,7 @@ class PromptBuilder(
                     val msg = item.message
                     if (msg.isUser) {
                         sb.append(template.inputSequence)
-                        sb.append(substituteMacros(msg.content))
+                        sb.append(substituteMacros(promptContent(msg)))
                         appendSuffix(sb, template, isUser = true)
                         sb.append("\n")
                     } else {
@@ -363,7 +363,7 @@ class PromptBuilder(
                         if (msg.senderName != null && msg.senderName != character.name) {
                             sb.append("${msg.senderName}: ")
                         }
-                        sb.append(substituteMacros(cleanMessageContent(msg.content)))
+                        sb.append(substituteMacros(cleanMessageContent(promptContent(msg))))
                         appendSuffix(sb, template, isUser = false)
                         sb.append("\n")
                         isFirstAssistant = false
@@ -443,7 +443,7 @@ class PromptBuilder(
                 is HistoryItem.Message -> {
                     val msg = item.message
                     val name = msg.senderName ?: (if (msg.isUser) userName else character.name)
-                    sb.append("$name: ${substituteMacros(cleanMessageContent(msg.content))}\n")
+                    sb.append("$name: ${substituteMacros(cleanMessageContent(promptContent(msg)))}\n")
                 }
                 is HistoryItem.Injection -> {
                     sb.append("[${item.content}]\n")
@@ -786,7 +786,7 @@ class PromptBuilder(
             append(newMessage)
             append(" ")
             chatHistory.takeLast(scanDepth).forEach { msg ->
-                append(msg.content)
+                append(promptContent(msg))
                 append(" ")
             }
             append(character.description)
@@ -975,6 +975,16 @@ class PromptBuilder(
             sb.append(template.stopSequence)
         }
     }
+
+    /**
+     * Return the raw (unfiltered) content for a message, falling back to the
+     * display content when rawContent is absent.  Output filters strip extension
+     * metadata tags (e.g. [remember:], [time:]) from msg.content for display,
+     * but the LLM needs to see those tags in history so it continues generating
+     * them.  Always use this when building prompt history.
+     */
+    private fun promptContent(msg: ChatMessage): String =
+        msg.rawContent ?: msg.content
 
     /**
      * Strip ST-specific hidden annotations from message content before sending to the LLM.

@@ -98,7 +98,11 @@ data class ChatUiState(
     // Which (messageIndex, extensionId) pairs have visible inline buttons
     val visibleHeaderButtons: Set<Pair<Int, String>> = emptySet(),
     // Edit dialog requested by JS extension via PT.showEditDialog()
-    val editDialogRequest: JsExtensionHost.EditDialogRequest? = null
+    val editDialogRequest: JsExtensionHost.EditDialogRequest? = null,
+    // True while the LLM is generating an image prompt
+    val isGeneratingImagePrompt: Boolean = false,
+    // Base64-encoded character avatar for img2img (loaded when Character mode selected)
+    val characterAvatarBase64: String? = null
 )
 
 enum class ImageGenType {
@@ -761,28 +765,163 @@ class ChatViewModel @Inject constructor(
         val messageIndex = _uiState.value.selectedMessageIndex ?: return
         val message = _uiState.value.messages.getOrNull(messageIndex) ?: return
 
-        val prompt = when (type) {
-            ImageGenType.CHARACTER -> buildCharacterPrompt(character)
-            ImageGenType.BACKGROUND -> buildBackgroundPrompt(message.content)
+        when (type) {
+            ImageGenType.CHARACTER -> {
+                // Ask the LLM to write a character-focused prompt from the message context
+                generateCharacterPromptViaLLM(character, message.rawContent ?: message.content)
+            }
+            ImageGenType.BACKGROUND -> {
+                // Ask the LLM to parse the message and write a Forge-compatible prompt
+                generateBackgroundPromptViaLLM(message.rawContent ?: message.content)
+            }
         }
-        _uiState.update { it.copy(imagePromptPreview = prompt) }
     }
 
-    private fun buildCharacterPrompt(character: Character): String {
-        val parts = mutableListOf("masterpiece, best quality, highly detailed", "portrait of ${character.name}")
-        if (character.description.isNotBlank()) parts.add(character.description.take(200))
-        if (character.personality.isNotBlank()) parts.add(character.personality.take(100))
-        return parts.joinToString(", ")
+    private fun generateCharacterPromptViaLLM(character: Character, messageContent: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isGeneratingImagePrompt = true, imagePromptPreview = "") }
+
+            try {
+                val config = when (val r = localRepository.getApiConfiguration()) {
+                    is Result.Success -> r.data
+                    is Result.Error -> ApiConfiguration.DEFAULT
+                }
+                val preset = localRepository.getCurrentTextGenPreset()
+
+                val llmPrompt = buildString {
+                    append("Write a Stable Diffusion prompt for the character below based on the scene in the message. ")
+                    append("ONLY describe what is explicitly stated in the description and message. Do NOT invent or assume any details about appearance, clothing, or actions that are not mentioned. ")
+                    append("Focus on: expression, pose, clothing, and setting from the message. ")
+                    append("Output ONLY comma-separated tags on a single line. No sentences, no explanation.\n\n")
+                    append("Character: ").append(character.name).append("\n")
+                    if (character.description.isNotBlank()) {
+                        append("Description: ").append(character.description.take(1500)).append("\n")
+                    }
+                    if (character.personality.isNotBlank()) {
+                        append("Personality: ").append(character.personality.take(300)).append("\n")
+                    }
+                    append("\nScene:\n")
+                    append(messageContent.take(3000))
+                }
+
+                val finalPrompt = wrapForTextCompletion(llmPrompt)
+
+                var resultText = ""
+                llmRepository.generate(finalPrompt, config, preset).collect { event ->
+                    when (event) {
+                        is StreamEvent.Complete -> resultText = event.fullText
+                        is StreamEvent.Error -> resultText = ""
+                        is StreamEvent.Token -> {}
+                    }
+                }
+
+                val cleaned = resultText.trim().removeSurrounding("\"").removeSurrounding("'").trim()
+
+                // Load the character avatar as base64 for img2img
+                loadAvatarBase64()
+
+                _uiState.update { it.copy(
+                    imagePromptPreview = cleaned.ifBlank { "(LLM returned empty — try editing manually)" },
+                    isGeneratingImagePrompt = false
+                ) }
+            } catch (e: Exception) {
+                android.util.Log.w("ImageGen", "LLM character prompt generation failed: ${e.message}")
+                _uiState.update { it.copy(
+                    imagePromptPreview = "(Failed to generate prompt — try editing manually)",
+                    isGeneratingImagePrompt = false
+                ) }
+            }
+        }
     }
 
-    private fun buildBackgroundPrompt(messageContent: String): String {
-        val parts = mutableListOf("masterpiece, best quality, highly detailed, scenic", "background, environment, landscape")
-        val desc = messageContent
-            .replace(Regex("\"[^\"]*\""), "")
-            .replace(Regex("\\*[^*]*\\*"), "")
-            .take(300)
-        if (desc.isNotBlank()) parts.add(desc.trim())
-        return parts.joinToString(", ")
+    /** Load the current character's avatar PNG as base64 for img2img. */
+    private fun loadAvatarBase64() {
+        val character = _uiState.value.character ?: return
+        try {
+            val fileName = character.avatar ?: "${character.name}.png"
+            val avatarUri = localRepository.getAvatarUri(fileName)
+            val file = java.io.File(avatarUri.path ?: return)
+            if (file.exists()) {
+                val bytes = file.readBytes()
+                val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                _uiState.update { it.copy(characterAvatarBase64 = base64) }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("ImageGen", "Failed to load avatar: ${e.message}")
+        }
+    }
+
+    /** Wrap a prompt with instruct template for text completion backends. */
+    private suspend fun wrapForTextCompletion(prompt: String): String {
+        val config = when (val r = localRepository.getApiConfiguration()) {
+            is Result.Success -> r.data
+            is Result.Error -> return prompt + "\n\nPrompt:\n"
+        }
+        if (config.usesChatCompletions) return prompt
+
+        val charFileName = _uiState.value.character?.let { it.avatar ?: "${it.name}.png" } ?: "char.png"
+        val instructTemplate = when (val r = localRepository.loadChatContext(
+            characterFileName = charFileName,
+            chatFileName = _uiState.value.currentChatFileName
+        )) {
+            is Result.Success -> r.data.instructTemplate
+            is Result.Error -> null
+        }
+        return if (instructTemplate != null) {
+            buildString {
+                append(instructTemplate.inputSequence)
+                append(prompt)
+                append(instructTemplate.inputSuffix)
+                append(instructTemplate.outputSequence)
+            }
+        } else {
+            prompt + "\n\nPrompt:\n"
+        }
+    }
+
+    private fun generateBackgroundPromptViaLLM(messageContent: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isGeneratingImagePrompt = true, imagePromptPreview = "") }
+
+            try {
+                val config = when (val r = localRepository.getApiConfiguration()) {
+                    is Result.Success -> r.data
+                    is Result.Error -> ApiConfiguration.DEFAULT
+                }
+                val preset = localRepository.getCurrentTextGenPreset()
+
+                val llmPrompt = buildString {
+                    append("Parse the following roleplay message and write a Stable Diffusion image generation prompt for the BACKGROUND/ENVIRONMENT described in it. ")
+                    append("Focus only on the setting, scenery, lighting, atmosphere, and environment — do NOT include any characters or people. ")
+                    append("Output ONLY the prompt as a single comma-separated line of descriptive tags. No explanation, no extra text.\n\n")
+                    append("Message:\n")
+                    append(messageContent.take(3000))
+                }
+
+                val finalPrompt = wrapForTextCompletion(llmPrompt)
+
+                var resultText = ""
+                llmRepository.generate(finalPrompt, config, preset).collect { event ->
+                    when (event) {
+                        is StreamEvent.Complete -> resultText = event.fullText
+                        is StreamEvent.Error -> resultText = ""
+                        is StreamEvent.Token -> {}
+                    }
+                }
+
+                val cleaned = resultText.trim().removeSurrounding("\"").removeSurrounding("'").trim()
+                _uiState.update { it.copy(
+                    imagePromptPreview = cleaned.ifBlank { "(LLM returned empty — try editing manually)" },
+                    isGeneratingImagePrompt = false
+                ) }
+            } catch (e: Exception) {
+                android.util.Log.w("ImageGen", "LLM prompt generation failed: ${e.message}")
+                _uiState.update { it.copy(
+                    imagePromptPreview = "(Failed to generate prompt — try editing manually)",
+                    isGeneratingImagePrompt = false
+                ) }
+            }
+        }
     }
 
     fun updateImagePrompt(prompt: String) {
@@ -793,16 +932,21 @@ class ChatViewModel @Inject constructor(
         val prompt = _uiState.value.imagePromptPreview
         if (prompt.isBlank()) return
 
+        val isCharacter = _uiState.value.imageGenType == ImageGenType.CHARACTER
+        val avatarBase64 = if (isCharacter) _uiState.value.characterAvatarBase64 else null
+
         viewModelScope.launch {
             _uiState.update { it.copy(imageGenState = GenerationState.Starting) }
 
             val params = ForgeGenerationParams(
                 prompt = prompt,
                 negativePrompt = "blurry, low quality, distorted, deformed, bad anatomy, worst quality, watermark, text",
-                width = if (_uiState.value.imageGenType == ImageGenType.CHARACTER) 512 else 768,
-                height = if (_uiState.value.imageGenType == ImageGenType.CHARACTER) 768 else 512,
+                width = if (isCharacter) 512 else 768,
+                height = if (isCharacter) 768 else 512,
                 steps = 20,
-                cfgScale = 7f
+                cfgScale = 7f,
+                sourceImageBase64 = avatarBase64,
+                denoisingStrength = if (avatarBase64 != null) 0.5f else 1f
             )
 
             forgeRepository.generateImageWithProgress(params).collect { state ->

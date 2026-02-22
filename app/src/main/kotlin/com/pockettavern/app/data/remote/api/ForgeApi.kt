@@ -21,6 +21,9 @@ interface ForgeApi {
     @POST("sdapi/v1/txt2img")
     suspend fun generateImage(@Body request: Txt2ImgRequest): Txt2ImgResponse
 
+    @POST("sdapi/v1/img2img")
+    suspend fun img2img(@Body request: Img2ImgRequest): Txt2ImgResponse
+
     @GET("sdapi/v1/progress")
     suspend fun getProgress(): ProgressResponse
 
