@@ -62,24 +62,31 @@ No Node.js. No PC. No SillyTavern server.
 
 PocketTavern's chat screen is built around a natural, responsive conversation flow:
 
-- **Streaming responses** — AI output appears word-by-word as it's generated
+- **Streaming responses** — AI output appears word-by-word as it's generated, with a live cursor
 - **Alternative responses (swipes)** — Swipe left/right on any AI message, or use the `‹ 1/2 ›` arrows that appear below it. The `↺` button at the end of the list generates a fresh alternative. All alternatives are saved alongside the original so you can flip back and forth
 - **Edit messages** — Tap any message to edit it directly
 - **Delete messages** — Remove individual messages from history
 - **Delete From Here** — Long-press a message to delete it and everything after it in one action
 - **Continue** — Append to the last AI response without starting a new one
-- **Author's Note** — Inject custom text into the context at a configurable depth and frequency
-- **Character backgrounds** — Display per-character background images behind the chat
+- **Auto-continue** — Automatically re-triggers continue if the response is shorter than a configurable minimum token length (up to 3 times per turn)
+- **Regenerate** — Remove the last AI message and re-generate a fresh response
+- **Narrator mode** — Insert narrator/system messages rendered as full-width centered italic text (also via the `/sys` input prefix)
+- **Author's Note** — Inject custom text into the context at a configurable depth, interval, position (Before Char, After Char, Top/Bottom of AN, At Depth), and role (System/User/Assistant)
+- **Character backgrounds** — Display per-character background images behind the chat (upload from gallery or set a generated image)
+- **Multiple chats per character** — Start fresh conversations or continue any previous one via the chat selector
+- **Alternate greeting picker** — When a character has multiple greetings, a picker dialog appears on new chat creation
 - **Background generation** — Long-running generations continue in a foreground service so Android won't kill them
+- **Rich text rendering** — Bold, italic, inline code, quoted dialogue highlighting, all with theme-aware colors
 
 ### Group Chat
 
 Chat with multiple AI characters simultaneously:
 
 - Create groups with any combination of your local characters
-- Configure reply order (sequential, random, or activation-based)
+- Configure activation strategy: Natural, List Order, Manual, or Pooled
+- Generation modes: Swap (characters take turns) or Append (characters build on each other)
+- Enable/disable individual members per conversation
 - Each character maintains its own persona, description, and world info
-- Narrator mode for injecting scene-setting messages
 
 </details>
 
@@ -123,14 +130,51 @@ Long-press any message in chat to access **Speak** and **Stop** options, regardl
 
 PocketTavern connects directly to your LLM without any intermediary server. Configure your endpoint once under **Settings → API Configuration**.
 
-| Backend | Type | Notes |
-|---------|------|-------|
-| **KoboldCPP** | Local | `POST /api/v1/generate` — streaming via `/extra/stream` |
-| **Ollama** | Local | `POST /api/generate` or `/api/chat` with streaming |
-| **OpenAI-Compatible** | Local / Cloud | Works with LM Studio, TabbyAPI, vLLM, Aphrodite, TextGen WebUI, OpenAI, Mistral, Groq, DeepSeek, and any service following the `/v1/chat/completions` spec |
-| **LlamaCpp Server** | Local | `POST /completion` with streaming |
-| **Anthropic** | Cloud | Claude models via `POST /v1/messages` |
-| **NovelAI** | Cloud | Subscription-based creative writing models |
+#### Text Completion
+| Backend | Notes |
+|---------|-------|
+| **KoboldCpp** | `POST /api/v1/generate` — streaming via `/extra/stream` |
+| **llama.cpp** | `POST /completion` with streaming |
+| **Text Gen WebUI (Ooba)** | Oobabooga's text-generation-webui API |
+| **Ollama** | `POST /api/generate` or `/api/chat` with streaming |
+| **vLLM** | High-throughput local inference |
+| **Aphrodite** | Local — `POST /v1/completions` |
+| **TabbyAPI** | ExllamaV2 backend |
+| **Together AI** | Cloud |
+| **Infermatic AI** | Cloud |
+| **OpenRouter** | Cloud (also available as chat completion) |
+| **Featherless** | Cloud |
+| **Mancer** | Cloud |
+| **DreamGen** | Cloud |
+| **HuggingFace** | Cloud — Inference API |
+| **Generic** | Any `/v1/completions`-compatible endpoint |
+
+#### Chat Completion
+| Backend | Notes |
+|---------|-------|
+| **OpenAI** | GPT-3.5, GPT-4, GPT-4o, o1 |
+| **Anthropic (Claude)** | Claude models via `/v1/messages` |
+| **Google AI Studio** | Gemini models |
+| **DeepSeek** | DeepSeek-V2, DeepSeek-Coder |
+| **Mistral AI** | Mistral, Mixtral |
+| **Groq** | Ultra-fast cloud inference |
+| **Cohere** | Command models |
+| **Perplexity** | Search-augmented generation |
+| **OpenRouter** | Multi-provider gateway |
+| **xAI (Grok)** | Grok models |
+| **Fireworks** | Cloud inference |
+| **AI21** | Jamba models |
+| **Vertex AI** | Google Cloud |
+| **Azure OpenAI** | Enterprise Azure endpoints |
+| **Moonshot** | Cloud |
+| **NanoGPT** | Cloud |
+| **AIML API** | Cloud |
+| **Pollinations** | Free text generation |
+| **Chutes** | Cloud |
+| **ElectronHub** | Cloud |
+| **SiliconFlow** | Cloud |
+| **Z.AI** | Cloud |
+| **Custom** | Any OpenAI-compatible endpoint via custom URL |
 
 ### Connection Profiles
 
@@ -143,12 +187,18 @@ Save multiple backend configurations and switch between them instantly — usefu
 
 ### Local Character Storage
 
-Characters are stored as PNG files with embedded metadata — the same format SillyTavern uses. Every card you import or create stays on your device in `/files/characters/`, and can be exported at any time.
+Characters are stored as PNG files with embedded metadata (V2 spec) — the same format SillyTavern uses. Every card you import or create stays on your device and can be exported at any time.
 
 - Import any `.png` character card by tapping the import button or sharing a card to PocketTavern
-- Create characters from scratch with name, description, personality, first message, scenario, and example dialogues
+- Create characters from scratch with a tabbed editor:
+  - **Basic** — Name, avatar (pick from gallery or generate with AI)
+  - **Personality** — Description, Personality, Scenario
+  - **Messages** — First Message, Alternate Greetings (unlimited), Example Dialogue
+  - **Advanced** — Character-specific System Prompt (supports `{{original}}`), Post-History Instructions, embedded Character Lorebook
+  - **Meta** — Creator name, Tags, Creator Notes
 - Edit any character's details at any time
-- Assign a background image per character
+- Favorite characters (pinned to top of list)
+- Per-character background images
 
 ### Character Settings (per-character)
 
@@ -158,13 +208,20 @@ Each character can have its own overrides:
 - System prompt override
 - Attached lorebook / world info file
 - Token allocation adjustments
+- TTS voice and provider override
+- Image generation: toggle whether the avatar is used as an img2img reference
 
-### Browse CharaVault & Forge
+### Browse CharaVault
 
 Browse thousands of community characters directly in the app:
 
-- **CharaVault** — Search by name, tag, or description; preview full card details; import with one tap
-- **Forge** — Community character browser with tag filtering
+- **CharaVault.net** — Browse the public catalog with login support (email/password, 2FA/TOTP); NSFW content requires age verification; guest browsing shows SFW only
+- **Self-hosted CharaVault** — Connect to your own CharaVault server
+- Search by name, tag, or description
+- Filter by tags, SFW/NSFW
+- Preview full card details (description, first message, tags)
+- One-tap import into PocketTavern
+- Upload your own characters to CharaVault directly from the character list
 
 </details>
 
@@ -176,7 +233,9 @@ Chats are stored as `.jsonl` files in SillyTavern-compatible format — one meta
 - **Recent Chats** home screen — shows your latest conversations sorted by most recently active, with a preview of the last message
 - **Multiple chats per character** — start fresh or continue any previous conversation
 - **Full chat history** — scroll back through your entire conversation
+- **Chat selector** — switch between a character's saved chats, create new ones, or delete old ones
 - **Export** — chats are plain files you can copy/backup at any time
+- **Connection status** — API name and model shown in the chat header
 
 </details>
 
@@ -185,13 +244,18 @@ Chats are stored as `.jsonl` files in SillyTavern-compatible format — one meta
 
 World Info (lorebooks) inject relevant lore into the AI's context automatically based on what's being discussed.
 
-- Attach lorebooks globally or per-character
+- Attach lorebooks globally, per-character, or per-persona
 - Character cards with embedded `character_book` entries are automatically loaded
-- Entries activate when their keywords appear in recent messages
+- Entries activate when their primary keywords appear in recent messages
+- **Secondary keys** — AND-filter for selective entries (both primary and secondary must match)
 - **Probability** — entries have a configurable activation chance
 - **Token budget** — stops injecting once the context budget is used up
 - **Recursive scanning** — activated entry content is scanned for additional keyword matches
 - **Regex keys** — use `/pattern/flags` as entry keys for advanced matching
+- **Insertion position** — Before Char, After Char, Top/Bottom of Author's Note, or At Depth
+- **Entry groups** — organize entries into named groups
+- **Constant entries** — always-active entries that bypass keyword matching
+- **Browse & import lorebooks from CharaVault** — download community lorebooks directly
 
 </details>
 
@@ -416,8 +480,11 @@ Set up a persona to tell the AI who it's talking to:
 
 - **Display name** — shown in chat bubbles
 - **Description** — injected into the system prompt so characters know who you are
-- **Avatar** — your profile picture in the chat interface
-- Multiple personas — create different personas for different roleplay scenarios and switch between them
+- **Avatar** — your profile picture in the chat interface (pick from gallery or generate with AI)
+- **Injection position** — control where the persona description appears: In System Prompt, In Chat at Depth, Top/Bottom of Author's Note
+- **Role** — System, User, or Assistant
+- **Attached lorebook** — attach a lorebook specific to this persona
+- Multiple personas — create different personas for different roleplay scenarios and switch between them with one tap
 
 </details>
 
@@ -453,26 +520,60 @@ Set up a persona to tell the AI who it's talking to:
 
 Settings are organized into five groups:
 
-- **Connection** — API Configuration, Connection Profiles
-- **Generation** — Text Generation Parameters, Formatting, OpenAI Presets
-- **World & Characters** — World Info, Character settings
-- **Appearance & Audio** — Themes, TTS, Stable Diffusion Forge
-- **Utilities** — SillyTavern Import, Extensions, Debug Logging
+- **Connection** — API Configuration, Connection Profiles, Image Generation
+- **Generation** — Text Generation Parameters, Chat Completion Presets, Formatting
+- **World & Characters** — World Info / Lorebooks, Context Settings (Author's Note), Personas
+- **Appearance & Audio** — Themes, Text-to-Speech
+- **Utilities** — Extensions, Import from SillyTavern, Help
 
 </details>
 
 <details>
-<summary><b>Stable Diffusion Avatar Generation</b></summary>
+<summary><b>Image Generation</b></summary>
 
-Generate character avatars using your local Stable Diffusion Forge server.
+PocketTavern supports multiple image generation backends — generate character portraits, scene backgrounds, and avatars directly from the chat or character editor.
 
-1. Install [Stable Diffusion WebUI Forge](https://github.com/lllyasviel/stable-diffusion-webui-forge) with `--api` flag
-2. Note the server address (e.g., `http://192.168.1.100:7860`)
-3. Enter it in **Settings → Stable Diffusion Forge**
+### Backends
 
-Avatar generation is available in the Create Character and Edit Character screens. Supports both txt2img and img2img (upload a reference image for the AI to work from).
+| Backend | Auth | Notes |
+|---------|------|-------|
+| **SD WebUI / Forge** | URL | Local Stable Diffusion WebUI or Forge server (`--api` flag required) |
+| **ComfyUI** | URL | Local ComfyUI node-graph server — builds a default txt2img workflow automatically |
+| **DALL-E (OpenAI)** | API Key | Models: dall-e-3, dall-e-2 |
+| **Stability AI** | API Key | Stability AI REST API |
+| **Pollinations (Free)** | None | Free, no authentication or server required |
+| **HuggingFace** | API Key | HF Inference API — configurable model ID (default: SDXL) |
 
-If you're using KoboldCpp on the same machine, PocketTavern automatically unloads the language model from VRAM before starting image generation, then reloads it afterwards — so you don't need a second GPU.
+### Generation from Chat
+
+Long-press any message in chat to open the image generation dialog:
+
+- **Background mode** — Generates scene/environment images (landscape orientation)
+- **Character mode** — Generates character portraits (portrait orientation)
+- **LLM-assisted prompting** — Your connected LLM automatically generates an image prompt from the message context
+- **Editable prompt** — Review and edit the generated prompt before sending it to the image backend
+- **Per-character img2img toggle** — In Character mode, optionally use the character's avatar as an img2img reference. This is a per-character setting that persists across sessions — useful for disabling when an avatar doesn't contain a face
+- **Save to gallery** — Save generated images to Photos/Pictures/PocketTavern
+- **Set as background** — Apply a generated image as the character's chat background
+
+### Avatar Generation
+
+Generate avatars directly in the Create Character and Edit Character screens. Supports both txt2img and img2img (upload a reference image for the AI to work from).
+
+If you're using KoboldCpp on the same machine as SD WebUI, PocketTavern automatically unloads the language model from VRAM before starting image generation, then reloads it afterwards — so you don't need a second GPU.
+
+### Settings
+
+Configure your preferred backend under **Settings → Image Generation**:
+
+- Backend selector — switch between all six backends
+- URL / API Key fields (shown only when the active backend requires them)
+- Sampler and model selection (fetched dynamically from SD WebUI and ComfyUI)
+- Steps, CFG Scale, and Seed controls
+- Resolution presets: Portrait 512x768, Landscape 768x512, Square 512x512, HD Portrait 768x1024, HD Landscape 1024x768, HD Square 1024x1024
+- Negative prompt editor
+- CLIP Skip (SD WebUI / Forge only)
+- Test Connection and Fetch Options buttons
 
 </details>
 
@@ -561,12 +662,13 @@ The following SillyTavern fields exist in `.json` exports but are not applicable
 
 ### Included Themes
 
-PocketTavern ships with four built-in themes, each with animated particle effects on the main screen:
+PocketTavern ships with five built-in themes, each with animated particle effects on the main screen:
 
 - **PocketTavern** (default) — Fire & Ice (hardcoded)
 - **Fire & Ice** — The default theme exported as an editable JSON (same look, fully customizable)
 - **Midnight Plum** — Purple stars rising + slow-falling diamonds
 - **Ember** — Warm embers with bright spark accents
+- **Sand and Sea** — Warm sandy tones with ocean-blue accents
 
 ### Particle Effects
 
@@ -748,16 +850,23 @@ A second example with rounded-square avatars, a warm amber accent, and ember par
 <details>
 <summary><b>SillyTavern Import (Migration)</b></summary>
 
-Already have characters and chats on a SillyTavern server? Migrate everything to PocketTavern in one step:
+Already have characters and chats in SillyTavern? Migrate everything to PocketTavern:
 
+### From Server
 1. Go to **Settings → Import from SillyTavern**
 2. Enter your SillyTavern server URL and credentials
 3. Select what to import: characters, chats, lorebooks
 4. Tap **Import** — everything is pulled down and saved locally
 
+### From Folder
+1. Copy your SillyTavern data directory to your Android device
+2. Go to **Settings → Import from SillyTavern** and choose **Import from Folder**
+3. Use the folder picker to select the data directory
+4. Characters, chats, and lorebooks are scanned and imported
+
 After import, PocketTavern works completely independently. Your SillyTavern server is no longer needed.
 
-Alternatively, you can import a folder of `.png` character cards directly via the file picker — no server required.
+You can also import individual `.png` character cards at any time via the character list import button.
 
 </details>
 

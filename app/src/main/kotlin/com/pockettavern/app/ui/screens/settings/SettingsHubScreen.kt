@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.StickyNote2
 import androidx.compose.material.icons.filled.*
@@ -184,9 +185,9 @@ fun SettingsHubScreen(
                 requiresConnection = false
             ),
             SettingsItem(
-                title = "Setup Guide",
-                subtitle = "Help with setup and troubleshooting",
-                icon = Icons.Default.Help,
+                title = "Help",
+                subtitle = "Guide, controls, and troubleshooting",
+                icon = Icons.AutoMirrored.Filled.Help,
                 onClick = onNavigateToSetupGuide,
                 requiresConnection = false
             )
