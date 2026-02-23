@@ -94,6 +94,14 @@ class ImageGenSettingsViewModel @Inject constructor(
         updateConfig { it.copy(huggingfaceModel = model) }
     }
 
+    fun updatePollinationsApiKey(key: String) {
+        updateConfig { it.copy(pollinationsApiKey = key) }
+    }
+
+    fun updatePollinationsModel(model: String) {
+        updateConfig { it.copy(pollinationsModel = model) }
+    }
+
     fun updateSampler(sampler: String) {
         updateConfig { it.copy(sampler = sampler) }
     }

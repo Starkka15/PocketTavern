@@ -16,7 +16,7 @@ enum class ImageGenBackendType {
             COMFYUI -> "ComfyUI"
             DALLE -> "DALL-E (OpenAI)"
             STABILITY -> "Stability AI"
-            POLLINATIONS -> "Pollinations (Free)"
+            POLLINATIONS -> "Pollinations"
             HUGGINGFACE -> "HuggingFace"
         }
 }
@@ -46,6 +46,8 @@ data class ImageGenConfig(
     val dalleApiKey: String = "",
     val dalleModel: String = "dall-e-3",
     val stabilityApiKey: String = "",
+    val pollinationsApiKey: String = "",
+    val pollinationsModel: String = "flux",
     val huggingfaceApiKey: String = "",
     val huggingfaceModel: String = "stabilityai/stable-diffusion-xl-base-1.0",
     val sampler: String = "Euler",

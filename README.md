@@ -541,7 +541,7 @@ PocketTavern supports multiple image generation backends — generate character 
 | **ComfyUI** | URL | Local ComfyUI node-graph server — builds a default txt2img workflow automatically |
 | **DALL-E (OpenAI)** | API Key | Models: dall-e-3, dall-e-2 |
 | **Stability AI** | API Key | Stability AI REST API |
-| **Pollinations (Free)** | None | Free, no authentication or server required |
+| **Pollinations** | API Key | Pollen credits (pay-as-you-go) — models: flux, flux-realism, flux-anime, flux-3d, turbo |
 | **HuggingFace** | API Key | HF Inference API — configurable model ID (default: SDXL) |
 
 ### Generation from Chat

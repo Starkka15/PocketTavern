@@ -261,7 +261,7 @@ Go to **Settings → Connection Profiles** to save multiple API configurations a
 | **ComfyUI** | URL | Local ComfyUI node-graph server |
 | **DALL-E (OpenAI)** | API Key | Models: dall-e-3, dall-e-2 |
 | **Stability AI** | API Key | Stability AI REST API |
-| **Pollinations (Free)** | None | Free, no authentication or server required |
+| **Pollinations** | API Key | Pollen credits (pay-as-you-go) — models: flux, flux-realism, flux-anime, flux-3d, turbo |
 | **HuggingFace** | API Key | HF Inference API — configurable model ID |
 
 ### Generating from Chat
@@ -679,7 +679,7 @@ Long-press a message → Generate Image. Choose Background or Character mode. Th
 <details>
 <summary><b>Do I need to pay for image generation?</b></summary>
 
-**Pollinations** is completely free with no API key required. SD WebUI / Forge and ComfyUI are free but require running a local server. DALL-E, Stability AI, and HuggingFace require paid API keys.
+SD WebUI / Forge and ComfyUI are free but require running a local server. Pollinations, DALL-E, Stability AI, and HuggingFace require paid API keys. Pollinations uses a pay-as-you-go "Pollen credits" system — get a key at pollinations.ai.
 </details>
 
 <details>

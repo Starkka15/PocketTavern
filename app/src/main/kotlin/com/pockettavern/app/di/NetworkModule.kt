@@ -114,7 +114,7 @@ object NetworkModule {
             ImageGenBackendType.COMFYUI to ComfyUiBackend(forgeClient, settingsDataStore),
             ImageGenBackendType.DALLE to DalleBackend(forgeClient, settingsDataStore),
             ImageGenBackendType.STABILITY to StabilityBackend(forgeClient, settingsDataStore),
-            ImageGenBackendType.POLLINATIONS to PollinationsBackend(forgeClient),
+            ImageGenBackendType.POLLINATIONS to PollinationsBackend(forgeClient, settingsDataStore),
             ImageGenBackendType.HUGGINGFACE to HuggingFaceBackend(forgeClient, settingsDataStore)
         )
     }

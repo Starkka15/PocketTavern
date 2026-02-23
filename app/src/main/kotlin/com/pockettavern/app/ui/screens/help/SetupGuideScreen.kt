@@ -237,7 +237,7 @@ fun SetupGuideScreen(
                 BulletItem("OpenAI, Anthropic (Claude), Google AI Studio (Gemini)")
                 BulletItem("DeepSeek, Mistral AI, Groq, Cohere, Perplexity")
                 BulletItem("OpenRouter, xAI (Grok), Fireworks, AI21, Vertex AI, Azure OpenAI")
-                BulletItem("Pollinations (free), and many more")
+                BulletItem("Pollinations, and many more")
                 BulletItem("Custom — any OpenAI-compatible endpoint via custom URL")
 
                 VerticalSpacer()
@@ -252,7 +252,7 @@ fun SetupGuideScreen(
                 BulletItem("ComfyUI — Local node-graph server. Enter URL in settings.")
                 BulletItem("DALL-E (OpenAI) — Cloud API. Enter API key. Supports dall-e-2 and dall-e-3.")
                 BulletItem("Stability AI — Cloud API. Enter API key.")
-                BulletItem("Pollinations (Free) — No authentication or server required.")
+                BulletItem("Pollinations — Pay-as-you-go Pollen credits. Enter API key. Models: flux, flux-realism, flux-anime, flux-3d, turbo.")
                 BulletItem("HuggingFace — Cloud API. Enter API key and model ID.")
 
                 VerticalSpacer()
@@ -587,7 +587,7 @@ fun SetupGuideScreen(
                 )
                 FaqItem(
                     question = "Do I need to pay for image generation?",
-                    answer = "Pollinations is completely free with no API key required. SD WebUI / Forge and ComfyUI are free but require running a local server. DALL-E, Stability AI, and HuggingFace require paid API keys."
+                    answer = "SD WebUI / Forge and ComfyUI are free but require running a local server. Pollinations, DALL-E, Stability AI, and HuggingFace require paid API keys. Pollinations uses a pay-as-you-go \"Pollen credits\" system — get a key at pollinations.ai."
                 )
                 FaqItem(
                     question = "What are swipes?",

@@ -226,11 +226,57 @@ fun ImageGenSettingsScreen(
                                 )
                             }
                             ImageGenBackendType.POLLINATIONS -> {
-                                Text(
-                                    "Pollinations is a free service — no API key or URL required.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                OutlinedTextField(
+                                    value = config.pollinationsApiKey,
+                                    onValueChange = { viewModel.updatePollinationsApiKey(it) },
+                                    label = { Text("Pollinations API Key") },
+                                    placeholder = { Text("pollen-...") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    visualTransformation = PasswordVisualTransformation(),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                                    colors = imageGenTextFieldColors()
                                 )
+                                Text(
+                                    "Get a key at pollinations.ai — required for image generation.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                var pollinationsExpanded by remember { mutableStateOf(false) }
+                                val pollinationsModels = listOf("flux", "flux-realism", "flux-anime", "flux-3d", "flux-cablyai", "turbo")
+                                ExposedDropdownMenuBox(
+                                    expanded = pollinationsExpanded,
+                                    onExpandedChange = { pollinationsExpanded = it }
+                                ) {
+                                    OutlinedTextField(
+                                        value = config.pollinationsModel.ifBlank { "flux" },
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        label = { Text("Model") },
+                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(pollinationsExpanded) },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                        colors = imageGenTextFieldColors()
+                                    )
+                                    ExposedDropdownMenu(
+                                        expanded = pollinationsExpanded,
+                                        onDismissRequest = { pollinationsExpanded = false }
+                                    ) {
+                                        pollinationsModels.forEach { model ->
+                                            DropdownMenuItem(
+                                                text = { Text(model) },
+                                                onClick = {
+                                                    viewModel.updatePollinationsModel(model)
+                                                    pollinationsExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
 
