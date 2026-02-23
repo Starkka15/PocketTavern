@@ -107,6 +107,8 @@ data class ChatUiState(
     val isGeneratingImagePrompt: Boolean = false,
     // Base64-encoded character avatar for img2img (loaded when Character mode selected)
     val characterAvatarBase64: String? = null,
+    // Whether to use avatar as img2img source (per-character, persisted in Room)
+    val useAvatarForImageGen: Boolean = true,
     // TTS
     val isTtsSpeaking: Boolean = false,
     val isTtsEnabled: Boolean = false
@@ -127,7 +129,8 @@ class ChatViewModel @Inject constructor(
     private val backgroundRepository: BackgroundRepository,
     private val extensionManager: ExtensionManager,
     private val ttsManager: TtsManager,
-    private val settingsDataStore: SettingsDataStore
+    private val settingsDataStore: SettingsDataStore,
+    private val characterDao: com.pockettavern.app.data.local.db.dao.CharacterDao
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -843,20 +846,37 @@ class ChatViewModel @Inject constructor(
     // ========== Image Generation ==========
 
     fun showImageGenerationDialog(messageIndex: Int) {
-        _uiState.update {
-            it.copy(
-                showMessageActions = false,
-                showImageGenDialog = true,
-                selectedMessageIndex = messageIndex,
-                imageGenState = GenerationState.Idle,
-                generatedImageBase64 = null
-            )
+        viewModelScope.launch {
+            // Load per-character img2img preference from Room
+            val character = _uiState.value.character
+            val fileName = character?.avatar ?: "${character?.name}.png"
+            val useAvatar = characterDao.getUseAvatarForImageGen(fileName) ?: true
+
+            _uiState.update {
+                it.copy(
+                    showMessageActions = false,
+                    showImageGenDialog = true,
+                    selectedMessageIndex = messageIndex,
+                    imageGenState = GenerationState.Idle,
+                    generatedImageBase64 = null,
+                    useAvatarForImageGen = useAvatar
+                )
+            }
         }
     }
 
     fun selectImageGenType(type: ImageGenType) {
         _uiState.update { it.copy(imageGenType = type) }
         generatePromptPreview(type)
+    }
+
+    fun toggleUseAvatarForImageGen(useAvatar: Boolean) {
+        _uiState.update { it.copy(useAvatarForImageGen = useAvatar) }
+        viewModelScope.launch {
+            val character = _uiState.value.character ?: return@launch
+            val fileName = character.avatar ?: "${character.name}.png"
+            characterDao.setUseAvatarForImageGen(fileName, useAvatar)
+        }
     }
 
     private fun generatePromptPreview(type: ImageGenType) {
@@ -1032,7 +1052,8 @@ class ChatViewModel @Inject constructor(
         if (prompt.isBlank()) return
 
         val isCharacter = _uiState.value.imageGenType == ImageGenType.CHARACTER
-        val avatarBase64 = if (isCharacter) _uiState.value.characterAvatarBase64 else null
+        val useAvatar = _uiState.value.useAvatarForImageGen
+        val avatarBase64 = if (isCharacter && useAvatar) _uiState.value.characterAvatarBase64 else null
 
         viewModelScope.launch {
             _uiState.update { it.copy(imageGenState = GenerationState.Starting) }

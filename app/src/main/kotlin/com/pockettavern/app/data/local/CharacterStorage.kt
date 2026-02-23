@@ -82,7 +82,8 @@ class CharacterStorage @Inject constructor(
                 name = character.name,
                 tags = character.tags.joinToString(","),
                 isFavorite = character.isFavorite,
-                hasCharacterBook = character.hasCharacterBook
+                hasCharacterBook = character.hasCharacterBook,
+                useAvatarForImageGen = character.useAvatarForImageGen
             )
         )
 

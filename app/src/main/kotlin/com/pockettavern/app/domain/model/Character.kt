@@ -26,5 +26,7 @@ data class Character(
     // Talkativeness (for group chats)
     val talkativeness: Float = 0.5f,
     // Favorite flag
-    val isFavorite: Boolean = false
+    val isFavorite: Boolean = false,
+    // Image generation: use avatar as img2img source
+    val useAvatarForImageGen: Boolean = true
 )

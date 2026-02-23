@@ -11,5 +11,6 @@ data class CharacterEntity(
     val tags: String = "",      // Comma-separated
     val isFavorite: Boolean = false,
     val lastChatDate: Long = 0, // Epoch millis of most recent chat
-    val hasCharacterBook: Boolean = false
+    val hasCharacterBook: Boolean = false,
+    val useAvatarForImageGen: Boolean = true
 )

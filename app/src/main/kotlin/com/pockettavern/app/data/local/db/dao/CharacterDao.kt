@@ -33,6 +33,12 @@ interface CharacterDao {
     @Query("UPDATE characters SET lastChatDate = :date WHERE fileName = :fileName")
     suspend fun updateLastChatDate(fileName: String, date: Long)
 
+    @Query("UPDATE characters SET useAvatarForImageGen = :useAvatar WHERE fileName = :fileName")
+    suspend fun setUseAvatarForImageGen(fileName: String, useAvatar: Boolean)
+
+    @Query("SELECT useAvatarForImageGen FROM characters WHERE fileName = :fileName")
+    suspend fun getUseAvatarForImageGen(fileName: String): Boolean?
+
     @Query("DELETE FROM characters")
     suspend fun deleteAll()
 }

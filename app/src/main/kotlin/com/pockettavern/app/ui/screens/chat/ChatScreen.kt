@@ -567,7 +567,9 @@ fun ChatScreen(
             generatedImageBase64 = uiState.generatedImageBase64,
             imageSaved = uiState.imageSaved,
             backgroundSetSuccess = uiState.backgroundSetSuccess,
+            useAvatarForImageGen = uiState.useAvatarForImageGen,
             onSelectType = { viewModel.selectImageGenType(it) },
+            onToggleUseAvatar = { viewModel.toggleUseAvatarForImageGen(it) },
             onUpdatePrompt = { viewModel.updateImagePrompt(it) },
             onGenerate = { viewModel.startImageGeneration() },
             onCancel = { viewModel.cancelImageGeneration() },
@@ -784,7 +786,9 @@ private fun ImageGenerationDialog(
     generatedImageBase64: String?,
     imageSaved: Boolean,
     backgroundSetSuccess: Boolean,
+    useAvatarForImageGen: Boolean,
     onSelectType: (ImageGenType) -> Unit,
+    onToggleUseAvatar: (Boolean) -> Unit,
     onUpdatePrompt: (String) -> Unit,
     onGenerate: () -> Unit,
     onCancel: () -> Unit,
@@ -821,6 +825,32 @@ private fun ImageGenerationDialog(
                         label = { Text("Character") },
                         enabled = !isGenerating
                     )
+                }
+
+                // Avatar reference toggle (only for Character mode)
+                if (imageGenType == ImageGenType.CHARACTER) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Use avatar as reference",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                if (useAvatarForImageGen) "img2img from avatar" else "Generate from prompt only",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = useAvatarForImageGen,
+                            onCheckedChange = onToggleUseAvatar,
+                            enabled = !isGenerating
+                        )
+                    }
                 }
 
                 // Prompt preview/editor
