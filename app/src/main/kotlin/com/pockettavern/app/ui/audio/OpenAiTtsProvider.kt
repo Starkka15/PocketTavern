@@ -115,13 +115,25 @@ class OpenAiTtsProvider(
     }
 
     private fun fetchVoicesFromServer(): List<TtsVoice> {
-        val url = "${apiUrl.trimEnd('/')}/v1/audio/voices"
-        val request = Request.Builder().url(url)
-            .apply { if (apiKey.isNotBlank()) addHeader("Authorization", "Bearer $apiKey") }
-            .build()
-        val response = okHttpClient.newCall(request).execute()
-        if (!response.isSuccessful) return emptyList()
-        val body = response.body?.string() ?: return emptyList()
+        val baseUrl = apiUrl.trimEnd('/')
+        // Try standard OpenAI-compatible path first, then fallback
+        val paths = listOf("/v1/audio/voices", "/v1/voices")
+        var body: String? = null
+        for (path in paths) {
+            val request = Request.Builder().url("$baseUrl$path")
+                .apply { if (apiKey.isNotBlank()) addHeader("Authorization", "Bearer $apiKey") }
+                .build()
+            try {
+                val response = okHttpClient.newCall(request).execute()
+                if (response.isSuccessful) {
+                    body = response.body?.string()
+                    if (!body.isNullOrBlank()) break
+                }
+            } catch (e: Exception) {
+                DebugLogger.log("[OpenAiTTS] Failed to fetch from $path: ${e.message}")
+            }
+        }
+        if (body.isNullOrBlank()) return emptyList()
 
         // Parse response — handles {"voices": ["name1", "name2"]} format (Kokoro)
         // and {"voices": [{"id": "...", "name": "..."}]} format

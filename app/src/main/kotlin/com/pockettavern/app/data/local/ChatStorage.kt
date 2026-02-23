@@ -253,10 +253,14 @@ class ChatStorage @Inject constructor(
         }
         if (message.extensionHeaders.isNotEmpty()) {
             val headersArray = message.extensionHeaders.map { entry ->
-                JsonObject(mapOf(
+                val fields = mutableMapOf<String, JsonElement>(
                     "text" to JsonPrimitive(entry.text),
                     "ext" to JsonPrimitive(entry.extensionId)
-                ))
+                )
+                if (entry.collapsibleText.isNotBlank()) {
+                    fields["collapsible"] = JsonPrimitive(entry.collapsibleText)
+                }
+                JsonObject(fields)
             }
             map["extension_headers"] = kotlinx.serialization.json.JsonArray(headersArray)
         }
@@ -289,7 +293,8 @@ class ChatStorage @Inject constructor(
                     val obj = elem.jsonObject
                     val text = obj["text"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
                     val ext = obj["ext"]?.jsonPrimitive?.contentOrNull ?: ""
-                    MessageHeaderEntry(text = text, extensionId = ext)
+                    val collapsible = obj["collapsible"]?.jsonPrimitive?.contentOrNull ?: ""
+                    MessageHeaderEntry(text = text, extensionId = ext, collapsibleText = collapsible)
                 } catch (e: Exception) { null }
             }
         }

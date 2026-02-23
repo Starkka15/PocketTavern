@@ -5,7 +5,8 @@ import java.util.UUID
 
 data class MessageHeaderEntry(
     val text: String,
-    val extensionId: String
+    val extensionId: String,
+    val collapsibleText: String = ""
 )
 
 data class ChatMessage(

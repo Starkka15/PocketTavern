@@ -290,18 +290,20 @@ class JsExtensionHost @Inject constructor(
         // ── New APIs ──────────────────────────────────────────────────────────
 
         /**
-         * Called by PT.setMessageHeader(index, text, extensionId).
+         * Called by PT.setMessageHeader(index, text, extensionId, collapsibleText).
          * Each extension gets its own header entry per message.
          * Pass empty text to remove this extension's header at that index.
+         * collapsibleText is optional — shown/hidden on tap in the header UI.
          */
         @JavascriptInterface
-        fun setMessageHeader(messageIndex: Int, text: String, extensionId: String) {
+        @JvmOverloads
+        fun setMessageHeader(messageIndex: Int, text: String, extensionId: String, collapsibleText: String = "") {
             _messageHeaders.update { current ->
                 val list = current[messageIndex]?.toMutableList() ?: mutableListOf()
                 // Remove any existing entry for this extension
                 list.removeAll { entry -> entry.extensionId == extensionId }
                 if (text.isNotBlank()) {
-                    list.add(MessageHeaderEntry(text = text, extensionId = extensionId))
+                    list.add(MessageHeaderEntry(text = text, extensionId = extensionId, collapsibleText = collapsibleText))
                 }
                 val updated = current.toMutableMap()
                 if (list.isEmpty()) updated.remove(messageIndex) else updated[messageIndex] = list.toList()
@@ -335,6 +337,9 @@ class JsExtensionHost @Inject constructor(
                 val obj = org.json.JSONObject()
                 obj.put("text", entry.text)
                 obj.put("extensionId", entry.extensionId)
+                if (entry.collapsibleText.isNotBlank()) {
+                    obj.put("collapsibleText", entry.collapsibleText)
+                }
                 arr.put(obj)
             }
             return arr.toString()

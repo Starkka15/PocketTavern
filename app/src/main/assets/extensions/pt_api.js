@@ -222,19 +222,17 @@
          *
          * The message index is provided in MESSAGE_RECEIVED event data as data.index.
          *
-         * @param {number} messageIndex  Index of the message to attach the header to.
-         * @param {string} text          Text to display in the header box.
-         * @param {string} [extensionId] Your extension's id (used for long-press ownership).
+         * @param {number} messageIndex      Index of the message to attach the header to.
+         * @param {string} text              Text to display in the header box (always visible).
+         * @param {string} [extensionId]     Your extension's id (used for long-press ownership).
+         * @param {string} [collapsibleText] Optional text shown/hidden when user taps the header.
          *
          * @example
-         *   PT.eventSource.on(PT.events.MESSAGE_RECEIVED, function(data) {
-         *       var thinking = data.text.match(/<thinking>([\s\S]*?)<\/thinking>/);
-         *       if (thinking) PT.setMessageHeader(data.index, '🤔 ' + thinking[1].trim(), 'my-ext');
-         *   });
+         *   PT.setMessageHeader(data.index, 'Time: 10:00 AM', 'my-ext', 'Alice\n  Outfit: Blue dress');
          */
-        setMessageHeader: function (messageIndex, text, extensionId) {
+        setMessageHeader: function (messageIndex, text, extensionId, collapsibleText) {
             if (window.PtBridge) {
-                PtBridge.setMessageHeader(messageIndex, text || '', extensionId || '');
+                PtBridge.setMessageHeader(messageIndex, text || '', extensionId || '', collapsibleText || '');
             }
         },
 
@@ -270,7 +268,7 @@
          * @example
          *   var headers = PT.getMessageHeaders(3);
          *   var myHeader = headers.find(function(h) { return h.extensionId === 'my-ext'; });
-         *   if (myHeader) console.log('Header text:', myHeader.text);
+         *   if (myHeader) console.log('Header text:', myHeader.text, 'Collapsible:', myHeader.collapsibleText);
          */
         getMessageHeaders: function (messageIndex) {
             if (!window.PtBridge) return [];

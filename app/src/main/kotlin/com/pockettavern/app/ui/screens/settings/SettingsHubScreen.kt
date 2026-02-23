@@ -3,6 +3,7 @@ package com.pockettavern.app.ui.screens.settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -64,15 +65,9 @@ fun SettingsHubScreen(
         viewModel.refresh()
     }
 
-    val settingsItems = remember(isConnected, currentPersonaName, usesChatCompletions, onNavigateToOaiPresets, onNavigateToExtensions, onNavigateToConnectionProfiles, onNavigateToTheme, onNavigateToTtsSettings) {
+    // ── Connection ────────────────────────────────────────────────
+    val connectionItems = remember(onNavigateToApiConfig, onNavigateToConnectionProfiles, onNavigateToConnection) {
         listOf(
-            SettingsItem(
-                title = "Stable Diffusion Forge",
-                subtitle = "Image generation server URL",
-                icon = Icons.Default.Wifi,
-                onClick = onNavigateToConnection,
-                requiresConnection = false
-            ),
             SettingsItem(
                 title = "API Configuration",
                 subtitle = "Select API type and model",
@@ -86,6 +81,19 @@ fun SettingsHubScreen(
                 onClick = onNavigateToConnectionProfiles,
                 requiresConnection = false
             ),
+            SettingsItem(
+                title = "Stable Diffusion Forge",
+                subtitle = "Image generation server URL",
+                icon = Icons.Default.Wifi,
+                onClick = onNavigateToConnection,
+                requiresConnection = false
+            )
+        )
+    }
+
+    // ── Generation ─────────────────────────────────────────────────
+    val generationItems = remember(onNavigateToTextGen, onNavigateToOaiPresets, onNavigateToFormatting) {
+        listOf(
             SettingsItem(
                 title = "Text Generation",
                 subtitle = "Sampler settings and presets (KoboldCpp / local)",
@@ -109,7 +117,13 @@ fun SettingsHubScreen(
                 onClick = onNavigateToFormatting,
                 requiresConnection = false,
                 mode = SettingsMode.TEXT_GEN
-            ),
+            )
+        )
+    }
+
+    // ── World & Characters ─────────────────────────────────────────
+    val worldItems = remember(currentPersonaName, onNavigateToWorldInfo, onNavigateToContextSettings, onNavigateToPersonas) {
+        listOf(
             SettingsItem(
                 title = "World Info / Lorebooks",
                 subtitle = "View and manage lorebook entries",
@@ -127,14 +141,33 @@ fun SettingsHubScreen(
                 subtitle = currentPersonaName?.let { "Current: $it" } ?: "Manage user personas and avatars",
                 icon = Icons.Default.Person,
                 onClick = onNavigateToPersonas
-            ),
+            )
+        )
+    }
+
+    // ── Appearance & Audio ─────────────────────────────────────────
+    val appearanceItems = remember(onNavigateToTheme, onNavigateToTtsSettings) {
+        listOf(
             SettingsItem(
-                title = "Setup Guide",
-                subtitle = "Help with setup and troubleshooting",
-                icon = Icons.Default.Help,
-                onClick = onNavigateToSetupGuide,
+                title = "Appearance",
+                subtitle = "Import and apply SillyTavern themes",
+                icon = Icons.Default.Palette,
+                onClick = onNavigateToTheme,
                 requiresConnection = false
             ),
+            SettingsItem(
+                title = "Text-to-Speech",
+                subtitle = "Voice synthesis for chat messages",
+                icon = Icons.Default.RecordVoiceOver,
+                onClick = onNavigateToTtsSettings,
+                requiresConnection = false
+            )
+        )
+    }
+
+    // ── Utilities ──────────────────────────────────────────────────
+    val utilityItems = remember(onNavigateToExtensions, onNavigateToStImport, onNavigateToSetupGuide) {
+        listOf(
             SettingsItem(
                 title = "Extensions",
                 subtitle = "Quick reply, regex rules, token counter and more",
@@ -150,17 +183,10 @@ fun SettingsHubScreen(
                 requiresConnection = false
             ),
             SettingsItem(
-                title = "Appearance",
-                subtitle = "Import and apply SillyTavern themes",
-                icon = Icons.Default.Palette,
-                onClick = onNavigateToTheme,
-                requiresConnection = false
-            ),
-            SettingsItem(
-                title = "Text-to-Speech",
-                subtitle = "Voice synthesis for chat messages",
-                icon = Icons.Default.RecordVoiceOver,
-                onClick = onNavigateToTtsSettings,
+                title = "Setup Guide",
+                subtitle = "Help with setup and troubleshooting",
+                icon = Icons.Default.Help,
+                onClick = onNavigateToSetupGuide,
                 requiresConnection = false
             )
         )
@@ -187,19 +213,11 @@ fun SettingsHubScreen(
                 .padding(padding),
             contentPadding = PaddingValues(vertical = 8.dp)
         ) {
-            items(settingsItems) { item ->
-                val enabled = !item.requiresConnection || isConnected
-                val modeActive = when (item.mode) {
-                    SettingsMode.CHAT_COMPLETION -> usesChatCompletions
-                    SettingsMode.TEXT_GEN -> !usesChatCompletions
-                    null -> true
-                }
-                SettingsListItem(
-                    item = item,
-                    enabled = enabled,
-                    modeActive = modeActive
-                )
-            }
+            settingsSection("Connection", connectionItems, isConnected, usesChatCompletions, isFirst = true)
+            settingsSection("Generation", generationItems, isConnected, usesChatCompletions)
+            settingsSection("World & Characters", worldItems, isConnected, usesChatCompletions)
+            settingsSection("Appearance & Audio", appearanceItems, isConnected, usesChatCompletions)
+            settingsSection("Utilities", utilityItems, isConnected, usesChatCompletions)
 
             // Connection status footer
             item {
@@ -296,5 +314,36 @@ private fun SettingsListItem(
     HorizontalDivider(
         modifier = Modifier.padding(start = 72.dp),
         color = MaterialTheme.colorScheme.surfaceVariant
+    )
+}
+
+private fun LazyListScope.settingsSection(
+    title: String,
+    items: List<SettingsItem>,
+    isConnected: Boolean,
+    usesChatCompletions: Boolean,
+    isFirst: Boolean = false
+) {
+    item(key = "header_$title") {
+        SectionHeader(text = title, isFirst = isFirst)
+    }
+    items(items, key = { it.title }) { item ->
+        val enabled = !item.requiresConnection || isConnected
+        val modeActive = when (item.mode) {
+            SettingsMode.CHAT_COMPLETION -> usesChatCompletions
+            SettingsMode.TEXT_GEN -> !usesChatCompletions
+            null -> true
+        }
+        SettingsListItem(item = item, enabled = enabled, modeActive = modeActive)
+    }
+}
+
+@Composable
+private fun SectionHeader(text: String, isFirst: Boolean = false) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 16.dp, top = if (isFirst) 8.dp else 24.dp, bottom = 8.dp)
     )
 }

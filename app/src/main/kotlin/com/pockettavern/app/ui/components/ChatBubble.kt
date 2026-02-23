@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.AnimatedVisibility
 import com.pockettavern.app.domain.model.ChatMessage
 import com.pockettavern.app.domain.model.MessageHeaderEntry
 import com.pockettavern.app.extensions.JsExtensionHost
@@ -84,6 +85,8 @@ fun ChatBubble(
                 val buttonsVisible = extId in visibleButtonExtensions
                 val menuItems = headerMenus[extId]
                 var menuExpanded by remember { mutableStateOf(false) }
+                var collapsibleExpanded by remember { mutableStateOf(false) }
+                val hasCollapsible = entry.collapsibleText.isNotBlank()
 
                 Box {
                     Surface(
@@ -93,7 +96,9 @@ fun ChatBubble(
                             .then(
                                 if (onHeaderLongPress != null) {
                                     Modifier.combinedClickable(
-                                        onClick = { },
+                                        onClick = {
+                                            if (hasCollapsible) collapsibleExpanded = !collapsibleExpanded
+                                        },
                                         onLongClick = {
                                             // If menu registered (and no inline buttons), show popup
                                             if (inlineButtons.isNullOrEmpty() && !menuItems.isNullOrEmpty()) {
@@ -101,6 +106,11 @@ fun ChatBubble(
                                             }
                                             onHeaderLongPress(extId)
                                         }
+                                    )
+                                } else if (hasCollapsible) {
+                                    Modifier.combinedClickable(
+                                        onClick = { collapsibleExpanded = !collapsibleExpanded },
+                                        onLongClick = { }
                                     )
                                 } else Modifier
                             ),
@@ -113,6 +123,37 @@ fun ChatBubble(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            // Collapsible section (tap header to toggle)
+                            if (hasCollapsible) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = if (collapsibleExpanded) "▾" else "▸",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    // Count lines to show character count
+                                    val sectionCount = entry.collapsibleText.split("\n\n").size
+                                    Text(
+                                        text = "Characters ($sectionCount)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                AnimatedVisibility(visible = collapsibleExpanded) {
+                                    Column {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = entry.collapsibleText,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
                             // Inline buttons (toggled by long-press)
                             if (buttonsVisible && !inlineButtons.isNullOrEmpty()) {
                                 Spacer(modifier = Modifier.height(6.dp))
