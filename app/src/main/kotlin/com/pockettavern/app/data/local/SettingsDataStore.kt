@@ -10,7 +10,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.datastore.preferences.core.floatPreferencesKey
 import com.pockettavern.app.domain.model.ApiConfiguration
+import com.pockettavern.app.domain.model.ImageGenConfig
 import com.pockettavern.app.domain.model.TtsConfig
+import kotlinx.serialization.json.Json
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -84,6 +86,9 @@ class SettingsDataStore @Inject constructor(
         val GLOBAL_AUTHORS_NOTE_INTERVAL = intPreferencesKey("global_authors_note_interval")
         val GLOBAL_AUTHORS_NOTE_POSITION = intPreferencesKey("global_authors_note_position")
         val GLOBAL_AUTHORS_NOTE_ROLE = intPreferencesKey("global_authors_note_role")
+
+        // Image Generation
+        val IMAGE_GEN_CONFIG = stringPreferencesKey("image_gen_config")
     }
 
     // ── LLM Configuration ────────────────────────────────────────────────────
@@ -350,6 +355,37 @@ class SettingsDataStore @Inject constructor(
             prefs[Keys.TTS_OPENAI_MODEL] = config.openAiModel
             prefs[Keys.TTS_SPEED] = config.speed
             prefs[Keys.TTS_FILTER_MODE] = config.filterMode
+        }
+    }
+
+    // ── Image Generation ────────────────────────────────────────────────────
+
+    private val imageGenJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+
+    val imageGenConfigFlow: Flow<ImageGenConfig> = context.dataStore.data.map { prefs ->
+        val raw = prefs[Keys.IMAGE_GEN_CONFIG]
+        if (raw != null) {
+            try {
+                imageGenJson.decodeFromString<ImageGenConfig>(raw)
+            } catch (_: Exception) {
+                // Migrate old forge URL if present
+                val oldUrl = prefs[Keys.FORGE_URL] ?: ""
+                ImageGenConfig(sdWebuiUrl = oldUrl)
+            }
+        } else {
+            // Migrate old forge URL if present
+            val oldUrl = prefs[Keys.FORGE_URL] ?: ""
+            ImageGenConfig(sdWebuiUrl = oldUrl)
+        }
+    }
+
+    suspend fun getImageGenConfig(): ImageGenConfig = imageGenConfigFlow.first()
+
+    suspend fun saveImageGenConfig(config: ImageGenConfig) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.IMAGE_GEN_CONFIG] = imageGenJson.encodeToString(ImageGenConfig.serializer(), config)
+            // Keep forgeUrl in sync for backward compat
+            prefs[Keys.FORGE_URL] = config.sdWebuiUrl.trimEnd('/')
         }
     }
 

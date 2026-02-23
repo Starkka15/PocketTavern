@@ -53,6 +53,7 @@ fun SettingsHubScreen(
     onNavigateToConnectionProfiles: () -> Unit = {},
     onNavigateToTheme: () -> Unit = {},
     onNavigateToTtsSettings: () -> Unit = {},
+    onNavigateToImageGen: () -> Unit = {},
     viewModel: SettingsHubViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -66,7 +67,7 @@ fun SettingsHubScreen(
     }
 
     // ── Connection ────────────────────────────────────────────────
-    val connectionItems = remember(onNavigateToApiConfig, onNavigateToConnectionProfiles, onNavigateToConnection) {
+    val connectionItems = remember(onNavigateToApiConfig, onNavigateToConnectionProfiles, onNavigateToImageGen) {
         listOf(
             SettingsItem(
                 title = "API Configuration",
@@ -82,10 +83,10 @@ fun SettingsHubScreen(
                 requiresConnection = false
             ),
             SettingsItem(
-                title = "Stable Diffusion Forge",
-                subtitle = "Image generation server URL",
-                icon = Icons.Default.Wifi,
-                onClick = onNavigateToConnection,
+                title = "Image Generation",
+                subtitle = "Configure image generation backends",
+                icon = Icons.Default.Image,
+                onClick = onNavigateToImageGen,
                 requiresConnection = false
             )
         )

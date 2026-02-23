@@ -8,8 +8,11 @@ import com.pockettavern.app.data.remote.api.CharaVaultApi
 import com.pockettavern.app.data.remote.api.ForgeApi
 import com.pockettavern.app.data.remote.api.GitHubApi
 import com.pockettavern.app.data.repository.CharaVaultRepository
+import com.pockettavern.app.data.remote.imagegen.*
 import com.pockettavern.app.data.repository.ForgeRepository
+import com.pockettavern.app.data.repository.ImageGenRepository
 import com.pockettavern.app.data.repository.LlmRepository
+import com.pockettavern.app.domain.model.ImageGenBackendType
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -98,6 +101,30 @@ object NetworkModule {
     fun provideForgeRepository(
         apiProvider: @JvmSuppressWildcards () -> ForgeApi
     ): ForgeRepository = ForgeRepository(apiProvider)
+
+    @Provides
+    @Singleton
+    fun provideImageGenBackends(
+        apiProvider: @JvmSuppressWildcards () -> ForgeApi,
+        @Named("Forge") forgeClient: OkHttpClient,
+        settingsDataStore: SettingsDataStore
+    ): Map<ImageGenBackendType, @JvmSuppressWildcards ImageGenBackend> {
+        return mapOf(
+            ImageGenBackendType.SD_WEBUI to SdWebuiBackend(apiProvider),
+            ImageGenBackendType.COMFYUI to ComfyUiBackend(forgeClient, settingsDataStore),
+            ImageGenBackendType.DALLE to DalleBackend(forgeClient, settingsDataStore),
+            ImageGenBackendType.STABILITY to StabilityBackend(forgeClient, settingsDataStore),
+            ImageGenBackendType.POLLINATIONS to PollinationsBackend(forgeClient),
+            ImageGenBackendType.HUGGINGFACE to HuggingFaceBackend(forgeClient, settingsDataStore)
+        )
+    }
+
+    @Provides
+    @Singleton
+    fun provideImageGenRepository(
+        backends: Map<ImageGenBackendType, @JvmSuppressWildcards ImageGenBackend>,
+        settingsDataStore: SettingsDataStore
+    ): ImageGenRepository = ImageGenRepository(backends, settingsDataStore)
 
     // ── CharaVault ────────────────────────────────────────────────────────────
 

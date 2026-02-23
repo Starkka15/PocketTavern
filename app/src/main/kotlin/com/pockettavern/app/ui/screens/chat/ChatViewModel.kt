@@ -12,6 +12,7 @@ import androidx.lifecycle.viewModelScope
 import com.pockettavern.app.GenerationService
 import com.pockettavern.app.data.repository.BackgroundRepository
 import com.pockettavern.app.data.repository.ForgeRepository
+import com.pockettavern.app.data.repository.ImageGenRepository
 import com.pockettavern.app.data.repository.LocalRepository
 import com.pockettavern.app.data.repository.LlmRepository
 import com.pockettavern.app.extensions.ExtensionEvent
@@ -122,6 +123,7 @@ class ChatViewModel @Inject constructor(
     private val localRepository: LocalRepository,
     private val llmRepository: LlmRepository,
     private val forgeRepository: ForgeRepository,
+    private val imageGenRepository: ImageGenRepository,
     private val backgroundRepository: BackgroundRepository,
     private val extensionManager: ExtensionManager,
     private val ttsManager: TtsManager,
@@ -316,6 +318,9 @@ class ChatViewModel @Inject constructor(
     fun loadCharacter(avatarUrl: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
+            // Set persona name early so extensions see it before first generation
+            val personaName = settingsDataStore.getUserPersonaName()
+            if (personaName.isNotBlank()) _currentUserName = personaName
 
             when (val result = localRepository.getCharacter(avatarUrl)) {
                 is Result.Success -> {
@@ -1041,18 +1046,21 @@ class ChatViewModel @Inject constructor(
                 llmRepository.unloadModel(config)
             }
 
+            val imageGenConfig = settingsDataStore.getImageGenConfig()
             val params = ForgeGenerationParams(
                 prompt = prompt,
-                negativePrompt = "blurry, low quality, distorted, deformed, bad anatomy, worst quality, watermark, text",
-                width = if (isCharacter) 512 else 768,
-                height = if (isCharacter) 768 else 512,
-                steps = 20,
-                cfgScale = 7f,
+                negativePrompt = imageGenConfig.negativePrompt,
+                width = if (isCharacter) imageGenConfig.height.coerceAtMost(imageGenConfig.width) else imageGenConfig.width.coerceAtLeast(imageGenConfig.height),
+                height = if (isCharacter) imageGenConfig.width.coerceAtLeast(imageGenConfig.height) else imageGenConfig.height.coerceAtMost(imageGenConfig.width),
+                steps = imageGenConfig.steps,
+                cfgScale = imageGenConfig.cfgScale,
+                sampler = imageGenConfig.sampler,
+                seed = imageGenConfig.seed,
                 sourceImageBase64 = avatarBase64,
                 denoisingStrength = if (avatarBase64 != null) 0.7f else 1f
             )
 
-            forgeRepository.generateImageWithProgress(params).collect { state ->
+            imageGenRepository.generateImageWithProgress(params).collect { state ->
                 _uiState.update { it.copy(imageGenState = state) }
                 if (state is GenerationState.Complete) {
                     _uiState.update { it.copy(generatedImageBase64 = state.imageBase64) }
@@ -1063,7 +1071,7 @@ class ChatViewModel @Inject constructor(
 
     fun cancelImageGeneration() {
         viewModelScope.launch {
-            forgeRepository.interrupt()
+            imageGenRepository.interrupt()
             _uiState.update { it.copy(imageGenState = GenerationState.Idle) }
         }
     }

@@ -36,6 +36,7 @@ import com.pockettavern.app.ui.screens.extensions.regex.RegexSettingsScreen
 import com.pockettavern.app.ui.screens.connectionprofiles.ConnectionProfilesScreen
 import com.pockettavern.app.ui.screens.debug.DebugLogScreen
 import com.pockettavern.app.ui.screens.theme.ThemeScreen
+import com.pockettavern.app.ui.screens.settings.ImageGenSettingsScreen
 import com.pockettavern.app.ui.screens.settings.TtsSettingsScreen
 import com.pockettavern.app.ui.audio.ThemeAudioManager
 
@@ -123,7 +124,8 @@ fun SillyTavernNavGraph(
                 onNavigateToExtensions = { navController.navigate(Route.Extensions) },
                 onNavigateToConnectionProfiles = { navController.navigate(Route.ConnectionProfiles) },
                 onNavigateToTheme = { navController.navigate(Route.ThemeSettings) },
-                onNavigateToTtsSettings = { navController.navigate(Route.TtsSettings) }
+                onNavigateToTtsSettings = { navController.navigate(Route.TtsSettings) },
+                onNavigateToImageGen = { navController.navigate(Route.ImageGenSettings) }
             )
         }
 
@@ -286,6 +288,10 @@ fun SillyTavernNavGraph(
 
         composable<Route.TtsSettings> {
             TtsSettingsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable<Route.ImageGenSettings> {
+            ImageGenSettingsScreen(onBack = { navController.popBackStack() })
         }
 
         composable<Route.GroupChat> { backStackEntry ->

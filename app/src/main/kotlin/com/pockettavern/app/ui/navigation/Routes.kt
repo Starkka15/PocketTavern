@@ -93,4 +93,7 @@ sealed class Route {
 
     @Serializable
     data object TtsSettings : Route()
+
+    @Serializable
+    data object ImageGenSettings : Route()
 }
