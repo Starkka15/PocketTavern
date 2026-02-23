@@ -66,9 +66,11 @@ PocketTavern's chat screen is built around a natural, responsive conversation fl
 - **Alternative responses (swipes)** — Swipe left/right on any AI message, or use the `‹ 1/2 ›` arrows that appear below it. The `↺` button at the end of the list generates a fresh alternative. All alternatives are saved alongside the original so you can flip back and forth
 - **Edit messages** — Tap any message to edit it directly
 - **Delete messages** — Remove individual messages from history
+- **Delete From Here** — Long-press a message to delete it and everything after it in one action
 - **Continue** — Append to the last AI response without starting a new one
 - **Author's Note** — Inject custom text into the context at a configurable depth and frequency
 - **Character backgrounds** — Display per-character background images behind the chat
+- **Background generation** — Long-running generations continue in a foreground service so Android won't kill them
 
 ### Group Chat
 
@@ -78,6 +80,41 @@ Chat with multiple AI characters simultaneously:
 - Configure reply order (sequential, random, or activation-based)
 - Each character maintains its own persona, description, and world info
 - Narrator mode for injecting scene-setting messages
+
+</details>
+
+<details>
+<summary><b>Text-to-Speech (TTS)</b></summary>
+
+Have AI messages read aloud using either your device's built-in speech engine or any OpenAI-compatible TTS server.
+
+### Providers
+
+| Provider | How it works |
+|----------|-------------|
+| **System TTS** | Uses Android's built-in `TextToSpeech` engine — works offline with whatever voices your device has installed |
+| **OpenAI-Compatible** | Sends text to any server implementing `POST /v1/audio/speech` — works with OpenAI, Kokoro, AllTalk, XTTS, and others |
+
+### Configuration
+
+Go to **Settings -> Appearance & Audio -> Text-to-Speech**:
+
+- **Provider** — System or OpenAI-Compatible
+- **Auto-play** — Automatically speak new AI messages as they arrive
+- **Speed** — Playback rate from 0.5x to 2.0x
+- **Voice** — Select from available voices (fetched from server for OpenAI-compatible)
+- **Filter mode** — Control what gets spoken:
+  - *All text* — Speaks everything (markdown stripped)
+  - *Quotes only* — Only reads quoted dialogue (`"like this"`)
+  - *No asterisks* — Skips action text (`*like this*`)
+
+### Per-Character Voices
+
+Each character can have its own voice and provider override. Set it in the character's settings under **TTS Voice** — the global default is used when no override is set.
+
+### Manual Playback
+
+Long-press any message in chat to access **Speak** and **Stop** options, regardless of auto-play settings.
 
 </details>
 
@@ -234,11 +271,14 @@ Display custom header boxes above AI messages (e.g. mood trackers, metadata).
 
 | API | Description |
 |-----|-------------|
-| `PT.setMessageHeader(index, text, extensionId)` | Set a header box above the AI message at `index`. Pass `extensionId` for long-press ownership. Pass empty text to remove. |
+| `PT.setMessageHeader(index, text, extensionId, collapsibleText)` | Set a header box above the AI message at `index`. Pass `extensionId` for long-press ownership. Optional `collapsibleText` creates a tap-to-expand section below the main text. Pass empty text to remove. |
+| `PT.getMessageHeaders(index)` | Get persisted headers for a message. Returns `[{ text, extensionId, collapsibleText }]`. |
 | `PT.clearMessageHeader(index)` | Remove the header at a specific message index. |
 | `PT.clearAllHeaders()` | Remove all message headers (typically called on `CHAT_CHANGED`). |
 
 Headers are persisted to disk automatically. Multiple extensions can each set their own header on the same message -- they stack vertically.
+
+**Collapsible sections:** Pass a 4th argument to `setMessageHeader` to add a collapsible body. The main `text` is always visible; the `collapsibleText` is hidden behind a tap-to-expand chevron. Useful for hiding detailed metadata (character trackers, scene notes) without cluttering the chat.
 
 #### UI: Header Inline Buttons
 
@@ -409,11 +449,15 @@ Set up a persona to tell the AI who it's talking to:
 - Per-block role and injection mode controls
 - Works with any chat-completion-style API
 
-### General Settings
-- Stable Diffusion Forge URL (for avatar generation)
-- CardVault / CharaVault server URL
-- Theme preferences
-- Debug logging toggle
+### Settings Categories
+
+Settings are organized into five groups:
+
+- **Connection** — API Configuration, Connection Profiles
+- **Generation** — Text Generation Parameters, Formatting, OpenAI Presets
+- **World & Characters** — World Info, Character settings
+- **Appearance & Audio** — Themes, TTS, Stable Diffusion Forge
+- **Utilities** — SillyTavern Import, Extensions, Debug Logging
 
 </details>
 
@@ -426,7 +470,9 @@ Generate character avatars using your local Stable Diffusion Forge server.
 2. Note the server address (e.g., `http://192.168.1.100:7860`)
 3. Enter it in **Settings → Stable Diffusion Forge**
 
-Avatar generation is available in the Create Character and Edit Character screens.
+Avatar generation is available in the Create Character and Edit Character screens. Supports both txt2img and img2img (upload a reference image for the AI to work from).
+
+If you're using KoboldCpp on the same machine, PocketTavern automatically unloads the language model from VRAM before starting image generation, then reloads it afterwards — so you don't need a second GPU.
 
 </details>
 
@@ -443,6 +489,32 @@ PocketTavern's visual style is fully themeable. Go to **Settings → Appearance*
 4. Pick the file — the theme is applied immediately
 
 Themes are stored in your app's private storage and persist between sessions.
+
+### ZIP Theme Bundles
+
+For themes that include backgrounds, logos, or music, use a `.zip` bundle:
+
+```
+mytheme.zip
+├── theme.json           (required — colors, particles, config)
+├── background.png       (optional — or .gif, .jpg, .webp)
+├── logo.png             (optional — or .gif for animated)
+└── music.mp3            (optional — or .ogg, .wav)
+```
+
+Import the ZIP the same way as a JSON file — PocketTavern detects the format automatically. Max bundle size is 50 MB.
+
+#### Animated backgrounds
+
+Background images can be animated GIFs or animated WebPs. Just name them `background.gif` or `background.webp` and they'll play automatically. The theme's `background_opacity` and `background_image_mode` settings apply to animated backgrounds the same as static ones.
+
+#### Theme logos
+
+Include a `logo.png` (or `logo.gif` for animated) to replace the PocketTavern logo on the main screen with your own branding.
+
+#### Theme audio
+
+Include a `music.mp3`, `music.ogg`, or `music.wav` to play background music when the theme is active. Set `"theme_audio": true` in `theme.json` to enable it, and optionally `"theme_audio_loop": false` for one-shot playback.
 
 ---
 
@@ -464,6 +536,18 @@ You can author themes specifically for PocketTavern. The format is a simple JSON
 | `bot_mes_blur_tint_color` | AI chat bubble | Falls back to `chat_tint_color`, then the default |
 | `chat_tint_color` | AI chat bubble (fallback) | Used when `bot_mes_blur_tint_color` is absent or transparent |
 | `avatar_style` | Avatar shape | `0` = circle (default), `1` = rounded square |
+| `italic_text_color` | Italic text color | Color for `*italic*` text in chat messages |
+| `code_background_color` | Code background | Background highlight for `` `inline code` `` |
+
+#### Background & Audio fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `background_image` | bool | false | Enable theme background image |
+| `background_image_mode` | string | `"fill"` | `"fill"` (crop), `"fit"` (letterbox), or `"stretch"` |
+| `background_opacity` | float | 0.3 | Background image opacity (0.0 - 1.0) |
+| `theme_audio` | bool | false | Enable background music from theme bundle |
+| `theme_audio_loop` | bool | true | Loop the background music |
 
 > **Tip:** User bubble text color is computed automatically — black on light bubbles, white on dark ones.
 
@@ -535,7 +619,7 @@ Fully custom multi-layer (this is what Midnight Plum uses):
 }
 ```
 
-**Available shapes:** `circle`, `square`, `diamond`, `star`, `snowflake`, `raindrop`
+**Available shapes:** `circle`, `square`, `diamond`, `star`, `snowflake`, `raindrop`, `cloud`
 
 **Available directions:** `up`, `down`, `left`, `right`, `random`
 
