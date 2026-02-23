@@ -66,14 +66,7 @@ data class ChatUiState(
     // Message action menu state
     val selectedMessageIndex: Int? = null,
     val showMessageActions: Boolean = false,
-    // Image generation state
-    val showImageGenDialog: Boolean = false,
-    val imageGenType: ImageGenType = ImageGenType.BACKGROUND,
-    val imageGenState: GenerationState = GenerationState.Idle,
-    val generatedImageBase64: String? = null,
-    val imagePromptPreview: String = "",
     val imageSaved: Boolean = false,
-    val backgroundSetSuccess: Boolean = false,
     // API indicator
     val currentApiName: String = "",
     val currentModelName: String = "",
@@ -103,21 +96,22 @@ data class ChatUiState(
     val visibleHeaderButtons: Set<Pair<Int, String>> = emptySet(),
     // Edit dialog requested by JS extension via PT.showEditDialog()
     val editDialogRequest: JsExtensionHost.EditDialogRequest? = null,
-    // True while the LLM is generating an image prompt
-    val isGeneratingImagePrompt: Boolean = false,
-    // Base64-encoded character avatar for img2img (loaded when Character mode selected)
-    val characterAvatarBase64: String? = null,
-    // Whether to use avatar as img2img source (per-character, persisted in Room)
-    val useAvatarForImageGen: Boolean = true,
     // TTS
     val isTtsSpeaking: Boolean = false,
-    val isTtsEnabled: Boolean = false
+    val isTtsEnabled: Boolean = false,
+    // Message context menu actions from JS extensions
+    val messageActions: List<JsExtensionHost.HeaderAction> = emptyList(),
+    // Image gallery
+    val showGallery: Boolean = false,
+    val galleryImages: List<GalleryImage> = emptyList()
 )
 
-enum class ImageGenType {
-    BACKGROUND,
-    CHARACTER
-}
+data class GalleryImage(
+    val imagePath: String,
+    val chatFileName: String,
+    val timestamp: Long,
+    val messageIndex: Int
+)
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
@@ -187,6 +181,13 @@ class ChatViewModel @Inject constructor(
                 _uiState.update { it.copy(headerMenus = menus) }
             }
         }
+        // Observe message context menu actions from JS extensions
+        viewModelScope.launch {
+            extensionManager.messageActions.collect { actionsMap ->
+                val allActions = actionsMap.values.flatten()
+                _uiState.update { it.copy(messageActions = allActions) }
+            }
+        }
         // Observe edit dialog requests from JS extensions
         viewModelScope.launch {
             extensionManager.jsHost.editDialogRequest.collect { request ->
@@ -196,6 +197,14 @@ class ChatViewModel @Inject constructor(
         // Wire hidden generate callback so PT.generateHidden() works
         extensionManager.jsHost.hiddenGenerateCallback = { prompt, callbackId ->
             viewModelScope.launch { doHiddenGenerate(prompt, callbackId) }
+        }
+        // Wire image generate callback so PT.generateImage() works
+        extensionManager.jsHost.imageGenerateCallback = { prompt, optionsJson, callbackId ->
+            viewModelScope.launch { doExtensionImageGenerate(prompt, optionsJson, callbackId) }
+        }
+        // Wire insert message callback so PT.insertMessage() works
+        extensionManager.jsHost.insertMessageCallback = { content, optionsJson ->
+            viewModelScope.launch { doExtensionInsertMessage(content, optionsJson) }
         }
         // Observe token counter enabled state
         _uiState.update { it.copy(showTokenCount = extensionManager.tokenCounter.enabled) }
@@ -218,13 +227,10 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             var serviceRunning = false
             _uiState.collect { state ->
-                val imageGenActive = state.imageGenState is GenerationState.Starting ||
-                        state.imageGenState is GenerationState.InProgress
-                val needsService = state.isGenerating || imageGenActive
+                val needsService = state.isGenerating
 
                 if (needsService && !serviceRunning) {
-                    val msg = if (imageGenActive) "Generating image..." else "Generating response..."
-                    GenerationService.start(context, msg)
+                    GenerationService.start(context, "Generating response...")
                     serviceRunning = true
                 } else if (!needsService && serviceRunning) {
                     GenerationService.stop(context)
@@ -340,6 +346,8 @@ class ChatViewModel @Inject constructor(
                             backgroundPath = bgPath
                         )
                     }
+                    // Update per-character extension filter
+                    extensionManager.updateCharacterFilter(avatarUrl)
                     loadChats(character, avatarUrl)
                 }
                 is Result.Error -> {
@@ -736,10 +744,143 @@ class ChatViewModel @Inject constructor(
         _uiState.update {
             it.copy(selectedMessageIndex = messageIndex, showMessageActions = true)
         }
+        // Dispatch MESSAGE_LONG_PRESSED so extensions can register context menu actions
+        extensionManager.emitJson(
+            ExtensionEvent.MESSAGE_LONG_PRESSED,
+            "{\"messageIndex\":$messageIndex}"
+        )
     }
 
     fun dismissMessageActions() {
         _uiState.update { it.copy(selectedMessageIndex = null, showMessageActions = false) }
+    }
+
+    fun saveImageMessageToGallery(messageIndex: Int) {
+        val message = _uiState.value.messages.getOrNull(messageIndex) ?: return
+        val imagePath = message.imagePath ?: return
+        val characterName = _uiState.value.character?.name ?: "Image"
+
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    val imageFile = File(context.filesDir, imagePath)
+                    if (!imageFile.exists()) throw Exception("Image file not found")
+
+                    val bitmap = BitmapFactory.decodeFile(imageFile.absolutePath)
+                        ?: throw Exception("Failed to decode image")
+                    val filename = "${characterName}_scene_${System.currentTimeMillis()}.png"
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val contentValues = ContentValues().apply {
+                            put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+                            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/PocketTavern")
+                        }
+                        val uri = context.contentResolver.insert(
+                            MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues
+                        ) ?: throw Exception("Failed to create media entry")
+                        context.contentResolver.openOutputStream(uri)?.use { out ->
+                            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                        } ?: throw Exception("Failed to open output stream")
+                    } else {
+                        val dir = File(
+                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                            "PocketTavern"
+                        ).also { it.mkdirs() }
+                        FileOutputStream(File(dir, filename)).use { out ->
+                            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                        }
+                    }
+                    _uiState.update { it.copy(imageSaved = true) }
+                } catch (e: Exception) {
+                    _uiState.update { it.copy(error = "Failed to save image: ${e.message}") }
+                }
+            }
+        }
+    }
+
+    // ── Image Gallery ────────────────────────────────────────────────────────
+
+    fun showGallery() {
+        viewModelScope.launch {
+            val characterName = _uiState.value.character?.name ?: return@launch
+            val images = withContext(Dispatchers.IO) { collectCharacterImages(characterName) }
+            _uiState.update { it.copy(showGallery = true, galleryImages = images) }
+        }
+    }
+
+    fun dismissGallery() {
+        _uiState.update { it.copy(showGallery = false) }
+    }
+
+    private suspend fun collectCharacterImages(characterName: String): List<GalleryImage> {
+        val chats = localRepository.getCharacterChats(characterName).getOrNull() ?: return emptyList()
+        val images = mutableListOf<GalleryImage>()
+        for (chatInfo in chats) {
+            val chat = localRepository.getChat(characterName, chatInfo.fileName).getOrNull() ?: continue
+            chat.messages.forEachIndexed { index, message ->
+                val path = message.imagePath ?: return@forEachIndexed
+                val file = File(context.filesDir, path)
+                if (!file.exists()) return@forEachIndexed
+                val ts = file.name.removeSuffix(".png").toLongOrNull() ?: file.lastModified()
+                images.add(GalleryImage(path, chatInfo.fileName, ts, index))
+            }
+        }
+        return images.sortedByDescending { it.timestamp }
+    }
+
+    fun saveGalleryImageToDevice(image: GalleryImage) {
+        val characterName = _uiState.value.character?.name ?: "Image"
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    val imageFile = File(context.filesDir, image.imagePath)
+                    if (!imageFile.exists()) throw Exception("Image file not found")
+                    val bitmap = BitmapFactory.decodeFile(imageFile.absolutePath)
+                        ?: throw Exception("Failed to decode image")
+                    val filename = "${characterName}_scene_${image.timestamp}.png"
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val contentValues = ContentValues().apply {
+                            put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+                            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/PocketTavern")
+                        }
+                        val uri = context.contentResolver.insert(
+                            MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues
+                        ) ?: throw Exception("Failed to create media entry")
+                        context.contentResolver.openOutputStream(uri)?.use { out ->
+                            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                        } ?: throw Exception("Failed to open output stream")
+                    } else {
+                        val dir = File(
+                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                            "PocketTavern"
+                        ).also { it.mkdirs() }
+                        FileOutputStream(File(dir, filename)).use { out ->
+                            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                        }
+                    }
+                    _uiState.update { it.copy(imageSaved = true) }
+                } catch (e: Exception) {
+                    _uiState.update { it.copy(error = "Failed to save image: ${e.message}") }
+                }
+            }
+        }
+    }
+
+    fun deleteGalleryImage(image: GalleryImage) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                // Delete image file
+                val imageFile = File(context.filesDir, image.imagePath)
+                imageFile.delete()
+            }
+            // Refresh gallery
+            val characterName = _uiState.value.character?.name ?: return@launch
+            val images = withContext(Dispatchers.IO) { collectCharacterImages(characterName) }
+            _uiState.update { it.copy(galleryImages = images) }
+        }
     }
 
     // ── TTS ──────────────────────────────────────────────────────────────────
@@ -843,318 +984,7 @@ class ChatViewModel @Inject constructor(
         generateResponse(character, userMessage, history)
     }
 
-    // ========== Image Generation ==========
-
-    fun showImageGenerationDialog(messageIndex: Int) {
-        viewModelScope.launch {
-            // Load per-character img2img preference from Room
-            val character = _uiState.value.character
-            val fileName = character?.avatar ?: "${character?.name}.png"
-            val useAvatar = characterDao.getUseAvatarForImageGen(fileName) ?: true
-
-            _uiState.update {
-                it.copy(
-                    showMessageActions = false,
-                    showImageGenDialog = true,
-                    selectedMessageIndex = messageIndex,
-                    imageGenState = GenerationState.Idle,
-                    generatedImageBase64 = null,
-                    useAvatarForImageGen = useAvatar
-                )
-            }
-        }
-    }
-
-    fun selectImageGenType(type: ImageGenType) {
-        _uiState.update { it.copy(imageGenType = type) }
-        generatePromptPreview(type)
-    }
-
-    fun toggleUseAvatarForImageGen(useAvatar: Boolean) {
-        _uiState.update { it.copy(useAvatarForImageGen = useAvatar) }
-        viewModelScope.launch {
-            val character = _uiState.value.character ?: return@launch
-            val fileName = character.avatar ?: "${character.name}.png"
-            characterDao.setUseAvatarForImageGen(fileName, useAvatar)
-        }
-    }
-
-    private fun generatePromptPreview(type: ImageGenType) {
-        val character = _uiState.value.character ?: return
-        val messageIndex = _uiState.value.selectedMessageIndex ?: return
-        val message = _uiState.value.messages.getOrNull(messageIndex) ?: return
-
-        when (type) {
-            ImageGenType.CHARACTER -> {
-                // Ask the LLM to write a character-focused prompt from the message context
-                generateCharacterPromptViaLLM(character, message.rawContent ?: message.content)
-            }
-            ImageGenType.BACKGROUND -> {
-                // Ask the LLM to parse the message and write a Forge-compatible prompt
-                generateBackgroundPromptViaLLM(message.rawContent ?: message.content)
-            }
-        }
-    }
-
-    private fun generateCharacterPromptViaLLM(character: Character, messageContent: String) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isGeneratingImagePrompt = true, imagePromptPreview = "") }
-
-            try {
-                val config = when (val r = localRepository.getApiConfiguration()) {
-                    is Result.Success -> r.data
-                    is Result.Error -> ApiConfiguration.DEFAULT
-                }
-                val preset = localRepository.getCurrentTextGenPreset()
-
-                val llmPrompt = buildString {
-                    append("Write a Stable Diffusion prompt for the character below based on the scene in the message. ")
-                    append("ONLY describe what is explicitly stated in the description and message. Do NOT invent or assume any details about appearance, clothing, or actions that are not mentioned. ")
-                    append("Focus on: expression, pose, clothing, and setting from the message. ")
-                    append("Output ONLY comma-separated tags on a single line. No sentences, no explanation.\n\n")
-                    append("Character: ").append(character.name).append("\n")
-                    if (character.description.isNotBlank()) {
-                        append("Description: ").append(character.description.take(1500)).append("\n")
-                    }
-                    if (character.personality.isNotBlank()) {
-                        append("Personality: ").append(character.personality.take(300)).append("\n")
-                    }
-                    append("\nScene:\n")
-                    append(messageContent.take(3000))
-                }
-
-                val finalPrompt = wrapForTextCompletion(llmPrompt)
-
-                var resultText = ""
-                llmRepository.generate(finalPrompt, config, preset).collect { event ->
-                    when (event) {
-                        is StreamEvent.Complete -> resultText = event.fullText
-                        is StreamEvent.Error -> resultText = ""
-                        is StreamEvent.Token -> {}
-                    }
-                }
-
-                val cleaned = resultText.trim().removeSurrounding("\"").removeSurrounding("'").trim()
-
-                // Load the character avatar as base64 for img2img
-                loadAvatarBase64()
-
-                _uiState.update { it.copy(
-                    imagePromptPreview = cleaned.ifBlank { "(LLM returned empty — try editing manually)" },
-                    isGeneratingImagePrompt = false
-                ) }
-            } catch (e: Exception) {
-                android.util.Log.w("ImageGen", "LLM character prompt generation failed: ${e.message}")
-                _uiState.update { it.copy(
-                    imagePromptPreview = "(Failed to generate prompt — try editing manually)",
-                    isGeneratingImagePrompt = false
-                ) }
-            }
-        }
-    }
-
-    /** Load the current character's avatar PNG as base64 for img2img. */
-    private fun loadAvatarBase64() {
-        val character = _uiState.value.character ?: return
-        try {
-            val fileName = character.avatar ?: "${character.name}.png"
-            val avatarUri = localRepository.getAvatarUri(fileName)
-            val file = java.io.File(avatarUri.path ?: return)
-            if (file.exists()) {
-                val bytes = file.readBytes()
-                val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
-                _uiState.update { it.copy(characterAvatarBase64 = base64) }
-            }
-        } catch (e: Exception) {
-            android.util.Log.w("ImageGen", "Failed to load avatar: ${e.message}")
-        }
-    }
-
-    /** Wrap a prompt with instruct template for text completion backends. */
-    private suspend fun wrapForTextCompletion(prompt: String): String {
-        val config = when (val r = localRepository.getApiConfiguration()) {
-            is Result.Success -> r.data
-            is Result.Error -> return prompt + "\n\nPrompt:\n"
-        }
-        if (config.usesChatCompletions) return prompt
-
-        val charFileName = _uiState.value.character?.let { it.avatar ?: "${it.name}.png" } ?: "char.png"
-        val instructTemplate = when (val r = localRepository.loadChatContext(
-            characterFileName = charFileName,
-            chatFileName = _uiState.value.currentChatFileName
-        )) {
-            is Result.Success -> r.data.instructTemplate
-            is Result.Error -> null
-        }
-        return if (instructTemplate != null) {
-            buildString {
-                append(instructTemplate.inputSequence)
-                append(prompt)
-                append(instructTemplate.inputSuffix)
-                append(instructTemplate.outputSequence)
-            }
-        } else {
-            prompt + "\n\nPrompt:\n"
-        }
-    }
-
-    private fun generateBackgroundPromptViaLLM(messageContent: String) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isGeneratingImagePrompt = true, imagePromptPreview = "") }
-
-            try {
-                val config = when (val r = localRepository.getApiConfiguration()) {
-                    is Result.Success -> r.data
-                    is Result.Error -> ApiConfiguration.DEFAULT
-                }
-                val preset = localRepository.getCurrentTextGenPreset()
-
-                val llmPrompt = buildString {
-                    append("Parse the following roleplay message and write a Stable Diffusion image generation prompt for the BACKGROUND/ENVIRONMENT described in it. ")
-                    append("Focus only on the setting, scenery, lighting, atmosphere, and environment — do NOT include any characters or people. ")
-                    append("Output ONLY the prompt as a single comma-separated line of descriptive tags. No explanation, no extra text.\n\n")
-                    append("Message:\n")
-                    append(messageContent.take(3000))
-                }
-
-                val finalPrompt = wrapForTextCompletion(llmPrompt)
-
-                var resultText = ""
-                llmRepository.generate(finalPrompt, config, preset).collect { event ->
-                    when (event) {
-                        is StreamEvent.Complete -> resultText = event.fullText
-                        is StreamEvent.Error -> resultText = ""
-                        is StreamEvent.Token -> {}
-                    }
-                }
-
-                val cleaned = resultText.trim().removeSurrounding("\"").removeSurrounding("'").trim()
-                _uiState.update { it.copy(
-                    imagePromptPreview = cleaned.ifBlank { "(LLM returned empty — try editing manually)" },
-                    isGeneratingImagePrompt = false
-                ) }
-            } catch (e: Exception) {
-                android.util.Log.w("ImageGen", "LLM prompt generation failed: ${e.message}")
-                _uiState.update { it.copy(
-                    imagePromptPreview = "(Failed to generate prompt — try editing manually)",
-                    isGeneratingImagePrompt = false
-                ) }
-            }
-        }
-    }
-
-    fun updateImagePrompt(prompt: String) {
-        _uiState.update { it.copy(imagePromptPreview = prompt) }
-    }
-
-    fun startImageGeneration() {
-        val prompt = _uiState.value.imagePromptPreview
-        if (prompt.isBlank()) return
-
-        val isCharacter = _uiState.value.imageGenType == ImageGenType.CHARACTER
-        val useAvatar = _uiState.value.useAvatarForImageGen
-        val avatarBase64 = if (isCharacter && useAvatar) _uiState.value.characterAvatarBase64 else null
-
-        viewModelScope.launch {
-            _uiState.update { it.copy(imageGenState = GenerationState.Starting) }
-
-            // Unload KoboldCpp model from VRAM to free GPU for Forge
-            val config = when (val r = localRepository.getApiConfiguration()) {
-                is Result.Success -> r.data
-                is Result.Error -> null
-            }
-            if (config != null) {
-                llmRepository.unloadModel(config)
-            }
-
-            val imageGenConfig = settingsDataStore.getImageGenConfig()
-            val params = ForgeGenerationParams(
-                prompt = prompt,
-                negativePrompt = imageGenConfig.negativePrompt,
-                width = if (isCharacter) imageGenConfig.height.coerceAtMost(imageGenConfig.width) else imageGenConfig.width.coerceAtLeast(imageGenConfig.height),
-                height = if (isCharacter) imageGenConfig.width.coerceAtLeast(imageGenConfig.height) else imageGenConfig.height.coerceAtMost(imageGenConfig.width),
-                steps = imageGenConfig.steps,
-                cfgScale = imageGenConfig.cfgScale,
-                sampler = imageGenConfig.sampler,
-                seed = imageGenConfig.seed,
-                sourceImageBase64 = avatarBase64,
-                denoisingStrength = if (avatarBase64 != null) 0.7f else 1f
-            )
-
-            imageGenRepository.generateImageWithProgress(params).collect { state ->
-                _uiState.update { it.copy(imageGenState = state) }
-                if (state is GenerationState.Complete) {
-                    _uiState.update { it.copy(generatedImageBase64 = state.imageBase64) }
-                }
-            }
-        }
-    }
-
-    fun cancelImageGeneration() {
-        viewModelScope.launch {
-            imageGenRepository.interrupt()
-            _uiState.update { it.copy(imageGenState = GenerationState.Idle) }
-        }
-    }
-
-    fun saveGeneratedImage() {
-        val base64 = _uiState.value.generatedImageBase64 ?: return
-        val characterName = _uiState.value.character?.name ?: "Generated"
-        val imageType = _uiState.value.imageGenType.name.lowercase()
-
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                try {
-                    val imageBytes = Base64.decode(base64, Base64.DEFAULT)
-                    val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-                        ?: throw Exception("Failed to decode image")
-                    val filename = "${characterName}_${imageType}_${System.currentTimeMillis()}.png"
-
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        val contentValues = ContentValues().apply {
-                            put(MediaStore.Images.Media.DISPLAY_NAME, filename)
-                            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-                            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/PocketTavern")
-                        }
-                        val uri = context.contentResolver.insert(
-                            MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues
-                        ) ?: throw Exception("Failed to create media entry")
-                        context.contentResolver.openOutputStream(uri)?.use { out ->
-                            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
-                        } ?: throw Exception("Failed to open output stream")
-                    } else {
-                        val dir = File(
-                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
-                            "PocketTavern"
-                        ).also { it.mkdirs() }
-                        FileOutputStream(File(dir, filename)).use { out ->
-                            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
-                        }
-                    }
-                    _uiState.update { it.copy(imageSaved = true) }
-                } catch (e: Exception) {
-                    _uiState.update { it.copy(error = "Failed to save image: ${e.message}") }
-                }
-            }
-        }
-    }
-
-    fun setGeneratedImageAsBackground() {
-        val base64 = _uiState.value.generatedImageBase64 ?: return
-        viewModelScope.launch {
-            val success = backgroundRepository.saveBackgroundFromBase64(currentAvatarUrl, base64)
-            if (success) {
-                val bgPath = backgroundRepository.getBackgroundPath(currentAvatarUrl)
-                _uiState.update { it.copy(backgroundPath = bgPath, backgroundSetSuccess = true) }
-            } else {
-                _uiState.update { it.copy(error = "Failed to set background") }
-            }
-        }
-    }
-
-    fun clearBackgroundSetSuccess() {
-        _uiState.update { it.copy(backgroundSetSuccess = false) }
-    }
+    // ── Chat Background ───────────────────────────────────────────────────
 
     fun uploadBackgroundFromUri(uri: android.net.Uri) {
         viewModelScope.launch {
@@ -1172,18 +1002,6 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             backgroundRepository.deleteBackground(currentAvatarUrl)
             _uiState.update { it.copy(backgroundPath = null) }
-        }
-    }
-
-    fun dismissImageGenDialog() {
-        _uiState.update {
-            it.copy(
-                showImageGenDialog = false,
-                imageGenState = GenerationState.Idle,
-                generatedImageBase64 = null,
-                imagePromptPreview = "",
-                imageSaved = false
-            )
         }
     }
 
@@ -1356,6 +1174,91 @@ class ChatViewModel @Inject constructor(
             extensionManager.jsHost.completeHiddenGenerate(callbackId, resultText)
         } catch (e: Exception) {
             extensionManager.jsHost.completeHiddenGenerate(callbackId, "")
+        }
+    }
+
+    // ── Image generation (JS extension) ──────────────────────────────────
+
+    private suspend fun doExtensionImageGenerate(prompt: String, optionsJson: String, callbackId: String) {
+        try {
+            val imageGenConfig = settingsDataStore.getImageGenConfig()
+
+            // Parse optional overrides from the extension
+            val options = try { org.json.JSONObject(optionsJson) } catch (_: Exception) { org.json.JSONObject() }
+            val width = options.optInt("width", imageGenConfig.width)
+            val height = options.optInt("height", imageGenConfig.height)
+            val negativePrompt = options.optString("negativePrompt", imageGenConfig.negativePrompt)
+            val seed = options.optInt("seed", imageGenConfig.seed)
+
+            val params = ForgeGenerationParams(
+                prompt = prompt,
+                negativePrompt = negativePrompt,
+                width = width,
+                height = height,
+                steps = imageGenConfig.steps,
+                cfgScale = imageGenConfig.cfgScale,
+                sampler = imageGenConfig.sampler,
+                seed = seed
+            )
+
+            var resultBase64 = ""
+            imageGenRepository.generateImageWithProgress(params).collect { state ->
+                if (state is GenerationState.Complete) {
+                    resultBase64 = state.imageBase64
+                }
+            }
+            extensionManager.jsHost.completeImageGenerate(callbackId, resultBase64)
+        } catch (e: Exception) {
+            extensionManager.jsHost.completeImageGenerate(callbackId, "")
+        }
+    }
+
+    // ── Insert message (JS extension) ────────────────────────────────────
+
+    private suspend fun doExtensionInsertMessage(content: String, optionsJson: String) {
+        val options = try { org.json.JSONObject(optionsJson) } catch (_: Exception) { org.json.JSONObject() }
+        val type = options.optString("type", "narrator")
+        val imageBase64 = options.optString("imageBase64", "")
+
+        when (type) {
+            "image" -> {
+                if (imageBase64.isBlank()) return
+                // Save image to file, then insert a narrator message with imagePath
+                val imagePath = withContext(Dispatchers.IO) {
+                    saveExtensionImage(imageBase64)
+                }
+                if (imagePath != null) {
+                    val imageMessage = ChatMessage(
+                        content = content.ifBlank { "" },
+                        isUser = false,
+                        isNarrator = true,
+                        imagePath = imagePath
+                    )
+                    _uiState.update { it.copy(messages = it.messages + imageMessage) }
+                    saveCurrentChat()
+                }
+            }
+            else -> {
+                // Narrator text message
+                if (content.isNotBlank()) {
+                    insertNarratorMessage(content)
+                }
+            }
+        }
+    }
+
+    /** Save a base64 image to the chat_images directory and return the relative path. */
+    private fun saveExtensionImage(base64: String): String? {
+        return try {
+            val imageBytes = Base64.decode(base64, Base64.DEFAULT)
+            val chatFileName = _uiState.value.currentChatFileName
+            val dir = File(context.filesDir, "chat_images/$chatFileName").also { it.mkdirs() }
+            val filename = "${System.currentTimeMillis()}.png"
+            val file = File(dir, filename)
+            file.writeBytes(imageBytes)
+            "chat_images/$chatFileName/$filename"
+        } catch (e: Exception) {
+            null
         }
     }
 

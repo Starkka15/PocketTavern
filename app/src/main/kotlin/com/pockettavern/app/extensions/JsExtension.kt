@@ -13,5 +13,6 @@ data class JsExtension(
     val author: String = "",
     val sourceUrl: String = "",
     val enabled: Boolean = true,
-    val scriptFile: File
+    val scriptFile: File,
+    val bundled: Boolean = false
 )

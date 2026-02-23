@@ -25,29 +25,59 @@ class JsExtensionStorage @Inject constructor(
 
     private val settingsFile: File get() = File(jsExtDir, "_settings.json")
     private val enabledFile: File  get() = File(jsExtDir, "_enabled.json")
+    private val charOverridesFile: File get() = File(jsExtDir, "_char_overrides.json")
 
     // ── Listing ───────────────────────────────────────────────────────────────
 
     fun listExtensions(): List<JsExtension> {
         val enabledMap = loadEnabledMap()
-        return jsExtDir.listFiles { f -> f.isDirectory }
-            ?.mapNotNull { dir ->
-                val script = File(dir, "index.js")
-                if (!script.exists()) return@mapNotNull null
-                val manifest = loadManifest(dir)
-                JsExtension(
-                    id          = dir.name,
-                    name        = manifest["name"] ?: dir.name,
-                    version     = manifest["version"] ?: "1.0.0",
-                    description = manifest["description"] ?: "",
-                    author      = manifest["author"] ?: "",
-                    sourceUrl   = manifest["sourceUrl"] ?: "",
-                    enabled     = enabledMap[dir.name] ?: true,
-                    scriptFile  = script
-                )
+        val result = mutableListOf<JsExtension>()
+        val seenIds = mutableSetOf<String>()
+
+        // Bundled extensions from assets
+        try {
+            val extDirs = context.assets.list("extensions") ?: emptyArray()
+            for (dirName in extDirs) {
+                if (dirName == "pt_api.js") continue
+                try {
+                    // Verify index.js exists by opening it
+                    context.assets.open("extensions/$dirName/index.js").close()
+                    val manifest = loadBundledManifest(dirName)
+                    seenIds.add(dirName)
+                    result.add(JsExtension(
+                        id          = dirName,
+                        name        = manifest["name"] ?: dirName,
+                        version     = manifest["version"] ?: "1.0.0",
+                        description = manifest["description"] ?: "",
+                        author      = manifest["author"] ?: "",
+                        sourceUrl   = "",
+                        enabled     = enabledMap[dirName] ?: true,
+                        scriptFile  = File(jsExtDir, "$dirName/index.js"), // placeholder
+                        bundled     = true
+                    ))
+                } catch (_: Exception) { /* not a valid extension dir */ }
             }
-            ?.sortedBy { it.name }
-            ?: emptyList()
+        } catch (_: Exception) { /* assets listing failed */ }
+
+        // User-installed extensions from filesystem
+        jsExtDir.listFiles { f -> f.isDirectory }?.forEach { dir ->
+            if (dir.name in seenIds) return@forEach // skip if bundled version exists
+            val script = File(dir, "index.js")
+            if (!script.exists()) return@forEach
+            val manifest = loadManifest(dir)
+            result.add(JsExtension(
+                id          = dir.name,
+                name        = manifest["name"] ?: dir.name,
+                version     = manifest["version"] ?: "1.0.0",
+                description = manifest["description"] ?: "",
+                author      = manifest["author"] ?: "",
+                sourceUrl   = manifest["sourceUrl"] ?: "",
+                enabled     = enabledMap[dir.name] ?: true,
+                scriptFile  = script
+            ))
+        }
+
+        return result.sortedBy { it.name }
     }
 
     // ── Install / Uninstall ───────────────────────────────────────────────────
@@ -241,6 +271,69 @@ class JsExtensionStorage @Inject constructor(
         saveEnabledMap(loadEnabledMap().toMutableMap().also { it[id] = enabled })
     }
 
+    // ── Per-character overrides ──────────────────────────────────────────────
+
+    /**
+     * Get per-character extension overrides.
+     * Returns a map of extensionId → enabled for the given character file.
+     * Only contains entries that differ from the global enabled state.
+     */
+    fun getCharacterOverrides(characterFile: String): Map<String, Boolean> {
+        val allOverrides = loadCharOverrides()
+        val charObj = allOverrides[characterFile]?.jsonObject ?: return emptyMap()
+        return charObj.entries.associate { (k, v) -> k to v.jsonPrimitive.boolean }
+    }
+
+    /**
+     * Set whether a specific extension is enabled/disabled for a specific character.
+     * Pass null to remove the override (revert to global).
+     */
+    fun setCharacterExtensionEnabled(characterFile: String, extensionId: String, enabled: Boolean?) {
+        val allOverrides = loadCharOverrides().toMutableMap()
+        val charObj = (allOverrides[characterFile]?.jsonObject?.toMutableMap() ?: mutableMapOf())
+
+        if (enabled != null) {
+            charObj[extensionId] = JsonPrimitive(enabled)
+        } else {
+            charObj.remove(extensionId)
+        }
+
+        if (charObj.isEmpty()) {
+            allOverrides.remove(characterFile)
+        } else {
+            allOverrides[characterFile] = JsonObject(charObj)
+        }
+
+        saveCharOverrides(allOverrides)
+    }
+
+    /**
+     * Get the list of extension IDs that are disabled for a specific character.
+     * Combines global enabled state with per-character overrides.
+     */
+    fun getDisabledExtensionsForCharacter(characterFile: String): List<String> {
+        val globalEnabled = loadEnabledMap()
+        val charOverrides = getCharacterOverrides(characterFile)
+        val extensions = listExtensions()
+
+        return extensions.filter { ext ->
+            val globallyEnabled = globalEnabled[ext.id] ?: true
+            val charEnabled = charOverrides[ext.id] ?: globallyEnabled
+            !charEnabled
+        }.map { it.id }
+    }
+
+    private fun loadCharOverrides(): Map<String, JsonElement> {
+        if (!charOverridesFile.exists()) return emptyMap()
+        return try {
+            json.parseToJsonElement(charOverridesFile.readText()).jsonObject.toMap()
+        } catch (_: Exception) { emptyMap() }
+    }
+
+    private fun saveCharOverrides(map: Map<String, JsonElement>) {
+        charOverridesFile.writeText(JsonObject(map).toString())
+    }
+
     // ── Settings ──────────────────────────────────────────────────────────────
 
     fun loadAllSettings(): String =
@@ -299,6 +392,14 @@ class JsExtensionStorage @Inject constructor(
         if (!f.exists()) return emptyMap()
         return try {
             json.parseToJsonElement(f.readText()).jsonObject
+                .entries.associate { (k, v) -> k to (v as? JsonPrimitive)?.content.orEmpty() }
+        } catch (_: Exception) { emptyMap() }
+    }
+
+    private fun loadBundledManifest(dirName: String): Map<String, String> {
+        return try {
+            val text = context.assets.open("extensions/$dirName/manifest.json").bufferedReader().readText()
+            json.parseToJsonElement(text).jsonObject
                 .entries.associate { (k, v) -> k to (v as? JsonPrimitive)?.content.orEmpty() }
         } catch (_: Exception) { emptyMap() }
     }

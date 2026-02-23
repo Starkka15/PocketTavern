@@ -142,6 +142,16 @@ fun CharacterSettingsScreen(
                     onTalkativenessChange = viewModel::updateTalkativeness
                 )
 
+                // Extensions Section
+                if (uiState.extensionToggles.isNotEmpty()) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+
+                    ExtensionsSection(
+                        toggles = uiState.extensionToggles,
+                        onToggle = viewModel::setExtensionEnabled
+                    )
+                }
+
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // TTS Voice
@@ -586,6 +596,51 @@ private fun TtsVoiceSection(
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text("Test Voice")
+        }
+    }
+}
+
+@Composable
+private fun ExtensionsSection(
+    toggles: List<ExtensionToggle>,
+    onToggle: (String, Boolean) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Extensions",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        Text(
+            text = "Enable or disable extensions for this character. Disabled extensions won't inject prompts or process messages.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        toggles.forEach { toggle ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = toggle.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(
+                    checked = toggle.enabled,
+                    onCheckedChange = { onToggle(toggle.id, it) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.colorScheme.primary,
+                        checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                )
+            }
         }
     }
 }

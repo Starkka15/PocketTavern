@@ -67,8 +67,15 @@ class JsExtensionHost @Inject constructor(
     private val _headerMenus = MutableStateFlow<Map<String, List<HeaderAction>>>(emptyMap())
     val headerMenus: StateFlow<Map<String, List<HeaderAction>>> = _headerMenus.asStateFlow()
 
+    // Message context menu actions: extensionId → list of actions shown in message long-press menu
+    private val _messageActions = MutableStateFlow<Map<String, List<HeaderAction>>>(emptyMap())
+    val messageActions: StateFlow<Map<String, List<HeaderAction>>> = _messageActions.asStateFlow()
+
     // Output filters registered by JS extensions: extensionId → regex pattern
     private val _outputFilters = mutableMapOf<String, Regex>()
+
+    // Per-character disabled extensions list (updated when character changes)
+    @Volatile private var _disabledExtensions: Set<String> = emptySet()
 
     // Callback wired by ChatViewModel so JS can send messages as the user
     var sendMessageCallback: ((String) -> Unit)? = null
@@ -85,6 +92,12 @@ class JsExtensionHost @Inject constructor(
 
     // Hidden generate request: JS calls PT.generateHidden() → Kotlin sends to LLM without adding to chat
     var hiddenGenerateCallback: ((String, String) -> Unit)? = null  // (prompt, callbackId) -> Unit
+
+    // Image generate request: JS calls PT.generateImage() → Kotlin runs image gen pipeline
+    var imageGenerateCallback: ((String, String, String) -> Unit)? = null  // (prompt, optionsJson, callbackId) -> Unit
+
+    // Insert message request: JS calls PT.insertMessage() → Kotlin inserts a non-LLM message into chat
+    var insertMessageCallback: ((String, String) -> Unit)? = null  // (content, optionsJson) -> Unit
 
     // ── Init / reload ─────────────────────────────────────────────────────────
 
@@ -126,6 +139,7 @@ class JsExtensionHost @Inject constructor(
         _jsButtonSets.value = emptyMap()
         _headerButtons.value = emptyMap()
         _headerMenus.value = emptyMap()
+        _messageActions.value = emptyMap()
         scope.launch {
             webView?.loadData("<html><body></body></html>", "text/html", "utf-8")
         }
@@ -200,8 +214,10 @@ class JsExtensionHost @Inject constructor(
     fun applyOutputFilters(text: String): String {
         if (_outputFilters.isEmpty()) return text
         var result = text
-        _outputFilters.values.forEach { regex ->
-            result = regex.replace(result, "")
+        _outputFilters.forEach { (extId, regex) ->
+            if (extId !in _disabledExtensions) {
+                result = regex.replace(result, "")
+            }
         }
         return result.trim()
     }
@@ -217,9 +233,29 @@ class JsExtensionHost @Inject constructor(
         }
     }
 
+    // ── Per-character filtering ──────────────────────────────────────────────
+
+    /**
+     * Update the list of disabled extensions for the current character.
+     * Pushes the list to the JS sandbox so event handlers are filtered.
+     */
+    fun updateDisabledExtensions(disabledIds: List<String>) {
+        _disabledExtensions = disabledIds.toSet()
+        if (!ready) return
+        val jsArray = disabledIds.joinToString(",") { "'${it.replace("'", "\\'")}'" }
+        scope.launch {
+            webView?.evaluateJavascript(
+                "window.__ptDisabledExtensions=[$jsArray];", null
+            )
+        }
+        DebugLogger.log("[JsExtensionHost] Disabled extensions: $disabledIds")
+    }
+
     // ── Prompt injections ─────────────────────────────────────────────────────
 
-    fun getInjections(): List<String> = _injections.values.toList()
+    fun getInjections(): List<String> = _injections
+        .filter { it.key !in _disabledExtensions }
+        .values.toList()
 
     // ── Private ───────────────────────────────────────────────────────────────
 
@@ -241,16 +277,43 @@ class JsExtensionHost @Inject constructor(
             null
         )
 
-        // Load each enabled extension
-        val extensions = storage.listExtensions().filter { it.enabled }
-        DebugLogger.log("[JsExtensionHost] " + "Loading ${extensions.size} JS extension(s)")
+        // Load bundled extensions from assets (before user-installed ones)
+        val bundledIds = mutableSetOf<String>()
+        try {
+            val extDirs = context.assets.list("extensions") ?: emptyArray()
+            for (dirName in extDirs) {
+                if (dirName == "pt_api.js") continue // skip the API file
+                try {
+                    val script = context.assets.open("extensions/$dirName/index.js")
+                        .bufferedReader().readText()
+                    bundledIds.add(dirName)
+                    DebugLogger.log("[JsExtensionHost] Loading bundled '$dirName' (${script.length} chars)")
+                    wv.evaluateJavascript("window.__ptCurrentExtId='$dirName';", null)
+                    wv.evaluateJavascript(script) { result ->
+                        DebugLogger.log("[JsExtensionHost] Bundled '$dirName' result: $result")
+                    }
+                    wv.evaluateJavascript("window.__ptCurrentExtId=null;", null)
+                } catch (_: Exception) {
+                    // Not a directory with index.js, skip
+                }
+            }
+        } catch (e: Exception) {
+            DebugLogger.log("[JsExtensionHost] Error scanning bundled extensions: ${e.message}")
+        }
+
+        // Load each enabled user-installed extension (skip if bundled version already loaded)
+        val extensions = storage.listExtensions().filter { it.enabled && it.id !in bundledIds }
+        DebugLogger.log("[JsExtensionHost] " + "Loading ${extensions.size} user JS extension(s)")
         extensions.forEach { ext ->
             try {
                 val script = ext.scriptFile.readText()
                 DebugLogger.log("[JsExtensionHost] Loading '${ext.name}' (${script.length} chars)")
+                // Tag event handlers registered during this script with the extension's ID
+                wv.evaluateJavascript("window.__ptCurrentExtId='${ext.id}';", null)
                 wv.evaluateJavascript(script) { result ->
                     DebugLogger.log("[JsExtensionHost] '${ext.name}' result: $result")
                 }
+                wv.evaluateJavascript("window.__ptCurrentExtId=null;", null)
             } catch (e: Exception) {
                 DebugLogger.log("[JsExtensionHost] Error loading '${ext.name}': ${e.message}")
             }
@@ -462,6 +525,36 @@ class JsExtensionHost @Inject constructor(
             _headerMenus.value = _headerMenus.value - extensionId
         }
 
+        // ── Message context menu actions ─────────────────────────────────────
+
+        /**
+         * Called by PT.registerMessageActions(extensionId, actionsJson).
+         * Registers actions that appear in the message long-press context menu.
+         * Clicking an action dispatches BUTTON_CLICKED with { action, label }.
+         */
+        @JavascriptInterface
+        fun registerMessageActions(extensionId: String, actionsJson: String) {
+            try {
+                val arr = JSONArray(actionsJson)
+                val actions = (0 until arr.length()).map { i ->
+                    val obj = arr.getJSONObject(i)
+                    HeaderAction(
+                        label  = obj.optString("label", "?"),
+                        action = obj.optString("action", "")
+                    )
+                }
+                _messageActions.value = _messageActions.value + (extensionId to actions)
+            } catch (e: Exception) {
+                DebugLogger.log("[JsExt] registerMessageActions parse error: ${e.message}")
+            }
+        }
+
+        /** Called by PT.clearMessageActions(extensionId). */
+        @JavascriptInterface
+        fun clearMessageActions(extensionId: String) {
+            _messageActions.value = _messageActions.value - extensionId
+        }
+
         /**
          * Called by PT.showEditDialog(title, fieldsJson, callbackId).
          * Shows a native Android dialog with editable text fields.
@@ -497,6 +590,29 @@ class JsExtensionHost @Inject constructor(
                 hiddenGenerateCallback?.invoke(prompt, callbackId)
             }
         }
+
+        /**
+         * Called by PT.generateImage(prompt, optionsJson, callbackId).
+         * Triggers the app's image generation pipeline and returns base64 via callback.
+         */
+        @JavascriptInterface
+        fun generateImage(prompt: String, optionsJson: String, callbackId: String) {
+            if (prompt.isBlank()) return
+            scope.launch(Dispatchers.Main) {
+                imageGenerateCallback?.invoke(prompt, optionsJson, callbackId)
+            }
+        }
+
+        /**
+         * Called by PT.insertMessage(content, optionsJson).
+         * Inserts a non-user, non-LLM message into the chat (narrator or image).
+         */
+        @JavascriptInterface
+        fun insertMessage(content: String, optionsJson: String) {
+            scope.launch(Dispatchers.Main) {
+                insertMessageCallback?.invoke(content, optionsJson)
+            }
+        }
     }
 
     /** Called by ChatViewModel after the user submits the edit dialog. */
@@ -530,6 +646,16 @@ class JsExtensionHost @Inject constructor(
         scope.launch {
             webView?.evaluateJavascript(
                 "if(window.__ptHiddenGenerateResult)__ptHiddenGenerateResult('$callbackId','$safe');", null
+            )
+        }
+    }
+
+    /** Called by ChatViewModel after image generation completes (or fails). */
+    fun completeImageGenerate(callbackId: String, base64: String) {
+        val safe = base64.replace("'", "\\'").replace("\n", "\\n")
+        scope.launch {
+            webView?.evaluateJavascript(
+                "if(window.__ptImageGenerateResult)__ptImageGenerateResult('$callbackId','$safe');", null
             )
         }
     }

@@ -15,8 +15,8 @@ android {
         applicationId = "com.pockettavern.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "2.1.2-beta"
+        versionCode = 8
+        versionName = "2.1.3-beta"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -3,6 +3,7 @@ package com.pockettavern.app.ui.screens.charactersettings
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.pockettavern.app.data.local.JsExtensionStorage
 import com.pockettavern.app.data.local.TtsVoiceStorage
 import com.pockettavern.app.data.repository.LocalRepository
 import com.pockettavern.app.domain.model.Character
@@ -38,9 +39,17 @@ data class CharacterSettingsUiState(
     val ttsVoiceId: String? = null,
     val ttsProviderOverride: String? = null,
     val availableVoices: List<TtsVoice> = emptyList(),
+    // Extension toggles: extensionId → (displayName, enabled)
+    val extensionToggles: List<ExtensionToggle> = emptyList(),
     // Messages
     val error: String? = null,
     val saveSuccess: Boolean = false
+)
+
+data class ExtensionToggle(
+    val id: String,
+    val name: String,
+    val enabled: Boolean
 )
 
 @HiltViewModel
@@ -48,6 +57,7 @@ class CharacterSettingsViewModel @Inject constructor(
     private val localRepository: LocalRepository,
     private val ttsVoiceStorage: TtsVoiceStorage,
     private val ttsManager: TtsManager,
+    private val jsExtensionStorage: JsExtensionStorage,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -60,6 +70,7 @@ class CharacterSettingsViewModel @Inject constructor(
         loadCharacter()
         loadAvailableWorldInfo()
         loadTtsVoice()
+        loadExtensionToggles()
     }
 
     private fun loadCharacter() {
@@ -181,6 +192,34 @@ class CharacterSettingsViewModel @Inject constructor(
 
     fun clearSaveSuccess() {
         _uiState.update { it.copy(saveSuccess = false) }
+    }
+
+    // ── Extension Toggles ──────────────────────────────────────────────────
+
+    private fun loadExtensionToggles() {
+        if (fileName.isBlank()) return
+        val extensions = jsExtensionStorage.listExtensions().filter { it.enabled }
+        val charOverrides = jsExtensionStorage.getCharacterOverrides(fileName)
+        val toggles = extensions.map { ext ->
+            ExtensionToggle(
+                id = ext.id,
+                name = ext.name,
+                enabled = charOverrides[ext.id] ?: true  // default to enabled
+            )
+        }
+        _uiState.update { it.copy(extensionToggles = toggles) }
+    }
+
+    fun setExtensionEnabled(extensionId: String, enabled: Boolean) {
+        jsExtensionStorage.setCharacterExtensionEnabled(fileName, extensionId, enabled)
+        // Update local UI state
+        _uiState.update { state ->
+            state.copy(
+                extensionToggles = state.extensionToggles.map { toggle ->
+                    if (toggle.id == extensionId) toggle.copy(enabled = enabled) else toggle
+                }
+            )
+        }
     }
 
     // ── TTS Voice ──────────────────────────────────────────────────────────

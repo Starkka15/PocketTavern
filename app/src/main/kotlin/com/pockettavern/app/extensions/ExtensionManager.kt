@@ -1,5 +1,6 @@
 package com.pockettavern.app.extensions
 
+import com.pockettavern.app.data.local.JsExtensionStorage
 import com.pockettavern.app.domain.model.MessageHeaderEntry
 import com.pockettavern.app.domain.model.QuickReplyButton
 import com.pockettavern.app.extensions.builtin.QuickReplyExtension
@@ -18,7 +19,8 @@ class ExtensionManager @Inject constructor(
     val quickReply: QuickReplyExtension,
     val regex: RegexExtension,
     val tokenCounter: TokenCounterExtension,
-    val jsHost: JsExtensionHost
+    val jsHost: JsExtensionHost,
+    val jsStorage: JsExtensionStorage
 ) {
     val all: List<NativeExtension> get() = listOf(quickReply, regex, tokenCounter)
 
@@ -39,6 +41,9 @@ class ExtensionManager @Inject constructor(
 
     /** Header context menus registered by extensions. extensionId → action list. */
     val headerMenus: StateFlow<Map<String, List<JsExtensionHost.HeaderAction>>> get() = jsHost.headerMenus
+
+    /** Message context menu actions registered by extensions. extensionId → action list. */
+    val messageActions: StateFlow<Map<String, List<JsExtensionHost.HeaderAction>>> get() = jsHost.messageActions
 
     /** Load persisted settings and initialise the JS sandbox. Call once at app start. */
     fun load() {
@@ -93,5 +98,16 @@ class ExtensionManager @Inject constructor(
     /** Replace the entire message headers map (e.g. after deleting/shifting messages). */
     fun replaceMessageHeaders(headers: Map<Int, List<MessageHeaderEntry>>) {
         jsHost.replaceMessageHeaders(headers)
+    }
+
+    /** Update the per-character extension filter. Call when the active character changes. */
+    fun updateCharacterFilter(characterFile: String) {
+        val disabled = jsStorage.getDisabledExtensionsForCharacter(characterFile)
+        jsHost.updateDisabledExtensions(disabled)
+    }
+
+    /** Clear per-character filter (e.g. when leaving a chat). */
+    fun clearCharacterFilter() {
+        jsHost.updateDisabledExtensions(emptyList())
     }
 }

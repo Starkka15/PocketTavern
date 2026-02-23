@@ -210,6 +210,7 @@ Each character can have its own overrides:
 - Token allocation adjustments
 - TTS voice and provider override
 - Image generation: toggle whether the avatar is used as an img2img reference
+- Extension toggles: enable/disable individual JS extensions per character
 
 ### Browse CharaVault
 
@@ -284,7 +285,7 @@ For chat-completion APIs (OpenAI, Claude, etc.), configure a prompt order: drag 
 <details>
 <summary><b>Extensions</b></summary>
 
-PocketTavern ships with three built-in native extensions and a **JavaScript extension API** that lets developers build and install their own.
+PocketTavern ships with built-in native extensions, a bundled **Scene Painter** extension, and a **JavaScript extension API** that lets developers build and install their own. Extensions can be enabled/disabled per-character from **Character Settings**.
 
 ### Built-in Extensions
 
@@ -297,11 +298,22 @@ Apply find-and-replace rules to AI output (and optionally to user messages). Rul
 #### Token Counter
 Displays a live estimated token count for the current chat context. Useful for knowing when you're approaching your model's context limit.
 
+#### Scene Painter (Bundled JS Extension)
+Generates images from chat context and inserts them directly into the conversation. Long-press any message to access:
+- **Send background image in chat** — Generates a scene/environment image from the message context
+- **Send a picture of yourself in chat** — Generates a character portrait
+
+Scene Painter uses your configured image generation backend (Settings → Image Generation). It asks your LLM to write an image prompt from the message, generates the image, and inserts it into chat. Per-character art style overrides are configurable via the "Set Art Style" option.
+
+### Per-Character Extension Toggles
+
+Each character can have extensions enabled or disabled independently. Go to **Character Settings** (from the chat overflow menu) to see a list of all installed extensions with toggle switches. Disabled extensions won't fire events, inject prompts, or filter output for that character.
+
 ---
 
 ### JavaScript Extension API
 
-PocketTavern includes a WebView sandbox that runs JavaScript extensions. Extensions are installed from a URL and loaded at startup. They can react to chat events, inject text into the prompt, show dialogs, send hidden LLM requests, and persist their own settings.
+PocketTavern includes a WebView sandbox that runs JavaScript extensions. Extensions are installed from a URL and loaded at startup. They can react to chat events, inject text into the prompt, show dialogs, send hidden LLM requests, generate images, insert messages, and persist their own settings.
 
 #### Installing an extension
 
@@ -328,6 +340,7 @@ Every extension has access to the `PT` global object:
 | `PT.setExtensionPrompt(id, text, position, depth)` | Inject text into the prompt before the next generation. Position: `PT.INJECTION_POSITION.*`. Pass empty text to clear. |
 | `PT.getContext()` | Returns `{ character, recentMessages, personaName, apiType }`. Each `recentMessages` entry has `{ index, text, isUser }`. |
 | `PT.sendMessage(text)` | Send a message as the user through the normal generation pipeline. |
+| `PT.isEnabled(extensionId)` | Check if an extension is currently enabled (respects per-character overrides). Returns `boolean`. |
 
 #### UI: Message Headers
 
@@ -396,6 +409,31 @@ The raw (unfiltered) message text is preserved and available via `PT.getContext(
 |-----|-------------|
 | `PT.generateHidden(prompt)` | Send a prompt to the LLM without adding messages to the chat. Returns a `Promise<string>` with the AI's response. Recent chat history is automatically prepended for context. |
 
+#### Image Generation
+
+Generate images from extensions using the user's configured image generation backend.
+
+| API | Description |
+|-----|-------------|
+| `PT.generateImage(prompt, options)` | Generate an image from a text prompt. Returns a `Promise<string>` resolving to a base64-encoded PNG. Options: `{ negativePrompt, width, height }`. Uses the backend configured in Settings → Image Generation. |
+
+#### Message Insertion
+
+Insert non-LLM messages into the chat (narrator text or images).
+
+| API | Description |
+|-----|-------------|
+| `PT.insertMessage(content, options)` | Insert a message into the chat. Options: `{ type }` where type is `"narrator"` (default) or `"image"`. For image type, pass `{ type: "image", imageBase64: "..." }`. Images are saved to disk and rendered inline in chat. |
+
+#### Message Context Menu
+
+Add custom actions to the long-press message context menu.
+
+| API | Description |
+|-----|-------------|
+| `PT.registerMessageActions(extensionId, actions)` | Register actions that appear when the user long-presses a message. Each action: `{ label, action }`. Selecting dispatches `BUTTON_CLICKED` with `{ action, label }`. |
+| `PT.clearMessageActions(extensionId)` | Remove message actions for this extension. |
+
 #### Events
 
 | Constant | Data | Fires when... |
@@ -410,6 +448,7 @@ The raw (unfiltered) message text is preserved and available via `PT.getContext(
 | `PT.events.CHARACTER_CHANGED` | character name | The active character changes |
 | `PT.events.BUTTON_CLICKED` | `{ action, label }` | A quick reply button with `action` is tapped |
 | `PT.events.HEADER_LONG_PRESSED` | `{ messageIndex, extensionId }` | User long-presses a message header |
+| `PT.events.MESSAGE_LONG_PRESSED` | `{ messageIndex }` | User long-presses a chat message (opens context menu) |
 
 #### Example extension
 
@@ -544,17 +583,17 @@ PocketTavern supports multiple image generation backends — generate character 
 | **Pollinations** | API Key | Pollen credits (pay-as-you-go) — models: flux, flux-realism, flux-anime, flux-3d, turbo |
 | **HuggingFace** | API Key | HF Inference API — configurable model ID (default: SDXL) |
 
-### Generation from Chat
+### Generation from Chat (Scene Painter)
 
-Long-press any message in chat to open the image generation dialog:
+Long-press any message in chat to access image generation via the bundled **Scene Painter** extension:
 
-- **Background mode** — Generates scene/environment images (landscape orientation)
-- **Character mode** — Generates character portraits (portrait orientation)
+- **Send background image in chat** — Generates a scene/environment image (landscape orientation) and inserts it into the conversation
+- **Send a picture of yourself in chat** — Generates a character portrait (portrait orientation, 512x768) and inserts it into the conversation
 - **LLM-assisted prompting** — Your connected LLM automatically generates an image prompt from the message context
-- **Editable prompt** — Review and edit the generated prompt before sending it to the image backend
-- **Per-character img2img toggle** — In Character mode, optionally use the character's avatar as an img2img reference. This is a per-character setting that persists across sessions — useful for disabling when an avatar doesn't contain a face
-- **Save to gallery** — Save generated images to Photos/Pictures/PocketTavern
-- **Set as background** — Apply a generated image as the character's chat background
+- **Per-character art style** — Configure art style and negative prompt per character
+- **Inline images** — Generated images appear directly in the chat as full-width image messages
+- **Image actions** — Tap the "..." button on any image to save it to your device gallery or delete it
+- **Image Gallery** — Access all generated images for the current character via the chat overflow menu → Image Gallery
 
 ### Avatar Generation
 

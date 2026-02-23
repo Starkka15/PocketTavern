@@ -1,14 +1,23 @@
 package com.pockettavern.app.ui.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -36,25 +45,91 @@ fun ChatBubble(
     headerMenus: Map<String, List<JsExtensionHost.HeaderAction>> = emptyMap(),
     onHeaderLongPress: ((String) -> Unit)? = null,
     onHeaderActionClick: ((String, String) -> Unit)? = null,
-    onBubbleLongPress: (() -> Unit)? = null
+    onBubbleLongPress: (() -> Unit)? = null,
+    onImageAction: (() -> Unit)? = null
 ) {
     // Narrator/system messages render as full-width centered italic text
     if (message.isNarrator) {
-        Row(
+        Column(
             modifier = modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.surfaceVariant)
-            Text(
-                text = formatMessage(message.content),
-                style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 12.dp)
-            )
-            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.surfaceVariant)
+            // Image message: render the image from file
+            if (message.imagePath != null) {
+                val context = LocalContext.current
+                val imageFile = remember(message.imagePath) {
+                    java.io.File(context.filesDir, message.imagePath)
+                }
+                if (imageFile.exists()) {
+                    val bitmap = remember(imageFile.absolutePath) {
+                        android.graphics.BitmapFactory.decodeFile(imageFile.absolutePath)
+                    }
+                    if (bitmap != null) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Image(
+                                bitmap = bitmap.asImageBitmap(),
+                                contentDescription = message.content.ifBlank { "Generated image" },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp)),
+                                contentScale = ContentScale.FillWidth
+                            )
+                            // Action button overlay
+                            if (onImageAction != null) {
+                                IconButton(
+                                    onClick = onImageAction,
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(8.dp)
+                                        .size(32.dp)
+                                        .background(
+                                            MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                                            CircleShape
+                                        )
+                                ) {
+                                    Icon(
+                                        Icons.Default.MoreVert,
+                                        contentDescription = "Image actions",
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                // Show text caption below the image if present
+                if (message.content.isNotBlank()) {
+                    Text(
+                        text = formatMessage(message.content),
+                        style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
+                    )
+                }
+            } else {
+                // Standard narrator text
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.surfaceVariant)
+                    Text(
+                        text = formatMessage(message.content),
+                        style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    )
+                    HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.surfaceVariant)
+                }
+            }
         }
         return
     }

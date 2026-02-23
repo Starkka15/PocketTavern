@@ -41,7 +41,10 @@
             try { data = JSON.parse(data); } catch (e) { /* keep as string */ }
         }
         var handlers = _listeners[eventName] ? _listeners[eventName].slice() : [];
+        var disabled = window.__ptDisabledExtensions || [];
         for (var i = 0; i < handlers.length; i++) {
+            var extId = handlers[i].__ptExtId;
+            if (extId && disabled.indexOf(extId) !== -1) continue;
             try {
                 handlers[i](data);
             } catch (e) {
@@ -59,6 +62,9 @@
          * @param {Function} callback   - called with event data (may be null)
          */
         on: function (eventName, callback) {
+            // Tag the callback with the currently loading extension's ID
+            // so per-character filtering can skip disabled extensions' handlers.
+            callback.__ptExtId = window.__ptCurrentExtId || null;
             if (!_listeners[eventName]) _listeners[eventName] = [];
             _listeners[eventName].push(callback);
         },
@@ -92,7 +98,8 @@
             CHAT_CHANGED:       'CHAT_CHANGED',
             CHARACTER_CHANGED:  'CHARACTER_CHANGED',
             BUTTON_CLICKED:       'BUTTON_CLICKED',
-            HEADER_LONG_PRESSED:  'HEADER_LONG_PRESSED'
+            HEADER_LONG_PRESSED:  'HEADER_LONG_PRESSED',
+            MESSAGE_LONG_PRESSED: 'MESSAGE_LONG_PRESSED'
         },
 
         /** Where to inject prompt text relative to the character definition. */
@@ -337,6 +344,38 @@
             }
         },
 
+        // ── Message context menu actions ─────────────────────────────────────
+
+        /**
+         * Register actions that appear in the message long-press context menu.
+         * When the user long-presses any message, a MESSAGE_LONG_PRESSED event fires first,
+         * then the menu shows with your registered actions after the built-in items.
+         * Clicking an action dispatches BUTTON_CLICKED with { action, label }.
+         *
+         * @param {string} extensionId  Your extension's unique id.
+         * @param {Array}  actions      Array of { label: string, action: string }
+         *
+         * @example
+         *   PT.registerMessageActions('my-ext', [
+         *       { label: 'Paint Scene', action: 'paint_scene' }
+         *   ]);
+         */
+        registerMessageActions: function (extensionId, actions) {
+            if (window.PtBridge) {
+                PtBridge.registerMessageActions(extensionId, JSON.stringify(actions || []));
+            }
+        },
+
+        /**
+         * Remove message context menu actions for this extension.
+         * @param {string} extensionId
+         */
+        clearMessageActions: function (extensionId) {
+            if (window.PtBridge) {
+                PtBridge.clearMessageActions(extensionId);
+            }
+        },
+
         // ── Output filters ───────────────────────────────────────────────────
 
         /**
@@ -420,6 +459,69 @@
                     resolve('');
                 }
             });
+        },
+
+        // ── Image generation ─────────────────────────────────────────────────
+
+        /**
+         * Generate an image using the app's configured image generation backend.
+         * Returns a Promise that resolves with the base64-encoded image data,
+         * or an empty string on failure.
+         *
+         * @param {string} prompt         The image generation prompt.
+         * @param {object} [options]      Optional overrides: { width, height, negativePrompt, seed }
+         * @returns {Promise<string>}     Base64 image data (PNG).
+         *
+         * @example
+         *   var base64 = await PT.generateImage('a medieval tavern at sunset');
+         *   if (base64) PT.insertMessage('', { type: 'image', imageBase64: base64 });
+         */
+        generateImage: function (prompt, options) {
+            return new Promise(function (resolve) {
+                var cbId = '__imgCb_' + (++_callbackCounter);
+                _pendingCallbacks[cbId] = resolve;
+                if (window.PtBridge) {
+                    PtBridge.generateImage(prompt || '', JSON.stringify(options || {}), cbId);
+                } else {
+                    resolve('');
+                }
+            });
+        },
+
+        // ── Message insertion ────────────────────────────────────────────────
+
+        /**
+         * Insert a non-LLM message into the chat (narrator text or image).
+         * Does not trigger AI generation — the message simply appears in chat.
+         *
+         * @param {string} content       Text content (for narrator messages).
+         * @param {object} [options]     { type: 'narrator'|'image', imageBase64: '...' }
+         *
+         * @example
+         *   // Insert narrator text
+         *   PT.insertMessage('The sun sets over the mountains.');
+         *
+         *   // Insert an image
+         *   PT.insertMessage('', { type: 'image', imageBase64: base64Data });
+         */
+        insertMessage: function (content, options) {
+            if (window.PtBridge) {
+                PtBridge.insertMessage(content || '', JSON.stringify(options || {}));
+            }
+        },
+
+        // ── Per-character extension state ────────────────────────────────────
+
+        /**
+         * Check if an extension is currently enabled for the active character.
+         * Useful for extensions to early-return from their logic when disabled.
+         *
+         * @param {string} extensionId  The extension's unique id.
+         * @returns {boolean}  True if enabled (or no per-character filter active).
+         */
+        isEnabled: function (extensionId) {
+            var disabled = window.__ptDisabledExtensions || [];
+            return disabled.indexOf(extensionId) === -1;
         }
     };
 
@@ -443,6 +545,15 @@
         if (cb) {
             delete _pendingCallbacks[callbackId];
             cb(text || '');
+        }
+    };
+
+    /** Called by Kotlin when image generation completes. */
+    window.__ptImageGenerateResult = function (callbackId, base64) {
+        var cb = _pendingCallbacks[callbackId];
+        if (cb) {
+            delete _pendingCallbacks[callbackId];
+            cb(base64 || '');
         }
     };
 

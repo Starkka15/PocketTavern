@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,7 +39,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pockettavern.app.domain.model.MessageHeaderEntry
 import com.pockettavern.app.extensions.JsExtensionHost
 import com.pockettavern.app.ui.components.*
-import com.pockettavern.app.domain.model.GenerationState
 import com.pockettavern.app.domain.model.QuickReplyButton
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -49,8 +50,14 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -184,6 +191,14 @@ fun ChatScreen(
                                     leadingIcon = { Icon(Icons.Default.Delete, null) }
                                 )
                             }
+                            DropdownMenuItem(
+                                text = { Text("Image Gallery") },
+                                onClick = {
+                                    showSettingsMenu = false
+                                    viewModel.showGallery()
+                                },
+                                leadingIcon = { Icon(Icons.Default.Collections, null) }
+                            )
                             HorizontalDivider()
                             DropdownMenuItem(
                                 text = { Text("Debug Log") },
@@ -498,6 +513,16 @@ fun ChatScreen(
         )
     }
 
+    // Image gallery
+    if (uiState.showGallery) {
+        ImageGalleryDialog(
+            images = uiState.galleryImages,
+            onSaveImage = { viewModel.saveGalleryImageToDevice(it) },
+            onDeleteImage = { viewModel.deleteGalleryImage(it) },
+            onDismiss = { viewModel.dismissGallery() }
+        )
+    }
+
     // Greeting picker for new chat
     if (uiState.showGreetingPicker) {
         GreetingPickerDialog(
@@ -516,6 +541,7 @@ fun ChatScreen(
             MessageActionsDialog(
                 isUserMessage = selectedMessage?.isUser == true,
                 isLastAssistantMessage = isLastAssistantMessage,
+                isImageMessage = selectedMessage?.imagePath != null,
                 onEdit = {
                     viewModel.startEditingMessage(messageIndex)
                 },
@@ -526,11 +552,12 @@ fun ChatScreen(
                     viewModel.dismissMessageActions()
                     viewModel.regenerateWithSwipe()
                 },
-                onGenerateImage = {
-                    viewModel.showImageGenerationDialog(messageIndex)
-                },
                 onDeleteFromHere = {
                     viewModel.deleteMessagesFromIndex(messageIndex)
+                },
+                onSaveImage = {
+                    viewModel.saveImageMessageToGallery(messageIndex)
+                    viewModel.dismissMessageActions()
                 },
                 onSpeakTts = {
                     viewModel.speakMessage(messageIndex)
@@ -542,6 +569,11 @@ fun ChatScreen(
                 },
                 isTtsEnabled = uiState.isTtsEnabled,
                 isTtsSpeaking = uiState.isTtsSpeaking,
+                extensionActions = uiState.messageActions,
+                onExtensionAction = { action, label ->
+                    viewModel.onHeaderActionClicked(action, label)
+                    viewModel.dismissMessageActions()
+                },
                 onDismiss = { viewModel.dismissMessageActions() }
             )
         }
@@ -554,31 +586,6 @@ fun ChatScreen(
             onTextChange = { viewModel.updateEditingText(it) },
             onSave = { viewModel.saveEditedMessage() },
             onDismiss = { viewModel.cancelEditing() }
-        )
-    }
-
-    // Image generation dialog
-    if (uiState.showImageGenDialog) {
-        ImageGenerationDialog(
-            imageGenType = uiState.imageGenType,
-            promptPreview = uiState.imagePromptPreview,
-            isGeneratingPrompt = uiState.isGeneratingImagePrompt,
-            generationState = uiState.imageGenState,
-            generatedImageBase64 = uiState.generatedImageBase64,
-            imageSaved = uiState.imageSaved,
-            backgroundSetSuccess = uiState.backgroundSetSuccess,
-            useAvatarForImageGen = uiState.useAvatarForImageGen,
-            onSelectType = { viewModel.selectImageGenType(it) },
-            onToggleUseAvatar = { viewModel.toggleUseAvatarForImageGen(it) },
-            onUpdatePrompt = { viewModel.updateImagePrompt(it) },
-            onGenerate = { viewModel.startImageGeneration() },
-            onCancel = { viewModel.cancelImageGeneration() },
-            onSave = { viewModel.saveGeneratedImage() },
-            onSetAsBackground = { viewModel.setGeneratedImageAsBackground() },
-            onDismiss = {
-                viewModel.clearBackgroundSetSuccess()
-                viewModel.dismissImageGenDialog()
-            }
         )
     }
 
@@ -749,7 +756,8 @@ private fun MessageWithActions(
                 headerMenus = headerMenus,
                 onHeaderLongPress = onHeaderLongPress,
                 onHeaderActionClick = onHeaderActionClick,
-                onBubbleLongPress = onLongPress
+                onBubbleLongPress = onLongPress,
+                onImageAction = if (message.imagePath != null) onLongPress else null
             )
         }
 
@@ -778,290 +786,62 @@ private fun MessageWithActions(
 }
 
 @Composable
-private fun ImageGenerationDialog(
-    imageGenType: ImageGenType,
-    promptPreview: String,
-    isGeneratingPrompt: Boolean,
-    generationState: GenerationState,
-    generatedImageBase64: String?,
-    imageSaved: Boolean,
-    backgroundSetSuccess: Boolean,
-    useAvatarForImageGen: Boolean,
-    onSelectType: (ImageGenType) -> Unit,
-    onToggleUseAvatar: (Boolean) -> Unit,
-    onUpdatePrompt: (String) -> Unit,
-    onGenerate: () -> Unit,
-    onCancel: () -> Unit,
-    onSave: () -> Unit,
-    onSetAsBackground: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val isGenerating = generationState is GenerationState.Starting ||
-            generationState is GenerationState.InProgress
-
-    AlertDialog(
-        onDismissRequest = { if (!isGenerating) onDismiss() },
-        title = { Text("Generate Image") },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Type selector
-                Text("Image Type", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = imageGenType == ImageGenType.BACKGROUND,
-                        onClick = { onSelectType(ImageGenType.BACKGROUND) },
-                        label = { Text("Background") },
-                        enabled = !isGenerating
-                    )
-                    FilterChip(
-                        selected = imageGenType == ImageGenType.CHARACTER,
-                        onClick = { onSelectType(ImageGenType.CHARACTER) },
-                        label = { Text("Character") },
-                        enabled = !isGenerating
-                    )
-                }
-
-                // Avatar reference toggle (only for Character mode)
-                if (imageGenType == ImageGenType.CHARACTER) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "Use avatar as reference",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            Text(
-                                if (useAvatarForImageGen) "img2img from avatar" else "Generate from prompt only",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            checked = useAvatarForImageGen,
-                            onCheckedChange = onToggleUseAvatar,
-                            enabled = !isGenerating
-                        )
-                    }
-                }
-
-                // Prompt preview/editor
-                Text("Prompt", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (isGeneratingPrompt) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    ) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        Text("Generating prompt from message...", style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-                OutlinedTextField(
-                    value = promptPreview,
-                    onValueChange = onUpdatePrompt,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 100.dp, max = 150.dp),
-                    enabled = !isGenerating && !isGeneratingPrompt,
-                    maxLines = 6,
-                    textStyle = MaterialTheme.typography.bodySmall
-                )
-
-                // Generation state display
-                when (generationState) {
-                    is GenerationState.Starting -> {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                            Text("Starting generation...", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                    is GenerationState.InProgress -> {
-                        Column {
-                            LinearProgressIndicator(
-                                progress = { generationState.progress },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Text(
-                                "Generating... ${(generationState.progress * 100).toInt()}%",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
-                    is GenerationState.Complete -> {
-                        // Show generated image
-                        generatedImageBase64?.let { base64 ->
-                            val bitmap = remember(base64) {
-                                try {
-                                    val imageBytes = Base64.decode(base64, Base64.DEFAULT)
-                                    BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-                                } catch (e: Exception) {
-                                    null
-                                }
-                            }
-                            if (bitmap != null) {
-                                Image(
-                                    bitmap = bitmap.asImageBitmap(),
-                                    contentDescription = "Generated image",
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .heightIn(max = 200.dp)
-                                        .border(1.dp, MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
-                                    contentScale = ContentScale.Fit
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                // Save button
-                                if (imageSaved) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Check,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Text(
-                                            "Saved to Pictures/SillyTavern",
-                                            color = MaterialTheme.colorScheme.primary,
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
-                                    }
-                                } else if (backgroundSetSuccess) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Check,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Text(
-                                            "Set as chat background",
-                                            color = MaterialTheme.colorScheme.primary,
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
-                                    }
-                                } else {
-                                    Column(
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        OutlinedButton(
-                                            onClick = onSave,
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Save,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text("Save to Gallery")
-                                        }
-                                        OutlinedButton(
-                                            onClick = onSetAsBackground,
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Image,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text("Set as Chat Background")
-                                        }
-                                    }
-                                }
-                            } else {
-                                Text("Failed to display image", color = MaterialTheme.colorScheme.error)
-                            }
-                        }
-                    }
-                    is GenerationState.Error -> {
-                        Text(
-                            "Error: ${generationState.message}",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                    else -> { /* Idle state, nothing to show */ }
-                }
-            }
-        },
-        confirmButton = {
-            if (isGenerating) {
-                TextButton(onClick = onCancel) {
-                    Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Cancel")
-                }
-            } else if (generationState is GenerationState.Complete) {
-                TextButton(onClick = onDismiss) {
-                    Text("Done")
-                }
-            } else {
-                TextButton(
-                    onClick = onGenerate,
-                    enabled = promptPreview.isNotBlank() && !isGeneratingPrompt
-                ) {
-                    Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Generate")
-                }
-            }
-        },
-        dismissButton = {
-            if (!isGenerating && generationState !is GenerationState.Complete) {
-                TextButton(onClick = onDismiss) {
-                    Text("Cancel")
-                }
-            } else if (generationState is GenerationState.Complete) {
-                TextButton(onClick = onGenerate) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Regenerate")
-                }
-            }
-        }
-    )
-}
-
-@Composable
 private fun MessageActionsDialog(
     isUserMessage: Boolean,
     isLastAssistantMessage: Boolean,
+    isImageMessage: Boolean = false,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onDeleteFromHere: () -> Unit,
     onRegenerate: () -> Unit,
-    onGenerateImage: () -> Unit,
+    onSaveImage: () -> Unit = {},
     onSpeakTts: () -> Unit = {},
     onStopTts: () -> Unit = {},
     isTtsEnabled: Boolean = false,
     isTtsSpeaking: Boolean = false,
+    extensionActions: List<com.pockettavern.app.extensions.JsExtensionHost.HeaderAction> = emptyList(),
+    onExtensionAction: (String, String) -> Unit = { _, _ -> },
     onDismiss: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Message Actions") },
+        title = { Text(if (isImageMessage) "Image Actions" else "Message Actions") },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                if (isImageMessage) {
+                    // Save Image to gallery
+                    TextButton(
+                        onClick = onSaveImage,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            Icons.Default.Save,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Save Image")
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+
+                    // Delete image message
+                    TextButton(
+                        onClick = onDelete,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Delete Image", color = MaterialTheme.colorScheme.error)
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                } else {
                 // Edit - available for all messages
                 TextButton(
                     onClick = onEdit,
@@ -1127,23 +907,6 @@ private fun MessageActionsDialog(
                     }
                 }
 
-                // Generate Image - available for assistant messages
-                if (!isUserMessage) {
-                    TextButton(
-                        onClick = onGenerateImage,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(
-                            Icons.Default.Image,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Generate Image")
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
-
                 // TTS - play/stop for any message when TTS is enabled
                 if (isTtsEnabled) {
                     if (isTtsSpeaking) {
@@ -1177,6 +940,29 @@ private fun MessageActionsDialog(
                         }
                     }
                 }
+                // Extension actions from JS extensions via PT.registerMessageActions()
+                if (extensionActions.isNotEmpty()) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                    extensionActions.forEach { action ->
+                        TextButton(
+                            onClick = { onExtensionAction(action.action, action.label) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(action.label)
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+                } // end else (non-image messages)
             }
         },
         confirmButton = {
@@ -1392,4 +1178,113 @@ private fun ExtensionEditDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ImageGalleryDialog(
+    images: List<GalleryImage>,
+    onSaveImage: (GalleryImage) -> Unit,
+    onDeleteImage: (GalleryImage) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Image Gallery") },
+        text = {
+            if (images.isEmpty()) {
+                Text("No images yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    modifier = Modifier.heightIn(max = 500.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(images) { image ->
+                        GalleryThumbnail(
+                            image = image,
+                            onSave = { onSaveImage(image) },
+                            onDelete = { onDeleteImage(image) }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun GalleryThumbnail(
+    image: GalleryImage,
+    onSave: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var showMenu by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val bitmap = remember(image.imagePath) {
+        BitmapFactory.decodeFile(File(context.filesDir, image.imagePath).absolutePath)
+    }
+
+    Box(
+        modifier = Modifier
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(8.dp))
+            .combinedClickable(
+                onClick = { },
+                onLongClick = { showMenu = true }
+            )
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        // Small action button at bottom-right
+        IconButton(
+            onClick = { showMenu = true },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(4.dp)
+                .size(28.dp)
+                .background(
+                    MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                    CircleShape
+                )
+        ) {
+            Icon(
+                Icons.Default.MoreVert,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        // Context menu
+        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+            DropdownMenuItem(
+                text = { Text("Save to Device") },
+                onClick = {
+                    showMenu = false
+                    onSave()
+                },
+                leadingIcon = { Icon(Icons.Default.Save, null) }
+            )
+            DropdownMenuItem(
+                text = { Text("Delete") },
+                onClick = {
+                    showMenu = false
+                    onDelete()
+                },
+                leadingIcon = {
+                    Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error)
+                }
+            )
+        }
+    }
 }
