@@ -124,7 +124,11 @@ fun ChatBubble(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             // Collapsible section (tap header to toggle)
+                            // First line of collapsibleText = chevron label, rest = expandable body
                             if (hasCollapsible) {
+                                val newlineIdx = entry.collapsibleText.indexOf('\n')
+                                val chevronLabel = if (newlineIdx > 0) entry.collapsibleText.substring(0, newlineIdx).trim() else entry.collapsibleText.trim()
+                                val expandableBody = if (newlineIdx > 0) entry.collapsibleText.substring(newlineIdx + 1) else ""
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
@@ -133,24 +137,24 @@ fun ChatBubble(
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    // Count lines to show character count
-                                    val sectionCount = entry.collapsibleText.split("\n\n").size
                                     Text(
-                                        text = "Characters ($sectionCount)",
+                                        text = chevronLabel,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                 }
-                                AnimatedVisibility(visible = collapsibleExpanded) {
-                                    Column {
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = entry.collapsibleText,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                if (expandableBody.isNotBlank()) {
+                                    AnimatedVisibility(visible = collapsibleExpanded) {
+                                        Column {
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = expandableBody,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
                                 }
                             }

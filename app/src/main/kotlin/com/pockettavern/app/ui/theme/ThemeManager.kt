@@ -263,6 +263,6 @@ class ThemeManager @Inject constructor(
     companion object {
         const val THEME_DEFAULT = "pockettavern"
         private const val KEY_ACTIVE = "active_theme_id"
-        private val BUNDLED_THEMES = setOf("fire_and_ice", "midnight_plum", "ember")
+        private val BUNDLED_THEMES = setOf("fire_and_ice", "midnight_plum", "ember", "sand_and_sea")
     }
 }
