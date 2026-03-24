@@ -1,0 +1,61 @@
+{
+  "name": "Midnight Plum",
+
+  "shadow_color":             "rgba(12, 10, 22, 1)",
+  "blur_tint_color":          "rgba(40, 32, 68, 0.95)",
+  "border_color":             "rgba(110, 85, 170, 0.55)",
+
+  "underline_text_color":     "rgba(190, 150, 255, 1)",
+  "main_text_color":          "rgba(230, 220, 245, 1)",
+  "quote_text_color":         "rgba(160, 140, 200, 1)",
+
+  "user_mes_blur_tint_color": "rgba(110, 75, 190, 0.85)",
+  "bot_mes_blur_tint_color":  "rgba(35, 28, 60, 0.85)",
+  "chat_tint_color":          "rgba(35, 28, 60, 0.8)",
+
+  "avatar_style": 0,
+
+  "particle_effect": {
+    "layers": [
+      {
+        "count": 40,
+        "shape": "star",
+        "direction": "up",
+        "size_min": 1.5,
+        "size_max": 4.0,
+        "speed_min": 0.1,
+        "speed_max": 0.4,
+        "wobble_amplitude": 0.3,
+        "wobble_frequency": 1.5,
+        "opacity_min": 0.15,
+        "opacity_max": 0.6,
+        "glow": true,
+        "glow_radius": 3.0,
+        "glow_opacity": 0.2,
+        "rotation": true,
+        "colors": ["#BE96FF", "#9B59B6", "#E0C0FF", "#7B68EE"]
+      },
+      {
+        "count": 15,
+        "shape": "diamond",
+        "direction": "down",
+        "size_min": 1.0,
+        "size_max": 3.0,
+        "speed_min": 0.08,
+        "speed_max": 0.25,
+        "wobble_amplitude": 0.4,
+        "wobble_frequency": 0.6,
+        "opacity_min": 0.1,
+        "opacity_max": 0.35,
+        "glow": true,
+        "glow_radius": 2.0,
+        "glow_opacity": 0.15,
+        "rotation": true,
+        "colors": ["#6A5ACD", "#483D8B", "#9370DB"]
+      }
+    ],
+    "animation_duration": 12000,
+    "background_glow": true,
+    "background_glow_opacity": 0.06
+  }
+}

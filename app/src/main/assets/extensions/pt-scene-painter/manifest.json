@@ -1,0 +1,7 @@
+{
+    "id": "pt-scene-painter",
+    "name": "Scene Painter",
+    "version": "1.0.0",
+    "description": "Generates images from scene descriptions and inserts them into chat.",
+    "author": "PocketTavern"
+}

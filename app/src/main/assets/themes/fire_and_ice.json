@@ -1,0 +1,48 @@
+{
+  "name": "Fire & Ice",
+
+  "shadow_color":             "rgba(10, 10, 15, 1)",
+  "blur_tint_color":          "rgba(18, 18, 26, 1)",
+  "border_color":             "rgba(26, 26, 37, 1)",
+
+  "underline_text_color":     "rgba(255, 107, 0, 1)",
+  "main_text_color":          "rgba(238, 238, 238, 1)",
+  "quote_text_color":         "rgba(136, 136, 136, 1)",
+
+  "user_mes_blur_tint_color": "rgba(255, 107, 0, 1)",
+  "bot_mes_blur_tint_color":  "rgba(26, 42, 58, 1)",
+  "chat_tint_color":          "rgba(26, 42, 58, 1)",
+
+  "avatar_style": 0,
+
+  "particle_effect": {
+    "layers": [
+      {
+        "count": 25,
+        "shape": "circle",
+        "direction": "up",
+        "size_min": 2.0, "size_max": 6.0,
+        "speed_min": 0.3, "speed_max": 0.7,
+        "wobble_amplitude": 0.5, "wobble_frequency": 1.0,
+        "opacity_min": 0.25, "opacity_max": 0.6,
+        "glow": true, "glow_radius": 2.8, "glow_opacity": 0.25,
+        "colors": ["#FF6B00", "#FFB347", "#E84A1B"]
+      },
+      {
+        "count": 15,
+        "shape": "snowflake",
+        "direction": "down",
+        "size_min": 3.0, "size_max": 7.0,
+        "speed_min": 0.15, "speed_max": 0.35,
+        "wobble_amplitude": 0.6, "wobble_frequency": 0.8,
+        "opacity_min": 0.2, "opacity_max": 0.5,
+        "glow": false,
+        "rotation": true,
+        "colors": ["#00BFFF", "#4DD0E1", "#E0F0FF"]
+      }
+    ],
+    "animation_duration": 10000,
+    "background_glow": true,
+    "background_glow_opacity": 0.10
+  }
+}

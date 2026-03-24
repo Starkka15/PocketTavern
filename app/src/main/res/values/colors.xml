@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- PocketTavern Fire & Ice Theme -->
+    <color name="background">#FF0A0A0F</color>
+    <color name="surface">#FF12121A</color>
+    <color name="surface_variant">#FF1A1A25</color>
+    <color name="accent">#FFFF6B00</color>
+    <color name="accent_secondary">#FF00BFFF</color>
+    <color name="error">#FFE84A1B</color>
+    <color name="text_primary">#FFEEEEEE</color>
+    <color name="text_secondary">#FF888888</color>
+</resources>
