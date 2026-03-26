@@ -9,6 +9,8 @@ import com.pockettavern.app.data.remote.api.GitHubRelease
 import com.pockettavern.app.data.repository.LocalRepository
 import com.pockettavern.app.domain.model.Character
 import com.pockettavern.app.domain.model.Result
+import com.pockettavern.app.extensions.ExtensionManager
+import com.pockettavern.app.extensions.JsExtensionHost
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -36,13 +38,15 @@ data class MainUiState(
     val showUpdateDialog: Boolean = false,
     // Standalone mode — always connected locally
     val isConnected: Boolean = true,
-    val statusText: String = "Local mode"
+    val statusText: String = "Local mode",
+    val panelRegistrations: Map<String, JsExtensionHost.PanelRegistration> = emptyMap()
 )
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val localRepository: LocalRepository,
-    private val gitHubApi: GitHubApi
+    private val gitHubApi: GitHubApi,
+    private val extensionManager: ExtensionManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MainUiState())
@@ -50,6 +54,11 @@ class MainViewModel @Inject constructor(
 
     init {
         checkForUpdates()
+        viewModelScope.launch {
+            extensionManager.panelRegistrations.collect { panels ->
+                _uiState.update { it.copy(panelRegistrations = panels) }
+            }
+        }
         // Rebuild Room index and load characters on first launch
         viewModelScope.launch {
             localRepository.rebuildCharacterIndex()

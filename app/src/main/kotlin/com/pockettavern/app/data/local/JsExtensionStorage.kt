@@ -106,16 +106,18 @@ class JsExtensionStorage @Inject constructor(
 
         val extDir = File(jsExtDir, id).also { it.mkdirs() }
         File(extDir, "index.js").writeText(scriptText)
+        val displayName = manifest?.get("display_name")?.jsonPrimitive?.content?.ifBlank { null }
+            ?: manifest?.get("displayName")?.jsonPrimitive?.content?.ifBlank { null }
+        val name = displayName ?: manifest?.get("name")?.jsonPrimitive?.content ?: id
         File(extDir, "manifest.json").writeText(buildJsonObject {
             put("id", id)
-            put("name",        manifest?.get("name")?.jsonPrimitive?.content ?: id)
+            put("name",        name)
+            if (displayName != null) put("display_name", displayName)
             put("version",     manifest?.get("version")?.jsonPrimitive?.content ?: "1.0.0")
             put("description", manifest?.get("description")?.jsonPrimitive?.content ?: "")
             put("author",      manifest?.get("author")?.jsonPrimitive?.content ?: "")
             put("sourceUrl",   baseUrl)
         }.toString())
-
-        val name = manifest?.get("name")?.jsonPrimitive?.content ?: id
         DebugLogger.log("[JsExtensionStorage] Installed '$name' ($id)")
         JsExtension(
             id          = id,
@@ -228,7 +230,9 @@ class JsExtensionStorage @Inject constructor(
             }
         }
 
-        val name = manifest?.get("name")?.jsonPrimitive?.content ?: id
+        val displayName = manifest?.get("display_name")?.jsonPrimitive?.content?.ifBlank { null }
+            ?: manifest?.get("displayName")?.jsonPrimitive?.content?.ifBlank { null }
+        val name = displayName ?: manifest?.get("name")?.jsonPrimitive?.content ?: id
         val version = manifest?.get("version")?.jsonPrimitive?.content ?: "1.0.0"
         val description = manifest?.get("description")?.jsonPrimitive?.content ?: ""
         val author = manifest?.get("author")?.jsonPrimitive?.content ?: ""
@@ -237,6 +241,7 @@ class JsExtensionStorage @Inject constructor(
         File(extDir, "manifest.json").writeText(buildJsonObject {
             put("id", id)
             put("name", name)
+            if (displayName != null) put("display_name", displayName)
             put("version", version)
             put("description", description)
             put("author", author)

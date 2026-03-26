@@ -45,6 +45,9 @@ class ExtensionManager @Inject constructor(
     /** Message context menu actions registered by extensions. extensionId → action list. */
     val messageActions: StateFlow<Map<String, List<JsExtensionHost.HeaderAction>>> get() = jsHost.messageActions
 
+    /** Panel registrations from browser.html-based extensions. extensionId → PanelRegistration. */
+    val panelRegistrations: StateFlow<Map<String, JsExtensionHost.PanelRegistration>> get() = jsHost.panelRegistrations
+
     /** Load persisted settings and initialise the JS sandbox. Call once at app start. */
     fun load() {
         quickReply.load()

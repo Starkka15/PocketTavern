@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Update
@@ -54,6 +55,7 @@ fun MainScreen(
     onNavigateToCharaVault: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToProfile: () -> Unit,
+    onNavigateToExtensionPanel: (String) -> Unit = {},
     themeAudioManager: ThemeAudioManager? = null,
     viewModel: MainViewModel = hiltViewModel()
 ) {
@@ -206,8 +208,8 @@ fun MainScreen(
                 if (true) {
                     NavigationCard(
                         icon = Icons.Default.Storage,
-                        title = "CharaVault",
-                        description = "Your local character card library",
+                        title = "Card Search",
+                        description = "Browse characters from CharaVault, Chub.ai, and more",
                         iconColor = MaterialTheme.colorScheme.primary,
                         onClick = onNavigateToCharaVault
                     )
@@ -222,6 +224,18 @@ fun MainScreen(
                     iconColor = MaterialTheme.colorScheme.primary,
                     onClick = onNavigateToSettings
                 )
+
+                // Extension panels registered via PT.registerPanel() or browser.html detection
+                uiState.panelRegistrations.values.forEach { panel ->
+                    Spacer(modifier = Modifier.height(20.dp))
+                    NavigationCard(
+                        icon = Icons.Default.Extension,
+                        title = panel.title,
+                        description = "Extension panel",
+                        iconColor = MaterialTheme.colorScheme.tertiary,
+                        onClick = { onNavigateToExtensionPanel(panel.extensionId) }
+                    )
+                }
             }
         }
     }

@@ -30,6 +30,7 @@ import com.pockettavern.app.ui.screens.help.SetupGuideScreen
 import com.pockettavern.app.ui.screens.groups.GroupChatScreen
 import com.pockettavern.app.ui.screens.stimport.StImportScreen
 import com.pockettavern.app.ui.screens.oaipreset.OaiPresetSettingsScreen
+import com.pockettavern.app.ui.screens.extensions.ExtensionPanelScreen
 import com.pockettavern.app.ui.screens.extensions.ExtensionsScreen
 import com.pockettavern.app.ui.screens.extensions.quickreply.QuickReplySettingsScreen
 import com.pockettavern.app.ui.screens.extensions.regex.RegexSettingsScreen
@@ -71,6 +72,9 @@ fun SillyTavernNavGraph(
                 },
                 onNavigateToProfile = {
                     navController.navigate(Route.Profile)
+                },
+                onNavigateToExtensionPanel = { extensionId ->
+                    navController.navigate(Route.ExtensionPanel(extensionId))
                 },
                 themeAudioManager = themeAudioManager
             )
@@ -299,6 +303,14 @@ fun SillyTavernNavGraph(
             GroupChatScreen(
                 groupId = route.groupId,
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable<Route.ExtensionPanel> { backStackEntry ->
+            val route: Route.ExtensionPanel = backStackEntry.toRoute()
+            ExtensionPanelScreen(
+                extensionId = route.extensionId,
+                onBack = { navController.popBackStack() }
             )
         }
     }

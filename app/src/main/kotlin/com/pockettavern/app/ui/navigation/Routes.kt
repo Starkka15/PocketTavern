@@ -96,4 +96,7 @@ sealed class Route {
 
     @Serializable
     data object ImageGenSettings : Route()
+
+    @Serializable
+    data class ExtensionPanel(val extensionId: String) : Route()
 }

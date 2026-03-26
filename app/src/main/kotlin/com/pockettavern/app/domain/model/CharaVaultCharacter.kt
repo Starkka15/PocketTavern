@@ -16,7 +16,10 @@ data class CharaVaultCharacter(
     val fullDescription: String? = null,
     val fullFirstMes: String? = null,
     val personality: String? = null,
-    val scenario: String? = null
+    val scenario: String? = null,
+    // External source fields (non-CharaVault)
+    val externalImageUrl: String? = null,
+    val externalDownloadUrl: String? = null
 ) {
     /**
      * Unique identifier for the card (folder/filename).

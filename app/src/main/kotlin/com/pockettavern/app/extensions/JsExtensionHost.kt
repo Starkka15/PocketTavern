@@ -2,6 +2,8 @@ package com.pockettavern.app.extensions
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.BitmapFactory
+import android.util.Base64
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
@@ -11,6 +13,7 @@ import com.pockettavern.app.data.local.JsExtensionStorage
 import com.pockettavern.app.domain.model.MessageHeaderEntry
 import com.pockettavern.app.domain.model.QuickReplyButton
 import com.pockettavern.app.util.DebugLogger
+
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -77,6 +80,23 @@ class JsExtensionHost @Inject constructor(
     // Per-character disabled extensions list (updated when character changes)
     @Volatile private var _disabledExtensions: Set<String> = emptySet()
 
+    // Current character file (e.g. "seraphina.png") — set by ExtensionManager.updateCharacterFilter()
+    @Volatile private var _currentCharacterFile: String = ""
+
+    // Character settings field definitions registered by JS extensions
+    data class CharSettingField(
+        val key: String,
+        val label: String,
+        val type: String,           // "text", "toggle", "select"
+        val default: String = "",   // default value (string for all types; "true"/"false" for toggle)
+        val options: List<SelectOption>? = null,  // static options for select type
+        val source: String? = null  // dynamic source key: "sd_samplers", "sd_models", "sd_styles", etc.
+    )
+    data class SelectOption(val label: String, val value: String)
+
+    private val _charSettingsDefs = MutableStateFlow<Map<String, List<CharSettingField>>>(emptyMap())
+    val charSettingsDefs: StateFlow<Map<String, List<CharSettingField>>> = _charSettingsDefs.asStateFlow()
+
     // Callback wired by ChatViewModel so JS can send messages as the user
     var sendMessageCallback: ((String) -> Unit)? = null
 
@@ -98,6 +118,32 @@ class JsExtensionHost @Inject constructor(
 
     // Insert message request: JS calls PT.insertMessage() → Kotlin inserts a non-LLM message into chat
     var insertMessageCallback: ((String, String) -> Unit)? = null  // (content, optionsJson) -> Unit
+
+    // Character import: JS calls PT.importCharacter() / PT.importCharacterFromBase64()
+    var importCharacterCallback: ((String, String, String) -> Unit)? = null         // (url, filename, callbackId)
+    var importCharacterBase64Callback: ((String, String, String) -> Unit)? = null   // (base64, filename, callbackId)
+
+    // Toast: JS calls PT._showToast()
+    var showToastCallback: ((String, String) -> Unit)? = null  // (type, message)
+
+    // Panel registrations: extensionId → PanelRegistration
+    /**
+     * @param extensionDir  Set for file-based extensions; ExtensionPanelScreen serves all files
+     *                      from this directory via shouldInterceptRequest.
+     * @param entryPoint    Relative path within extensionDir to load first (e.g. "browser.html",
+     *                      "app/library.html"). Ignored when extensionDir is null.
+     */
+    data class PanelRegistration(
+        val extensionId: String,
+        val title: String,
+        val html: String,
+        val css: String,
+        val extensionDir: java.io.File? = null,
+        val entryPoint: String = "browser.html",
+        val urlParams: String = ""
+    )
+    private val _panelRegistrations = MutableStateFlow<Map<String, PanelRegistration>>(emptyMap())
+    val panelRegistrations: StateFlow<Map<String, PanelRegistration>> = _panelRegistrations.asStateFlow()
 
     // ── Init / reload ─────────────────────────────────────────────────────────
 
@@ -235,6 +281,11 @@ class JsExtensionHost @Inject constructor(
 
     // ── Per-character filtering ──────────────────────────────────────────────
 
+    /** Update the current character file for per-character settings lookups. */
+    fun updateCurrentCharacterFile(characterFile: String) {
+        _currentCharacterFile = characterFile
+    }
+
     /**
      * Update the list of disabled extensions for the current character.
      * Pushes the list to the JS sandbox so event handlers are filtered.
@@ -259,6 +310,134 @@ class JsExtensionHost @Inject constructor(
 
     // ── Private ───────────────────────────────────────────────────────────────
 
+    /**
+     * Strip ES module import/export syntax so ST extensions written as ES modules
+     * can run in the evaluateJavascript context (which is non-module).
+     *
+     * All imported names are already available as globals via st_compat.js, so
+     * removing the import declarations is sufficient.
+     *
+     * Handles:
+     *   import { a, b } from '...';
+     *   import defaultExport from '...';
+     *   import * as ns from '...';
+     *   import '...';                          (side-effect imports)
+     *   Multi-line imports spanning several lines
+     *   export default ...
+     *   export { a, b };
+     *   export const/let/var/function/class/async function
+     */
+    /**
+     * Scans an extension directory for a standalone web panel entry point by cross-referencing
+     * HTML files on disk with references inside index.js.  Works generically for any extension
+     * that constructs its panel URL from its own directory (e.g. via import.meta.url or by
+     * scanning <script> tags) — no hardcoded filenames required.
+     *
+     * Algorithm:
+     *  1. Collect every .html file in the extension root and one level of subdirectories.
+     *  2. Keep only those whose filename (or subdir/filename path) appears in the script text.
+     *  3. Return the best candidate (prefer root-level files, then subdirectory files).
+     *
+     * Returns a relative path like "browser.html" or "app/library.html", or null if the
+     * extension has no web panel (pure chat-plugin extensions have no .html files at all).
+     */
+    private fun detectPanelEntryPoint(extDir: java.io.File, scriptContent: String): String? {
+        // Collect .html files: root level first, then one subdirectory level
+        val candidates = mutableListOf<String>()
+        extDir.listFiles()
+            ?.filter { it.isFile && it.extension.equals("html", ignoreCase = true) }
+            ?.forEach { candidates.add(it.name) }
+        extDir.listFiles()
+            ?.filter { it.isDirectory }
+            ?.sortedBy { it.name }
+            ?.forEach { subdir ->
+                subdir.listFiles()
+                    ?.filter { it.isFile && it.extension.equals("html", ignoreCase = true) }
+                    ?.forEach { candidates.add("${subdir.name}/${it.name}") }
+            }
+
+        if (candidates.isEmpty()) return null
+
+        // Filter to candidates whose filename is actually referenced in the script.
+        // CharacterLibrary: `app/library.html` appears in a template literal.
+        // BotBrowser:       `'browser.html'` appears as a string literal.
+        val referenced = candidates.filter { rel ->
+            val filename = rel.substringAfterLast('/')
+            scriptContent.contains(filename)
+        }
+
+        // Prefer root-level entry over subdirectory entry; within same level prefer the
+        // first alphabetical match so the result is deterministic.
+        return (referenced.firstOrNull { '/' !in it }
+            ?: referenced.firstOrNull())
+            ?: candidates.firstOrNull { '/' !in it }   // fallback: any root .html
+    }
+
+    /**
+     * Reads manifest.json from the extension directory and returns the display_name field,
+     * or null if the manifest is absent or unparseable.
+     */
+    private fun readManifestDisplayName(extDir: java.io.File): String? {
+        return try {
+            val manifest = java.io.File(extDir, "manifest.json")
+            if (!manifest.exists()) return null
+            val json = org.json.JSONObject(manifest.readText())
+            // Prefer display_name, fall back to name (for existing installs that predate display_name storage)
+            val raw = json.optString("display_name", "").takeIf { it.isNotBlank() }
+                ?: json.optString("name", "").takeIf { it.isNotBlank() && !it.contains('-') && !it.contains('_') }
+                ?: return null
+            // Apply camelCase splitting so "BotBrowser" → "Bot Browser"
+            raw.replace(Regex("([a-z])([A-Z])"), "$1 $2")
+               .replace(Regex("([A-Z]+)([A-Z][a-z])"), "$1 $2")
+               .trim()
+        } catch (_: Exception) { null }
+    }
+
+    private fun stripEsModuleSyntax(script: String): String {
+        var result = script
+
+        // Multi-line import ... from '...' (handles braces spanning lines)
+        result = result.replace(
+            Regex("""^\s*import\s+(?:\{[^}]*\}|\*\s+as\s+\w+|\w+)(?:\s*,\s*(?:\{[^}]*\}|\*\s+as\s+\w+|\w+))*\s+from\s+['"][^'"]*['"]\s*;?\s*$""",
+                setOf(RegexOption.MULTILINE)),
+            ""
+        )
+        // Multi-line import with braces (fallback for complex cases)
+        result = result.replace(
+            Regex("""import\s*\{[^}]*\}\s*from\s*['"][^'"]*['"];?""",
+                setOf(RegexOption.DOT_MATCHES_ALL)),
+            ""
+        )
+        // Bare side-effect imports: import '...'
+        result = result.replace(
+            Regex("""^\s*import\s+['"][^'"]*['"]\s*;?\s*$""", setOf(RegexOption.MULTILINE)),
+            ""
+        )
+        // export default (keep the value, just remove the keyword)
+        result = result.replace(
+            Regex("""^\s*export\s+default\s+""", setOf(RegexOption.MULTILINE)),
+            ""
+        )
+        // export const/let/var/function/async function/class (keep the declaration)
+        result = result.replace(
+            Regex("""^\s*export\s+((?:async\s+)?(?:const|let|var|function|class)\s)""", setOf(RegexOption.MULTILINE)),
+            "$1"
+        )
+        // export { ... };
+        result = result.replace(
+            Regex("""^\s*export\s*\{[^}]*\}\s*(?:from\s*['"][^'"]*['"])?\s*;?\s*$""", setOf(RegexOption.MULTILINE)),
+            ""
+        )
+
+        // import.meta — replace with a stub using the per-extension URL injected before the script runs.
+        // Must be done textually since 'import' is a reserved word and can't be assigned.
+        result = result.replace("import.meta.url", "(window.__ptCurrentExtUrl||'https://pt-ext.local/index.js')")
+        result = result.replace("import.meta.resolve", "function(s){return s;}")
+        result = result.replace("import.meta", "({url:(window.__ptCurrentExtUrl||'https://pt-ext.local/index.js'),resolve:function(s){return s;}})")
+
+        return result
+    }
+
     private fun loadExtensionScripts(wv: WebView) {
         val apiJs = try {
             context.assets.open("extensions/pt_api.js").bufferedReader().readText()
@@ -277,12 +456,27 @@ class JsExtensionHost @Inject constructor(
             null
         )
 
+        // Inject bundled jQuery (if present) before the ST compat shim
+        try {
+            val jqueryJs = context.assets.open("extensions/jquery.min.js").bufferedReader().readText()
+            wv.evaluateJavascript(jqueryJs, null)
+        } catch (_: Exception) { /* not bundled, skip */ }
+
+        // Inject ST compatibility shim (after pt_api.js + settings, before extensions)
+        try {
+            val compatJs = context.assets.open("extensions/st_compat.js").bufferedReader().readText()
+            wv.evaluateJavascript(compatJs, null)
+        } catch (_: Exception) { /* not present, skip */ }
+
+        // Files in the extensions/ asset directory that are not themselves extension folders
+        val assetFileSkipList = setOf("pt_api.js", "st_compat.js", "jquery.min.js")
+
         // Load bundled extensions from assets (before user-installed ones)
         val bundledIds = mutableSetOf<String>()
         try {
             val extDirs = context.assets.list("extensions") ?: emptyArray()
             for (dirName in extDirs) {
-                if (dirName == "pt_api.js") continue // skip the API file
+                if (dirName in assetFileSkipList) continue // skip non-extension files
                 try {
                     val script = context.assets.open("extensions/$dirName/index.js")
                         .bufferedReader().readText()
@@ -306,18 +500,57 @@ class JsExtensionHost @Inject constructor(
         DebugLogger.log("[JsExtensionHost] " + "Loading ${extensions.size} user JS extension(s)")
         extensions.forEach { ext ->
             try {
-                val script = ext.scriptFile.readText()
+                val extDir = ext.scriptFile.parentFile
+                val extBaseUrl = "https://pt-ext.local/extensions/${ext.id}/"
+                val rawScript = ext.scriptFile.readText()
+                val script = if (rawScript.contains("import ") || rawScript.contains("export "))
+                    stripEsModuleSyntax(rawScript) else rawScript
                 DebugLogger.log("[JsExtensionHost] Loading '${ext.name}' (${script.length} chars)")
-                // Tag event handlers registered during this script with the extension's ID
-                wv.evaluateJavascript("window.__ptCurrentExtId='${ext.id}';", null)
+                // Tag event handlers and set base URL for import.meta.url stubs
+                wv.evaluateJavascript("window.__ptCurrentExtId='${ext.id}';window.__ptCurrentExtUrl='${extBaseUrl}index.js';", null)
                 wv.evaluateJavascript(script) { result ->
                     DebugLogger.log("[JsExtensionHost] '${ext.name}' result: $result")
                 }
-                wv.evaluateJavascript("window.__ptCurrentExtId=null;", null)
+                wv.evaluateJavascript("window.__ptCurrentExtId=null;window.__ptCurrentExtUrl=null;", null)
+
+                // Auto-register a panel for extensions with a standalone web UI.
+                // Detects the entry point by scanning the extension dir for .html files
+                // that are also referenced in index.js — no hardcoded filenames needed.
+                if (extDir != null) {
+                    val entryPoint = detectPanelEntryPoint(extDir, rawScript)
+                    if (entryPoint != null) {
+                        val title = readManifestDisplayName(extDir)
+                            ?: ext.name
+                                .replace(Regex("^sillytavern-", RegexOption.IGNORE_CASE), "")
+                                .replace(Regex("-(?:master|main|latest)$", RegexOption.IGNORE_CASE), "")
+                                .replace("-", " ").replace("_", " ")
+                                .split(" ").filter { it.isNotEmpty() }
+                                .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+                        val registration = PanelRegistration(
+                            extensionId = ext.id,
+                            title = title,
+                            html = "",
+                            css = "",
+                            extensionDir = extDir,
+                            entryPoint = entryPoint,
+                            urlParams = if (entryPoint.contains("library.html")) "?embedded=1&csrf=pt-panel-noop" else "?csrf=pt-panel-noop"
+                        )
+                        _panelRegistrations.value = _panelRegistrations.value + (ext.id to registration)
+                        DebugLogger.log("[JsExtensionHost] Auto-registered panel '$title' for '${ext.id}' (entry: $entryPoint)")
+                    }
+                }
             } catch (e: Exception) {
                 DebugLogger.log("[JsExtensionHost] Error loading '${ext.name}': ${e.message}")
             }
         }
+
+        // Fire ST lifecycle events so extensions waiting for APP_READY (e.g. BotBrowser) initialise.
+        // Queued after all extension evals, so all handlers are already registered when this runs.
+        wv.evaluateJavascript(
+            "(function(){['SETTINGS_LOADED_BEFORE','SETTINGS_LOADED_AFTER','EXTENSION_SETTINGS_LOADED','APP_READY']" +
+            ".forEach(function(e){if(window.__ptDispatchEvent)__ptDispatchEvent(e,null);});})();",
+            null
+        )
     }
 
     // ── JavascriptInterface bridge ────────────────────────────────────────────
@@ -612,6 +845,162 @@ class JsExtensionHost @Inject constructor(
             scope.launch(Dispatchers.Main) {
                 insertMessageCallback?.invoke(content, optionsJson)
             }
+        }
+
+        // ── Character settings registration ─────────────────────────────────
+
+        /**
+         * Called by PT.registerCharacterSettings(extensionId, fieldsJson).
+         * Registers per-character settings fields that render in Character Settings UI.
+         */
+        @JavascriptInterface
+        fun registerCharacterSettings(extensionId: String, fieldsJson: String) {
+            try {
+                val arr = JSONArray(fieldsJson)
+                val fields = (0 until arr.length()).map { i ->
+                    val obj = arr.getJSONObject(i)
+                    val options = if (obj.has("options")) {
+                        val optArr = obj.getJSONArray("options")
+                        (0 until optArr.length()).map { j ->
+                            val optObj = optArr.getJSONObject(j)
+                            SelectOption(
+                                label = optObj.optString("label", ""),
+                                value = optObj.optString("value", "")
+                            )
+                        }
+                    } else null
+                    CharSettingField(
+                        key = obj.optString("key", "field$i"),
+                        label = obj.optString("label", "Field ${i + 1}"),
+                        type = obj.optString("type", "text"),
+                        default = obj.optString("default", ""),
+                        options = options,
+                        source = if (obj.has("source")) obj.optString("source") else null
+                    )
+                }
+                _charSettingsDefs.value = _charSettingsDefs.value + (extensionId to fields)
+                DebugLogger.log("[JsExt] Character settings registered for '$extensionId': ${fields.size} field(s)")
+            } catch (e: Exception) {
+                DebugLogger.log("[JsExt] registerCharacterSettings parse error: ${e.message}")
+            }
+        }
+
+        /**
+         * Called by PT.getCharacterSetting(key).
+         * Returns the per-character value for the currently loaded extension's setting,
+         * or the field's default if not set. Returns empty string if key not found.
+         */
+        @JavascriptInterface
+        fun getCharacterSetting(key: String): String {
+            val charFile = _currentCharacterFile
+            // Find which extension registered this key
+            val extId = _charSettingsDefs.value.entries.firstOrNull { (_, fields) ->
+                fields.any { it.key == key }
+            }?.key ?: return ""
+
+            // Per-character setting lookup not available on this branch; fall through to default.
+
+            // Fall back to field default
+            val field = _charSettingsDefs.value[extId]?.find { it.key == key }
+            return field?.default ?: ""
+        }
+
+        /**
+         * Called by PT.getCharacterFace().
+         * Loads the current character's avatar, detects and crops the face region,
+         * and returns it as a base64 PNG string. Returns empty string if no face found.
+         */
+        @JavascriptInterface
+        fun getCharacterFace(): String {
+            val charFile = _currentCharacterFile
+            if (charFile.isBlank()) return ""
+
+            return try {
+                val avatarFile = java.io.File(
+                    java.io.File(context.filesDir, "characters"), charFile
+                )
+                if (!avatarFile.exists()) return ""
+
+                // FaceExtractor not available on this branch.
+                return ""
+            } catch (e: Exception) {
+                DebugLogger.log("[JsExt] getCharacterFace error: ${e.message}")
+                ""
+            }
+        }
+
+        /**
+         * Called by PT.getCharacterAvatar().
+         * Returns the full avatar as a base64 PNG string.
+         */
+        @JavascriptInterface
+        fun getCharacterAvatar(): String {
+            val charFile = _currentCharacterFile
+            if (charFile.isBlank()) return ""
+
+            return try {
+                val avatarFile = java.io.File(
+                    java.io.File(context.filesDir, "characters"), charFile
+                )
+                if (!avatarFile.exists()) return ""
+
+                Base64.encodeToString(avatarFile.readBytes(), Base64.NO_WRAP)
+            } catch (e: Exception) {
+                DebugLogger.log("[JsExt] getCharacterAvatar error: ${e.message}")
+                ""
+            }
+        }
+
+        // ── Character import ──────────────────────────────────────────────────
+
+        /** Called by PT.importCharacter(url, filename). */
+        @JavascriptInterface
+        fun importCharacterFromUrl(url: String, filename: String, callbackId: String) {
+            if (url.isBlank()) { deliverImportResult(callbackId, false); return }
+            scope.launch(Dispatchers.Main) { importCharacterCallback?.invoke(url, filename, callbackId) }
+        }
+
+        /** Called by PT.importCharacterFromBase64(base64, filename). */
+        @JavascriptInterface
+        fun importCharacterFromBase64(base64: String, filename: String, callbackId: String) {
+            if (base64.isBlank()) { deliverImportResult(callbackId, false); return }
+            scope.launch(Dispatchers.Main) { importCharacterBase64Callback?.invoke(base64, filename, callbackId) }
+        }
+
+        // ── Toast ─────────────────────────────────────────────────────────────
+
+        /** Called by PT._showToast(type, message). */
+        @JavascriptInterface
+        fun showToast(type: String, message: String) {
+            scope.launch(Dispatchers.Main) { showToastCallback?.invoke(type, message) }
+        }
+
+        // ── Panel registration ────────────────────────────────────────────────
+
+        /** Called by PT.registerPanel(config). */
+        @JavascriptInterface
+        fun registerPanel(extensionId: String, configJson: String) {
+            try {
+                val cfg = JSONObject(configJson)
+                val reg = PanelRegistration(
+                    extensionId = extensionId,
+                    title       = cfg.optString("title", extensionId),
+                    html        = cfg.optString("html", ""),
+                    css         = cfg.optString("css", "")
+                )
+                _panelRegistrations.value = _panelRegistrations.value + (extensionId to reg)
+            } catch (e: Exception) {
+                DebugLogger.log("[JsExt] registerPanel parse error: ${e.message}")
+            }
+        }
+    }
+
+    /** Deliver a character import result back to the JS callback. */
+    fun deliverImportResult(callbackId: String, success: Boolean) {
+        scope.launch {
+            webView?.evaluateJavascript(
+                "if(window.__ptImportCharacterResult)__ptImportCharacterResult('$callbackId',$success);", null
+            )
         }
     }
 
