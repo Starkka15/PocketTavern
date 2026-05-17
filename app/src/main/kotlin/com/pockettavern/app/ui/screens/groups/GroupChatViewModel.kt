@@ -57,7 +57,8 @@ class GroupChatViewModel @Inject constructor(
 
     private var generationJob: Job? = null
     private var loadedCharacters: Map<String, Character> = emptyMap()
-    private var listIndex: Int = 0  // for LIST strategy round-robin
+    private var lastSpeakerFileName: String? = null   // avoid same char replying twice in a row
+    private val maxFollowUps = 2  // max auto follow-up exchanges per user turn
 
     fun loadGroup(groupId: String) {
         viewModelScope.launch {
@@ -126,57 +127,72 @@ class GroupChatViewModel @Inject constructor(
         val enabled = group.enabledMembers
         if (enabled.isEmpty()) return
 
-        val strategy = group.activationStrategy
-        val responders = pickResponders(strategy, enabled, history)
+        when (group.activationStrategy) {
+            ActivationStrategy.LIST -> {
+                // Every enabled character responds in order
+                for (fileName in enabled) {
+                    val character = loadedCharacters[fileName] ?: continue
+                    generateForCharacter(group, character, fileName)
+                    lastSpeakerFileName = fileName
+                }
+            }
+            else -> {
+                // NATURAL / POOLED / MANUAL: one primary responder, then optional follow-ups
+                val first = when (group.activationStrategy) {
+                    ActivationStrategy.POOLED -> enabled.filter { it != lastSpeakerFileName }
+                        .ifEmpty { enabled }.random()
+                    else -> pickByTalkativeness(enabled.filter { it != lastSpeakerFileName }.ifEmpty { enabled })
+                }
+                val firstChar = loadedCharacters[first] ?: return
+                generateForCharacter(group, firstChar, first)
+                lastSpeakerFileName = first
 
-        for (fileName in responders) {
-            val character = loadedCharacters[fileName] ?: continue
-            generateForCharacter(group, character, fileName, _uiState.value.messages)
+                // Probabilistic follow-ups: other characters may chime in
+                var followUps = 0
+                while (followUps < maxFollowUps) {
+                    val others = enabled.filter { it != lastSpeakerFileName }
+                    if (others.isEmpty()) break
+                    // Each character's chance to jump in = talkativeness * 0.6
+                    val next = pickFollowUp(others) ?: break
+                    val nextChar = loadedCharacters[next] ?: break
+                    generateForCharacter(group, nextChar, next)
+                    lastSpeakerFileName = next
+                    followUps++
+                }
+            }
         }
     }
 
-    private fun pickResponders(
-        strategy: Int,
-        enabled: List<String>,
-        history: List<GroupChatMessage>
-    ): List<String> = when (strategy) {
-        ActivationStrategy.LIST -> {
-            // Round-robin: each enabled member responds in turn
-            enabled
-        }
-        ActivationStrategy.MANUAL -> {
-            // Manual: pick one at random for now (UI picker could be added later)
-            listOf(enabled.random())
-        }
-        ActivationStrategy.POOLED -> {
-            // Weighted random, ignoring talkativeness (any can respond)
-            listOf(enabled.random())
-        }
-        else -> {
-            // NATURAL: weighted by talkativeness
-            listOf(pickByTalkativeness(enabled))
-        }
-    }
-
-    private fun pickByTalkativeness(enabled: List<String>): String {
-        if (enabled.size == 1) return enabled.first()
-        val weights = enabled.map { fileName ->
+    private fun pickByTalkativeness(candidates: List<String>): String {
+        if (candidates.size == 1) return candidates.first()
+        val weights = candidates.map { fileName ->
             loadedCharacters[fileName]?.talkativeness?.coerceIn(0.01f, 1f) ?: 0.5f
         }
         val total = weights.sum()
         var r = Random.nextFloat() * total
         for (i in weights.indices) {
             r -= weights[i]
-            if (r <= 0f) return enabled[i]
+            if (r <= 0f) return candidates[i]
         }
-        return enabled.last()
+        return candidates.last()
+    }
+
+    // Returns a character that probabilistically decides to chime in, or null if no one does.
+    private fun pickFollowUp(candidates: List<String>): String? {
+        // Shuffle so every candidate gets a fair chance
+        val shuffled = candidates.shuffled()
+        for (fileName in shuffled) {
+            val talk = loadedCharacters[fileName]?.talkativeness?.coerceIn(0f, 1f) ?: 0.5f
+            // Probability of joining = talkativeness * 0.55 (max ~55% for talkativeness=1)
+            if (Random.nextFloat() < talk * 0.55f) return fileName
+        }
+        return null
     }
 
     private suspend fun generateForCharacter(
         group: Group,
         character: Character,
-        fileName: String,
-        history: List<GroupChatMessage>
+        fileName: String
     ) {
         val config = when (val r = localRepository.getApiConfiguration()) {
             is Result.Success -> r.data
@@ -194,7 +210,9 @@ class GroupChatViewModel @Inject constructor(
             )
         }
 
-        val prompt = buildGroupPrompt(character, personaName, history)
+        // Read live messages so each character sees what the previous one just said
+        val history = _uiState.value.messages
+        val prompt = buildGroupPrompt(character, personaName, group, history)
 
         generationJob = viewModelScope.launch {
             llmRepository.generate(prompt, config, preset).collect { event ->
@@ -244,21 +262,38 @@ class GroupChatViewModel @Inject constructor(
     private fun buildGroupPrompt(
         character: Character,
         personaName: String,
+        group: Group,
         history: List<GroupChatMessage>
     ): String = buildString {
+        // Character card for the current speaker
         append("[character(\"${character.name}\")\n")
-        if (character.description.isNotBlank()) append("description: ${character.description.take(800)}\n")
-        if (character.personality.isNotBlank()) append("personality: ${character.personality.take(400)}\n")
-        if (character.scenario.isNotBlank()) append("scenario: ${character.scenario.take(400)}\n")
+        if (character.description.isNotBlank()) append("description: ${character.description.take(600)}\n")
+        if (character.personality.isNotBlank()) append("personality: ${character.personality.take(300)}\n")
+        if (character.scenario.isNotBlank()) append("scenario: ${character.scenario.take(300)}\n")
         append("]\n\n")
 
-        // Group chat context
-        val groupName = _uiState.value.group?.name ?: "Group Chat"
-        append("This is a group chat named \"$groupName\". ")
-        append("You are ${character.name}. Respond in character.\n\n")
+        // Brief profiles of the other characters so this char knows who they're talking to
+        val others = group.enabledMembers.filter { it != character.avatar }
+            .mapNotNull { loadedCharacters[it] }
+        if (others.isNotEmpty()) {
+            append("[other characters in this conversation]\n")
+            for (other in others) {
+                append("${other.name}")
+                val snippet = other.personality.take(120).ifBlank { other.description.take(120) }
+                if (snippet.isNotBlank()) append(": $snippet")
+                append("\n")
+            }
+            append("\n")
+        }
 
-        // History (last 20 messages)
-        val recent = if (history.size > 20) history.takeLast(20) else history
+        // Conversation framing
+        val groupName = group.name
+        append("You are ${character.name} in a group chat called \"$groupName\".\n")
+        append("Respond naturally in character. You may address $personaName or the other characters.\n")
+        append("Keep your reply concise and conversational.\n\n")
+
+        // Conversation history (last 24 messages)
+        val recent = if (history.size > 24) history.takeLast(24) else history
         for (msg in recent) {
             val role = when {
                 msg.isUser -> personaName
@@ -276,7 +311,8 @@ class GroupChatViewModel @Inject constructor(
         viewModelScope.launch {
             val enabled = group.enabledMembers
             if (enabled.isEmpty()) return@launch
-            // Pick opener(s) — in LIST mode all members greet; otherwise just one
+            // In LIST mode, all characters introduce themselves in order.
+            // Otherwise one character sets the scene (weighted by talkativeness).
             val openers = if (group.activationStrategy == ActivationStrategy.LIST) {
                 enabled
             } else {
@@ -285,6 +321,7 @@ class GroupChatViewModel @Inject constructor(
             for (fileName in openers) {
                 val character = loadedCharacters[fileName] ?: continue
                 generateFirstMessageFor(group, character, fileName)
+                lastSpeakerFileName = fileName
             }
         }
     }
@@ -299,7 +336,8 @@ class GroupChatViewModel @Inject constructor(
             is Result.Error -> ApiConfiguration.DEFAULT
         }
         val preset = localRepository.getCurrentTextGenPreset()
-        val members = group.enabledMembers.mapNotNull { f -> loadedCharacters[f]?.name }
+        val others = group.enabledMembers.mapNotNull { f -> loadedCharacters[f] }
+            .filter { it.name != character.name }
 
         _uiState.update {
             it.copy(
@@ -310,7 +348,7 @@ class GroupChatViewModel @Inject constructor(
             )
         }
 
-        val prompt = buildFirstMessagePrompt(character, group.name, members)
+        val prompt = buildFirstMessagePrompt(character, group.name, others, _uiState.value.messages)
 
         generationJob = viewModelScope.launch {
             llmRepository.generate(prompt, config, preset).collect { event ->
@@ -360,23 +398,40 @@ class GroupChatViewModel @Inject constructor(
     private fun buildFirstMessagePrompt(
         character: Character,
         groupName: String,
-        memberNames: List<String>
+        others: List<Character>,
+        priorMessages: List<GroupChatMessage>
     ): String = buildString {
         append("[character(\"${character.name}\")\n")
-        if (character.description.isNotBlank()) append("description: ${character.description.take(800)}\n")
-        if (character.personality.isNotBlank()) append("personality: ${character.personality.take(400)}\n")
-        if (character.scenario.isNotBlank()) append("scenario: ${character.scenario.take(400)}\n")
+        if (character.description.isNotBlank()) append("description: ${character.description.take(600)}\n")
+        if (character.personality.isNotBlank()) append("personality: ${character.personality.take(300)}\n")
+        if (character.scenario.isNotBlank()) append("scenario: ${character.scenario.take(300)}\n")
         append("]\n\n")
 
-        val others = memberNames.filter { it != character.name }
-        append("This is a group chat named \"$groupName\" with ")
         if (others.isNotEmpty()) {
-            append("${character.name} and ${others.joinToString(", ")}. ")
-        } else {
-            append("${character.name}. ")
+            append("[other characters present]\n")
+            for (other in others) {
+                append("${other.name}")
+                val snippet = other.personality.take(100).ifBlank { other.description.take(100) }
+                if (snippet.isNotBlank()) append(": $snippet")
+                append("\n")
+            }
+            append("\n")
         }
-        append("Write an in-character opening message for ${character.name} that sets the scene and greets the group. ")
-        append("Be creative and true to the character's personality.\n\n")
+
+        append("You are ${character.name} in a group chat called \"$groupName\".\n")
+        if (priorMessages.isEmpty()) {
+            // True opening — set the scene
+            append("Write an in-character opening message that sets the scene and greets the group. ")
+            append("Be creative and true to your personality. Keep it concise.\n\n")
+        } else {
+            // A later character joining after others have already spoken
+            append("The conversation has already started. Join in naturally, in character.\n\n")
+            val recent = if (priorMessages.size > 10) priorMessages.takeLast(10) else priorMessages
+            for (msg in recent) {
+                val role = msg.senderName ?: "Unknown"
+                append("$role: ${msg.content}\n")
+            }
+        }
         append("${character.name}:")
     }
 
