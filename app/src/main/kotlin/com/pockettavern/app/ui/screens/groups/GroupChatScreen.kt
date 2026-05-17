@@ -3,6 +3,7 @@ package com.pockettavern.app.ui.screens.groups
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,8 +13,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
@@ -30,9 +35,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.pockettavern.app.domain.model.ActivationStrategy
+import com.pockettavern.app.domain.model.ChatInfo
+import com.pockettavern.app.domain.model.ChatStyle
 import com.pockettavern.app.domain.model.GroupChatMessage
 import com.pockettavern.app.ui.theme.*
 import com.pockettavern.app.ui.theme.LocalPocketTavernColors
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,8 +62,15 @@ fun GroupChatScreen(
     val hasStreamingItem = uiState.isGenerating && uiState.streamingCharacterName.isNotBlank()
     val totalItems = uiState.messages.size + if (hasStreamingItem) 1 else 0
 
-    // Auto-scroll to bottom when messages change or streaming content updates
-    LaunchedEffect(uiState.messages.size, uiState.streamingContent) {
+    // While streaming: keep the bottom of the growing bubble visible (no animation — keep up with tokens)
+    LaunchedEffect(uiState.streamingContent) {
+        if (hasStreamingItem && totalItems > 0) {
+            listState.scrollToItem(totalItems - 1, scrollOffset = Int.MAX_VALUE)
+        }
+    }
+
+    // When a message is committed (or chat loads): smooth scroll to bottom
+    LaunchedEffect(uiState.messages.size) {
         if (totalItems > 0) {
             listState.animateScrollToItem(totalItems - 1)
         }
@@ -127,6 +144,64 @@ fun GroupChatScreen(
                             expanded = showMenu,
                             onDismissRequest = { showMenu = false }
                         ) {
+                            DropdownMenuItem(
+                                text = { Text("Edit Prompt") },
+                                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                onClick = {
+                                    showMenu = false
+                                    viewModel.showPromptEditor()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Chat History") },
+                                leadingIcon = { Icon(Icons.Default.History, contentDescription = null) },
+                                onClick = {
+                                    showMenu = false
+                                    viewModel.showChatSelector()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("New Chat") },
+                                leadingIcon = { Icon(Icons.Default.Add, contentDescription = null) },
+                                onClick = {
+                                    showMenu = false
+                                    viewModel.createNewChat()
+                                }
+                            )
+                            HorizontalDivider()
+                            Text(
+                                "Chat Style",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                            )
+                            val currentStyle = uiState.group?.chatStyle ?: ChatStyle.DIALOGUE
+                            listOf(
+                                ChatStyle.DIALOGUE to "Dialogue",
+                                ChatStyle.RP to "RP (actions + dialogue)"
+                            ).forEach { (value, label) ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            RadioButton(
+                                                selected = currentStyle == value,
+                                                onClick = null,
+                                                colors = RadioButtonDefaults.colors(
+                                                    selectedColor = MaterialTheme.colorScheme.primary,
+                                                    unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(label, color = MaterialTheme.colorScheme.onSurface)
+                                        }
+                                    },
+                                    onClick = {
+                                        viewModel.setChatStyle(value)
+                                        showMenu = false
+                                    }
+                                )
+                            }
+                            HorizontalDivider()
                             Text(
                                 "Activation Strategy",
                                 style = MaterialTheme.typography.labelSmall,
@@ -235,15 +310,23 @@ fun GroupChatScreen(
                 uiState.messages.isEmpty() && uiState.isGenerating -> {
                     Column(
                         modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        StreamingBubble(
-                            characterName = uiState.streamingCharacterName,
-                            avatarUrl = uiState.memberAvatarUrls[uiState.streamingCharacterAvatar],
-                            content = uiState.streamingContent.ifBlank { "…" }
-                        )
+                        if (uiState.streamingCharacterName == "Narrator") {
+                            NarratorBubble(
+                                content = uiState.streamingContent.ifBlank { "…" },
+                                isStreaming = true
+                            )
+                        } else {
+                            StreamingBubble(
+                                characterName = uiState.streamingCharacterName,
+                                avatarUrl = uiState.memberAvatarUrls[uiState.streamingCharacterAvatar],
+                                content = uiState.streamingContent.ifBlank { "…" }
+                            )
+                        }
                     }
                 }
                 else -> {
@@ -254,20 +337,31 @@ fun GroupChatScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(uiState.messages) { message ->
-                            GroupMessageBubble(
-                                message = message,
-                                avatarUrl = uiState.memberAvatarUrls[message.senderAvatar]
-                            )
+                            if (message.isSystem) {
+                                NarratorBubble(content = message.content)
+                            } else {
+                                GroupMessageBubble(
+                                    message = message,
+                                    avatarUrl = uiState.memberAvatarUrls[message.senderAvatar]
+                                )
+                            }
                         }
 
                         // Streaming bubble
                         if (hasStreamingItem) {
                             item(key = "streaming") {
-                                StreamingBubble(
-                                    characterName = uiState.streamingCharacterName,
-                                    avatarUrl = uiState.memberAvatarUrls[uiState.streamingCharacterAvatar],
-                                    content = uiState.streamingContent
-                                )
+                                if (uiState.streamingCharacterName == "Narrator") {
+                                    NarratorBubble(
+                                        content = uiState.streamingContent.ifBlank { "…" },
+                                        isStreaming = true
+                                    )
+                                } else {
+                                    StreamingBubble(
+                                        characterName = uiState.streamingCharacterName,
+                                        avatarUrl = uiState.memberAvatarUrls[uiState.streamingCharacterAvatar],
+                                        content = uiState.streamingContent
+                                    )
+                                }
                             }
                         }
                     }
@@ -276,11 +370,79 @@ fun GroupChatScreen(
         }
     }
 
+    // Group prompt editor
+    if (uiState.showPromptEditor) {
+        GroupPromptEditorDialog(
+            text = uiState.promptEditorText,
+            onTextChange = { viewModel.updatePromptEditorText(it) },
+            onSave = { viewModel.saveGroupPrompt() },
+            onDismiss = { viewModel.dismissPromptEditor() }
+        )
+    }
+
+    // Chat history selector
+    if (uiState.showChatSelector) {
+        GroupChatSelectorDialog(
+            chats = uiState.availableChats,
+            currentChatFileName = uiState.currentChatFileName,
+            onSelectChat = { viewModel.selectChat(it) },
+            onNewChat = { viewModel.createNewChat() },
+            onDeleteChat = { viewModel.deleteChat(it) },
+            onDismiss = { viewModel.dismissChatSelector() }
+        )
+    }
+
     // Error handling
     uiState.error?.let { error ->
         LaunchedEffect(error) {
             kotlinx.coroutines.delay(3000)
             viewModel.clearError()
+        }
+    }
+}
+
+@Composable
+private fun NarratorBubble(
+    content: String,
+    isStreaming: Boolean = false
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
+        tonalElevation = 0.dp
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                )
+                Text(
+                    text = if (isStreaming) "Narrator…" else "Narrator",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = content,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
@@ -569,5 +731,185 @@ private fun GroupChatInputBar(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun GroupChatSelectorDialog(
+    chats: List<ChatInfo>,
+    currentChatFileName: String?,
+    onSelectChat: (String) -> Unit,
+    onNewChat: () -> Unit,
+    onDeleteChat: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var pendingDelete by remember { mutableStateOf<ChatInfo?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Chat History") },
+        text = {
+            Column {
+                if (chats.isEmpty()) {
+                    Text(
+                        text = "No chat history",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 400.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(chats) { chat ->
+                            val isSelected = chat.fileName == currentChatFileName
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onSelectChat(chat.fileName) },
+                                color = if (isSelected)
+                                    MaterialTheme.colorScheme.primaryContainer
+                                else
+                                    MaterialTheme.colorScheme.surface,
+                                shape = MaterialTheme.shapes.small
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = formatGroupChatFileName(chat.fileName),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = if (isSelected)
+                                                MaterialTheme.colorScheme.onPrimaryContainer
+                                            else
+                                                MaterialTheme.colorScheme.onSurface
+                                        )
+                                        chat.lastMessage?.let { lastMsg ->
+                                            Text(
+                                                text = lastMsg.take(50) + if (lastMsg.length > 50) "…" else "",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                        Text(
+                                            text = "${chat.messageCount} messages",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    IconButton(onClick = { pendingDelete = chat }) {
+                                        Icon(
+                                            Icons.Default.Delete,
+                                            contentDescription = "Delete chat",
+                                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onNewChat) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("New Chat")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+
+    // Delete confirmation
+    pendingDelete?.let { chat ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("Delete chat?") },
+            text = { Text("This will permanently delete \"${formatGroupChatFileName(chat.fileName)}\". This cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteChat(chat.fileName)
+                        pendingDelete = null
+                    }
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun GroupPromptEditorDialog(
+    text: String,
+    onTextChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Group Prompt") },
+        text = {
+            Column {
+                Text(
+                    text = "Injected into every generation for this group. Describe the scenario, rules, or tone.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = onTextChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 160.dp, max = 320.dp),
+                    placeholder = {
+                        Text(
+                            "e.g. This is a fantasy tavern setting. Characters should stay in a medieval tone...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    },
+                    minLines = 6,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onSave) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+private fun formatGroupChatFileName(fileName: String): String {
+    if (fileName == "chat_imported") return "Imported Chat"
+    return try {
+        val parts = fileName.removePrefix("chat_").split("_")
+        if (parts.size >= 2) {
+            val sdf = SimpleDateFormat("yyyyMMdd HHmmss", Locale.getDefault())
+            val date = sdf.parse("${parts[0]} ${parts[1]}")
+            val out = SimpleDateFormat("MMM d, yyyy  h:mm a", Locale.getDefault())
+            date?.let { out.format(it) } ?: fileName
+        } else fileName
+    } catch (_: Exception) {
+        fileName
     }
 }

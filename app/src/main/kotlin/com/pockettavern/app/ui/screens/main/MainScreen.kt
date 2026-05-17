@@ -208,8 +208,8 @@ fun MainScreen(
                 if (true) {
                     NavigationCard(
                         icon = Icons.Default.Storage,
-                        title = "Card Search",
-                        description = "Browse characters from CharaVault, Chub.ai, and more",
+                        title = "Browse CharaVault",
+                        description = "Browse and download character cards from CharaVault",
                         iconColor = MaterialTheme.colorScheme.primary,
                         onClick = onNavigateToCharaVault
                     )

@@ -91,6 +91,11 @@ fun CharaVaultScreen(
                             modifier = Modifier.clickable { showContentTypeMenu = true }
                         ) {
                             Column {
+                                Text(
+                                    "Browse CharaVault",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                                 Text(uiState.contentType.displayName)
                                 val countText = when {
                                     uiState.contentType == CharaVaultContentType.CHARACTERS ->

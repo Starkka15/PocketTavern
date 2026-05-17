@@ -15,6 +15,8 @@ data class Group(
     val favorite: Boolean = false,
     val activationStrategy: Int = ActivationStrategy.NATURAL,
     val generationMode: Int = GenerationMode.SWAP,
+    val chatStyle: Int = ChatStyle.DIALOGUE,
+    val systemPrompt: String = "",
     val disabledMembers: List<String> = emptyList(),
     val allowSelfResponses: Boolean = false,
     val chats: List<String> = emptyList()
@@ -34,6 +36,11 @@ object ActivationStrategy {
 object GenerationMode {
     const val SWAP = 0
     const val APPEND = 1
+}
+
+object ChatStyle {
+    const val DIALOGUE = 0  // spoken words only
+    const val RP = 1        // dialogue + *actions*
 }
 
 /**
