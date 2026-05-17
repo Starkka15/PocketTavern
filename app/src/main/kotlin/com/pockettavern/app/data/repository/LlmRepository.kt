@@ -380,7 +380,7 @@ class LlmRepository @Inject constructor(
         stopSequences: List<String>,
         apiKey: String
     ): Flow<StreamEvent> = flow {
-        val baseUrl = config.effectiveBaseUrl.trimEnd('/')
+        val baseUrl = config.effectiveBaseUrl.trimEnd('/').removeSuffix("/v1")
 
         // Use structured messages from PromptBuilder when available,
         // otherwise fall back to wrapping the flat prompt as a single user message.
@@ -435,7 +435,17 @@ class LlmRepository @Inject constructor(
         okHttpClient.newCall(httpReq).execute().use { response ->
             if (!response.isSuccessful) {
                 val errorBody = response.body?.string() ?: ""
-                emit(StreamEvent.Error("${config.displayName} error HTTP ${response.code}: $errorBody"))
+                val message = try {
+                    val obj = json.parseToJsonElement(errorBody).jsonObject
+                    val msg = (obj["error"]?.jsonPrimitive?.contentOrNull
+                        ?: obj["message"]?.jsonPrimitive?.contentOrNull
+                        ?: "").ifBlank { null }
+                    if (msg != null) "${config.displayName} error HTTP ${response.code}: $msg"
+                    else "${config.displayName} error HTTP ${response.code}"
+                } catch (_: Exception) {
+                    "${config.displayName} error HTTP ${response.code}: $errorBody"
+                }
+                emit(StreamEvent.Error(message))
                 return@use
             }
             response.body?.source()?.let { source ->
@@ -470,7 +480,7 @@ class LlmRepository @Inject constructor(
         stopSequences: List<String>,
         apiKey: String
     ): Flow<StreamEvent> = flow {
-        val baseUrl = config.apiServer.trimEnd('/')
+        val baseUrl = config.apiServer.trimEnd('/').removeSuffix("/v1")
         val request = OaiTextRequest(
             model = config.currentModel.ifBlank { "default" },
             prompt = prompt,
