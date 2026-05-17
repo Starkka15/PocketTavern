@@ -7,6 +7,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -21,7 +22,8 @@ fun MessageInput(
     onSend: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    placeholder: String = "Type a message..."
+    placeholder: String = "Type a message...",
+    onVoiceInput: (() -> Unit)? = null
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -33,6 +35,20 @@ fun MessageInput(
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.Bottom
         ) {
+            if (onVoiceInput != null) {
+                IconButton(
+                    onClick = onVoiceInput,
+                    enabled = enabled
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Voice input",
+                        tint = if (enabled) MaterialTheme.colorScheme.primary
+                               else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    )
+                }
+            }
+
             OutlinedTextField(
                 value = value,
                 onValueChange = onValueChange,

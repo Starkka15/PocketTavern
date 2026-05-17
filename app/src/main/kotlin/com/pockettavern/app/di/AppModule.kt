@@ -44,7 +44,7 @@ object AppModule {
         context,
         AppDatabase::class.java,
         "pockettavern.db"
-    ).addMigrations(AppDatabase.MIGRATION_1_2).fallbackToDestructiveMigration().build()
+    ).addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3).fallbackToDestructiveMigration().build()
 
     @Provides
     @Singleton

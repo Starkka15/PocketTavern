@@ -1,5 +1,6 @@
 package com.pockettavern.app.domain.model
 
+import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.util.UUID
 
@@ -40,12 +41,13 @@ data class ChatMessageMetadata(
 )
 
 // Group chat message - includes sender information
+@Serializable
 data class GroupChatMessage(
     val id: String = UUID.randomUUID().toString(),
     val content: String,
     val isUser: Boolean,
     val isSystem: Boolean = false,
-    val senderName: String? = null,  // Character name for AI messages
-    val senderAvatar: String? = null,  // Character avatar URL
-    val timestamp: Instant = Instant.now()
+    val senderName: String? = null,
+    val senderAvatar: String? = null,
+    val timestamp: Long = System.currentTimeMillis()
 )

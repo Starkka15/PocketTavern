@@ -28,5 +28,7 @@ data class Character(
     // Favorite flag
     val isFavorite: Boolean = false,
     // Image generation: use avatar as img2img source
-    val useAvatarForImageGen: Boolean = true
+    val useAvatarForImageGen: Boolean = true,
+    // Personal notes about this character (stored in Room, not embedded in PNG)
+    val notes: String = ""
 )

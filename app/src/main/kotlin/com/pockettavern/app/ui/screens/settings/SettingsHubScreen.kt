@@ -55,6 +55,7 @@ fun SettingsHubScreen(
     onNavigateToTheme: () -> Unit = {},
     onNavigateToTtsSettings: () -> Unit = {},
     onNavigateToImageGen: () -> Unit = {},
+    onNavigateToBackup: () -> Unit = {},
     viewModel: SettingsHubViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -168,7 +169,7 @@ fun SettingsHubScreen(
     }
 
     // ── Utilities ──────────────────────────────────────────────────
-    val utilityItems = remember(onNavigateToExtensions, onNavigateToStImport, onNavigateToSetupGuide) {
+    val utilityItems = remember(onNavigateToExtensions, onNavigateToStImport, onNavigateToSetupGuide, onNavigateToBackup) {
         listOf(
             SettingsItem(
                 title = "Extensions",
@@ -182,6 +183,13 @@ fun SettingsHubScreen(
                 subtitle = "Migrate characters, chats, and lorebooks",
                 icon = Icons.Default.Download,
                 onClick = onNavigateToStImport,
+                requiresConnection = false
+            ),
+            SettingsItem(
+                title = "Backup & Restore",
+                subtitle = "Export or restore all app data as a ZIP",
+                icon = Icons.Default.Save,
+                onClick = onNavigateToBackup,
                 requiresConnection = false
             ),
             SettingsItem(

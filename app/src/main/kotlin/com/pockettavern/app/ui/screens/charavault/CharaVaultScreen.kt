@@ -114,26 +114,24 @@ fun CharaVaultScreen(
                             )
                         }
 
-                        // Content type dropdown menu (CharaVault only)
-                        if (isCharaVault) {
-                            DropdownMenu(
-                                expanded = showContentTypeMenu,
-                                onDismissRequest = { showContentTypeMenu = false }
-                            ) {
-                                CharaVaultContentType.entries.forEach { type ->
-                                    DropdownMenuItem(
-                                        text = { Text(type.displayName) },
-                                        onClick = {
-                                            viewModel.setContentType(type)
-                                            showContentTypeMenu = false
-                                        },
-                                        leadingIcon = {
-                                            if (uiState.contentType == type) {
-                                                Icon(Icons.Default.Check, contentDescription = null)
-                                            }
+                        // Content type dropdown menu
+                        DropdownMenu(
+                            expanded = showContentTypeMenu,
+                            onDismissRequest = { showContentTypeMenu = false }
+                        ) {
+                            CharaVaultContentType.entries.forEach { type ->
+                                DropdownMenuItem(
+                                    text = { Text(type.displayName) },
+                                    onClick = {
+                                        viewModel.setContentType(type)
+                                        showContentTypeMenu = false
+                                    },
+                                    leadingIcon = {
+                                        if (uiState.contentType == type) {
+                                            Icon(Icons.Default.Check, contentDescription = null)
                                         }
-                                    )
-                                }
+                                    }
+                                )
                             }
                         }
                     }

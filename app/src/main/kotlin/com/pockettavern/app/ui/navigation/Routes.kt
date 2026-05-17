@@ -99,4 +99,7 @@ sealed class Route {
 
     @Serializable
     data class ExtensionPanel(val extensionId: String) : Route()
+
+    @Serializable
+    data object Backup : Route()
 }

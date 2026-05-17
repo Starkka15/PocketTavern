@@ -103,7 +103,14 @@ data class ChatUiState(
     val messageActions: List<JsExtensionHost.HeaderAction> = emptyList(),
     // Image gallery
     val showGallery: Boolean = false,
-    val galleryImages: List<GalleryImage> = emptyList()
+    val galleryImages: List<GalleryImage> = emptyList(),
+    // Message search
+    val isSearching: Boolean = false,
+    val searchQuery: String = "",
+    val searchResults: List<Int> = emptyList(),
+    val currentSearchResultIndex: Int = 0,
+    // Context window usage (estimated tokens)
+    val contextUsedTokens: Int = 0
 )
 
 data class GalleryImage(
@@ -618,6 +625,7 @@ class ChatViewModel @Inject constructor(
                         // Step 5: refresh context (rawContent now set), persist headers
                         pushExtensionContext()
                         persistExtensionHeaders()
+                        updateContextEstimate()
                         extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
                         generationJob = null
                         saveCurrentChat()
@@ -1336,6 +1344,56 @@ class ChatViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    // ========== Message Search ==========
+
+    fun toggleSearch() {
+        val searching = _uiState.value.isSearching
+        _uiState.update {
+            it.copy(
+                isSearching = !searching,
+                searchQuery = "",
+                searchResults = emptyList(),
+                currentSearchResultIndex = 0
+            )
+        }
+    }
+
+    fun updateSearchQuery(query: String) {
+        val results = if (query.isBlank()) emptyList() else {
+            _uiState.value.messages.indices.filter { i ->
+                _uiState.value.messages[i].content.contains(query, ignoreCase = true)
+            }
+        }
+        val idx = if (results.isNotEmpty()) results.size - 1 else 0
+        _uiState.update {
+            it.copy(searchQuery = query, searchResults = results, currentSearchResultIndex = idx)
+        }
+    }
+
+    fun navigateSearchResult(delta: Int) {
+        val results = _uiState.value.searchResults
+        if (results.isEmpty()) return
+        val current = _uiState.value.currentSearchResultIndex
+        val newIdx = (current + delta + results.size) % results.size
+        _uiState.update { it.copy(currentSearchResultIndex = newIdx) }
+    }
+
+    // ========== Context Usage ==========
+
+    private fun updateContextEstimate() {
+        val state = _uiState.value
+        val character = state.character
+        val messages = state.messages
+
+        var chars = 0
+        if (character != null) {
+            chars += character.description.length + character.personality.length +
+                     character.scenario.length + character.systemPrompt.length
+        }
+        chars += messages.sumOf { it.content.length }
+        _uiState.update { it.copy(contextUsedTokens = chars / 4) }
     }
 
     // ========== Message Editing ==========

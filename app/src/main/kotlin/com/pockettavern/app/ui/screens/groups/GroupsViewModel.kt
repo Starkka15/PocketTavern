@@ -1,13 +1,18 @@
 package com.pockettavern.app.ui.screens.groups
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.pockettavern.app.data.local.CharacterStorage
+import com.pockettavern.app.data.local.GroupStorage
 import com.pockettavern.app.domain.model.Character
 import com.pockettavern.app.domain.model.Group
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import java.util.UUID
 import javax.inject.Inject
 
 data class GroupsUiState(
@@ -15,20 +20,21 @@ data class GroupsUiState(
     val groupAvatarUrls: Map<String, List<String?>> = emptyMap(),
     val isLoading: Boolean = false,
     val error: String? = null,
-    // Create group dialog
     val showCreateDialog: Boolean = false,
     val availableCharacters: List<Character> = emptyList(),
     val characterAvatarUrls: Map<String, String?> = emptyMap(),
     val newGroupName: String = "",
     val selectedMembers: Set<String> = emptySet(),
     val isCreating: Boolean = false,
-    // Delete group
     val showDeleteDialog: Boolean = false,
     val groupToDelete: Group? = null
 )
 
 @HiltViewModel
-class GroupsViewModel @Inject constructor() : ViewModel() {
+class GroupsViewModel @Inject constructor(
+    private val groupStorage: GroupStorage,
+    private val characterStorage: CharacterStorage
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(GroupsUiState())
     val uiState: StateFlow<GroupsUiState> = _uiState.asStateFlow()
@@ -38,21 +44,40 @@ class GroupsViewModel @Inject constructor() : ViewModel() {
     }
 
     fun loadGroups() {
-        // Groups are not yet supported in standalone mode
-        _uiState.update { it.copy(isLoading = false, groups = emptyList()) }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val groups = groupStorage.loadGroups()
+            val avatarUrls = groups.associate { group ->
+                group.id to group.members.map { member ->
+                    characterStorage.getAvatarUri(member).toString()
+                }
+            }
+            _uiState.update { it.copy(groups = groups, groupAvatarUrls = avatarUrls, isLoading = false) }
+        }
     }
 
     fun showCreateDialog() {
-        _uiState.update { it.copy(error = "Group chats are not yet supported in standalone mode") }
+        viewModelScope.launch {
+            val characters = characterStorage.listCharacters()
+            val urls = characters.associate { char ->
+                (char.avatar ?: "${char.name}.png") to
+                    characterStorage.getAvatarUri(char.avatar ?: "${char.name}.png").toString()
+            }
+            _uiState.update {
+                it.copy(
+                    showCreateDialog = true,
+                    availableCharacters = characters,
+                    characterAvatarUrls = urls,
+                    newGroupName = "",
+                    selectedMembers = emptySet()
+                )
+            }
+        }
     }
 
     fun dismissCreateDialog() {
         _uiState.update {
-            it.copy(
-                showCreateDialog = false,
-                newGroupName = "",
-                selectedMembers = emptySet()
-            )
+            it.copy(showCreateDialog = false, newGroupName = "", selectedMembers = emptySet())
         }
     }
 
@@ -72,12 +97,25 @@ class GroupsViewModel @Inject constructor() : ViewModel() {
     }
 
     fun createGroup() {
-        _uiState.update {
-            it.copy(
-                isCreating = false,
-                showCreateDialog = false,
-                error = "Group chats are not yet supported in standalone mode"
+        val state = _uiState.value
+        if (state.newGroupName.isBlank()) {
+            _uiState.update { it.copy(error = "Group name cannot be empty") }
+            return
+        }
+        if (state.selectedMembers.size < 2) {
+            _uiState.update { it.copy(error = "Select at least 2 characters") }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCreating = true) }
+            val group = Group(
+                id = UUID.randomUUID().toString(),
+                name = state.newGroupName.trim(),
+                members = state.selectedMembers.toList()
             )
+            groupStorage.saveGroup(group)
+            _uiState.update { it.copy(isCreating = false, showCreateDialog = false) }
+            loadGroups()
         }
     }
 
@@ -90,7 +128,12 @@ class GroupsViewModel @Inject constructor() : ViewModel() {
     }
 
     fun deleteGroup() {
-        _uiState.update { it.copy(showDeleteDialog = false, groupToDelete = null) }
+        val group = _uiState.value.groupToDelete ?: return
+        viewModelScope.launch {
+            groupStorage.deleteGroup(group.id)
+            _uiState.update { it.copy(showDeleteDialog = false, groupToDelete = null) }
+            loadGroups()
+        }
     }
 
     fun clearError() {

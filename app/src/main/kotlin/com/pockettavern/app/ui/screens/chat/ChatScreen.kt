@@ -27,8 +27,13 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,7 +47,10 @@ import com.pockettavern.app.ui.components.*
 import com.pockettavern.app.domain.model.QuickReplyButton
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import android.app.Activity
+import android.content.Intent
 import android.graphics.BitmapFactory
+import android.speech.RecognizerIntent
 import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -86,6 +94,28 @@ fun ChatScreen(
         uri?.let { viewModel.uploadBackgroundFromUri(it) }
     }
 
+    // STT launcher
+    val sttLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spoken = result.data
+                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull() ?: ""
+            if (spoken.isNotBlank()) {
+                val current = uiState.inputText
+                viewModel.updateInput(if (current.isBlank()) spoken else "$current $spoken")
+            }
+        }
+    }
+
+    fun launchStt() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        }
+        try { sttLauncher.launch(intent) } catch (_: Exception) {}
+    }
+
     // Load character on first composition
     LaunchedEffect(characterAvatar) {
         viewModel.loadCharacter(characterAvatar)
@@ -97,6 +127,15 @@ fun ChatScreen(
         if (itemCount > 0) {
             // Use a large offset to scroll to the bottom of the last item
             listState.animateScrollToItem(itemCount - 1, scrollOffset = Int.MAX_VALUE)
+        }
+    }
+
+    // Scroll to current search result
+    LaunchedEffect(uiState.currentSearchResultIndex, uiState.searchResults) {
+        val results = uiState.searchResults
+        if (results.isNotEmpty()) {
+            val msgIndex = results[uiState.currentSearchResultIndex]
+            listState.animateScrollToItem(msgIndex)
         }
     }
 
@@ -131,6 +170,12 @@ fun ChatScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { viewModel.toggleSearch() }) {
+                        Icon(
+                            if (uiState.isSearching) Icons.Default.Close else Icons.Default.Search,
+                            contentDescription = if (uiState.isSearching) "Close search" else "Search messages"
+                        )
+                    }
                     Box {
                         IconButton(onClick = { showSettingsMenu = true }) {
                             Icon(Icons.Default.MoreVert, "Settings")
@@ -235,6 +280,67 @@ fun ChatScreen(
         },
         bottomBar = {
             Column {
+                // Message search bar
+                if (uiState.isSearching) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextField(
+                                value = uiState.searchQuery,
+                                onValueChange = { viewModel.updateSearchQuery(it) },
+                                modifier = Modifier.weight(1f),
+                                placeholder = { Text("Search messages...") },
+                                singleLine = true,
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedIndicatorColor = MaterialTheme.colorScheme.surfaceVariant
+                                ),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(onSearch = {})
+                            )
+                            if (uiState.searchResults.isNotEmpty()) {
+                                Text(
+                                    text = "${uiState.currentSearchResultIndex + 1}/${uiState.searchResults.size}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.padding(horizontal = 8.dp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                IconButton(onClick = { viewModel.navigateSearchResult(-1) }) {
+                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous result")
+                                }
+                                IconButton(onClick = { viewModel.navigateSearchResult(1) }) {
+                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next result")
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Context window usage indicator
+                if (uiState.contextUsedTokens > 0) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Context: ~${uiState.contextUsedTokens} tokens",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
                 // API indicator bar
                 if (uiState.currentApiName.isNotBlank()) {
                     Surface(
@@ -340,7 +446,8 @@ fun ChatScreen(
                     value = uiState.inputText,
                     onValueChange = { viewModel.updateInput(it) },
                     onSend = { viewModel.sendMessage() },
-                    enabled = !uiState.isGenerating && !uiState.isLoading && uiState.editingMessageIndex == null
+                    enabled = !uiState.isGenerating && !uiState.isLoading && uiState.editingMessageIndex == null,
+                    onVoiceInput = { launchStt() }
                 )
             }
         }

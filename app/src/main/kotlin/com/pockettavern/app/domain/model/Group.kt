@@ -1,8 +1,11 @@
 package com.pockettavern.app.domain.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * A group chat with multiple characters
  */
+@Serializable
 data class Group(
     val id: String,
     val name: String,

@@ -37,7 +37,13 @@ class CharacterStorage @Inject constructor(
 
     /** Read a single character card from fileName (e.g. "seraphina.png"). */
     suspend fun getCharacter(fileName: String): Character? = withContext(Dispatchers.IO) {
-        readCharacterFile(File(charactersDir, fileName))
+        val character = readCharacterFile(File(charactersDir, fileName)) ?: return@withContext null
+        val entity = characterDao.getByFileName(fileName)
+        character.copy(
+            isFavorite = entity?.isFavorite ?: character.isFavorite,
+            useAvatarForImageGen = entity?.useAvatarForImageGen ?: character.useAvatarForImageGen,
+            notes = entity?.notes ?: ""
+        )
     }
 
     /** Save a character card PNG with embedded metadata. Returns the saved file name. */
@@ -83,7 +89,8 @@ class CharacterStorage @Inject constructor(
                 tags = character.tags.joinToString(","),
                 isFavorite = character.isFavorite,
                 hasCharacterBook = character.hasCharacterBook,
-                useAvatarForImageGen = character.useAvatarForImageGen
+                useAvatarForImageGen = character.useAvatarForImageGen,
+                notes = character.notes
             )
         )
 

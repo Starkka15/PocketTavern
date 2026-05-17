@@ -105,6 +105,14 @@ fun CharacterSettingsScreen(
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
+                // Personal Notes Section
+                NotesSection(
+                    notes = uiState.notes,
+                    onNotesChange = viewModel::updateNotes
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+
                 // World Info Section
                 WorldInfoSection(
                     attachedWorldInfo = uiState.attachedWorldInfo,
@@ -172,6 +180,39 @@ fun CharacterSettingsScreen(
         ErrorDialog(
             message = error,
             onDismiss = { viewModel.clearError() }
+        )
+    }
+}
+
+@Composable
+private fun NotesSection(
+    notes: String,
+    onNotesChange: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Personal Notes",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = "Private notes about this character. Not sent to the AI.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        OutlinedTextField(
+            value = notes,
+            onValueChange = onNotesChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Add your notes here...") },
+            minLines = 3,
+            maxLines = 8,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
+            )
         )
     }
 }

@@ -33,6 +33,7 @@ data class CharacterSettingsUiState(
     val depthPromptRole: String = "system",
     val talkativeness: Float = 0.5f,
     val isFavorite: Boolean = false,
+    val notes: String = "",
     // Available world info files
     val availableWorldInfo: List<WorldInfoListItem> = emptyList(),
     // TTS voice
@@ -96,7 +97,8 @@ class CharacterSettingsViewModel @Inject constructor(
                             depthPromptDepth = character.depthPromptDepth,
                             depthPromptRole = character.depthPromptRole,
                             talkativeness = character.talkativeness,
-                            isFavorite = character.isFavorite
+                            isFavorite = character.isFavorite,
+                            notes = character.notes
                         )
                     }
                 }
@@ -155,6 +157,10 @@ class CharacterSettingsViewModel @Inject constructor(
         _uiState.update { it.copy(isFavorite = value) }
     }
 
+    fun updateNotes(value: String) {
+        _uiState.update { it.copy(notes = value) }
+    }
+
     fun saveSettings() {
         val state = _uiState.value
         val base = state.character ?: return
@@ -170,7 +176,8 @@ class CharacterSettingsViewModel @Inject constructor(
                 depthPromptDepth = state.depthPromptDepth,
                 depthPromptRole = state.depthPromptRole,
                 talkativeness = state.talkativeness,
-                isFavorite = state.isFavorite
+                isFavorite = state.isFavorite,
+                notes = state.notes
             )
 
             when (val result = localRepository.editCharacter(fileName, updated)) {

@@ -39,6 +39,7 @@ import com.pockettavern.app.ui.screens.debug.DebugLogScreen
 import com.pockettavern.app.ui.screens.theme.ThemeScreen
 import com.pockettavern.app.ui.screens.settings.ImageGenSettingsScreen
 import com.pockettavern.app.ui.screens.settings.TtsSettingsScreen
+import com.pockettavern.app.ui.screens.backup.BackupScreen
 import com.pockettavern.app.ui.audio.ThemeAudioManager
 
 @Composable
@@ -129,7 +130,14 @@ fun SillyTavernNavGraph(
                 onNavigateToConnectionProfiles = { navController.navigate(Route.ConnectionProfiles) },
                 onNavigateToTheme = { navController.navigate(Route.ThemeSettings) },
                 onNavigateToTtsSettings = { navController.navigate(Route.TtsSettings) },
-                onNavigateToImageGen = { navController.navigate(Route.ImageGenSettings) }
+                onNavigateToImageGen = { navController.navigate(Route.ImageGenSettings) },
+                onNavigateToBackup = { navController.navigate(Route.Backup) }
+            )
+        }
+
+        composable<Route.Backup> {
+            BackupScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 
