@@ -484,8 +484,14 @@ class ChatViewModel @Inject constructor(
         val character = _uiState.value.character ?: return
         viewModelScope.launch {
             val fileName = localRepository.generateChatFileName(character.name)
+            val userName = settingsDataStore.getUserPersonaName().ifBlank { "User" }
             val messages = if (!greeting.isNullOrBlank()) {
-                listOf(ChatMessage(content = greeting, isUser = false))
+                val substituted = greeting
+                    .replace("{{user}}", userName, ignoreCase = true)
+                    .replace("{{username}}", userName, ignoreCase = true)
+                    .replace("{{char}}", character.name, ignoreCase = true)
+                    .replace("{{charname}}", character.name, ignoreCase = true)
+                listOf(ChatMessage(content = substituted, isUser = false))
             } else emptyList()
             // Clear stale headers from previous chat
             extensionManager.clearMessageHeaders()

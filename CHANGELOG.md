@@ -4,6 +4,13 @@ All notable changes to PocketTavern are documented here.
 
 ---
 
+## [2.1.5.1] — 2026-05-17
+
+### Fixed
+- First message no longer shows raw `{{user}}` — persona name now substituted on greeting creation
+
+---
+
 ## [2.1.5] — 2026-05-17
 
 ### Added
