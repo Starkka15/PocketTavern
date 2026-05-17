@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Stop
@@ -214,9 +215,34 @@ fun GroupChatScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "Send a message to chat with the group",
+                            "Send a message, or let the characters introduce themselves.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(onClick = { viewModel.generateFirstMessage() }) {
+                            Icon(
+                                Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Generate Opening Message")
+                        }
+                    }
+                }
+                uiState.messages.isEmpty() && uiState.isGenerating -> {
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        StreamingBubble(
+                            characterName = uiState.streamingCharacterName,
+                            avatarUrl = uiState.memberAvatarUrls[uiState.streamingCharacterAvatar],
+                            content = uiState.streamingContent.ifBlank { "…" }
                         )
                     }
                 }

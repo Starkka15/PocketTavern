@@ -270,6 +270,116 @@ class GroupChatViewModel @Inject constructor(
         append("${character.name}:")
     }
 
+    fun generateFirstMessage() {
+        val group = _uiState.value.group ?: return
+        if (_uiState.value.isGenerating) return
+        viewModelScope.launch {
+            val enabled = group.enabledMembers
+            if (enabled.isEmpty()) return@launch
+            // Pick opener(s) — in LIST mode all members greet; otherwise just one
+            val openers = if (group.activationStrategy == ActivationStrategy.LIST) {
+                enabled
+            } else {
+                listOf(pickByTalkativeness(enabled))
+            }
+            for (fileName in openers) {
+                val character = loadedCharacters[fileName] ?: continue
+                generateFirstMessageFor(group, character, fileName)
+            }
+        }
+    }
+
+    private suspend fun generateFirstMessageFor(
+        group: Group,
+        character: Character,
+        fileName: String
+    ) {
+        val config = when (val r = localRepository.getApiConfiguration()) {
+            is Result.Success -> r.data
+            is Result.Error -> ApiConfiguration.DEFAULT
+        }
+        val preset = localRepository.getCurrentTextGenPreset()
+        val members = group.enabledMembers.mapNotNull { f -> loadedCharacters[f]?.name }
+
+        _uiState.update {
+            it.copy(
+                isGenerating = true,
+                streamingCharacterName = character.name,
+                streamingCharacterAvatar = fileName,
+                streamingContent = ""
+            )
+        }
+
+        val prompt = buildFirstMessagePrompt(character, group.name, members)
+
+        generationJob = viewModelScope.launch {
+            llmRepository.generate(prompt, config, preset).collect { event ->
+                when (event) {
+                    is StreamEvent.Token -> {
+                        _uiState.update { it.copy(streamingContent = event.accumulated) }
+                    }
+                    is StreamEvent.Complete -> {
+                        val content = event.fullText.trim()
+                        val aiMsg = GroupChatMessage(
+                            content = content,
+                            isUser = false,
+                            senderName = character.name,
+                            senderAvatar = fileName
+                        )
+                        val newMessages = _uiState.value.messages + aiMsg
+                        _uiState.update {
+                            it.copy(
+                                messages = newMessages,
+                                isGenerating = false,
+                                streamingContent = "",
+                                streamingCharacterName = "",
+                                streamingCharacterAvatar = ""
+                            )
+                        }
+                        groupStorage.appendMessage(group.id, aiMsg)
+                        generationJob = null
+                    }
+                    is StreamEvent.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                isGenerating = false,
+                                streamingContent = "",
+                                streamingCharacterName = "",
+                                streamingCharacterAvatar = "",
+                                error = event.message
+                            )
+                        }
+                        generationJob = null
+                    }
+                }
+            }
+        }
+        generationJob?.join()
+    }
+
+    private fun buildFirstMessagePrompt(
+        character: Character,
+        groupName: String,
+        memberNames: List<String>
+    ): String = buildString {
+        append("[character(\"${character.name}\")\n")
+        if (character.description.isNotBlank()) append("description: ${character.description.take(800)}\n")
+        if (character.personality.isNotBlank()) append("personality: ${character.personality.take(400)}\n")
+        if (character.scenario.isNotBlank()) append("scenario: ${character.scenario.take(400)}\n")
+        append("]\n\n")
+
+        val others = memberNames.filter { it != character.name }
+        append("This is a group chat named \"$groupName\" with ")
+        if (others.isNotEmpty()) {
+            append("${character.name} and ${others.joinToString(", ")}. ")
+        } else {
+            append("${character.name}. ")
+        }
+        append("Write an in-character opening message for ${character.name} that sets the scene and greets the group. ")
+        append("Be creative and true to the character's personality.\n\n")
+        append("${character.name}:")
+    }
+
     fun setActivationStrategy(strategy: Int) {
         val group = _uiState.value.group ?: return
         val updated = group.copy(activationStrategy = strategy)
