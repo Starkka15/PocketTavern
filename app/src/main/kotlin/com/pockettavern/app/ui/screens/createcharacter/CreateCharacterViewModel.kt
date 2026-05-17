@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
 import com.pockettavern.app.data.repository.ForgeRepository
+import com.pockettavern.app.data.repository.ImageGenRepository
 import com.pockettavern.app.data.repository.LocalRepository
 import com.pockettavern.app.data.repository.SettingsRepository
 import com.pockettavern.app.domain.model.Character
@@ -61,6 +62,7 @@ data class CreateCharacterUiState(
 class CreateCharacterViewModel @Inject constructor(
     private val localRepository: LocalRepository,
     private val forgeRepository: ForgeRepository,
+    private val imageGenRepository: ImageGenRepository,
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
@@ -211,7 +213,7 @@ class CreateCharacterViewModel @Inject constructor(
                 steps = 20
             )
 
-            forgeRepository.generateImageWithProgress(params).collect { state ->
+            imageGenRepository.generateImageWithProgress(params).collect { state ->
                 _uiState.update { it.copy(generationState = state) }
 
                 when (state) {

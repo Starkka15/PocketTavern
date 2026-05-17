@@ -115,7 +115,8 @@ object NetworkModule {
             ImageGenBackendType.DALLE to DalleBackend(forgeClient, settingsDataStore),
             ImageGenBackendType.STABILITY to StabilityBackend(forgeClient, settingsDataStore),
             ImageGenBackendType.POLLINATIONS to PollinationsBackend(forgeClient, settingsDataStore),
-            ImageGenBackendType.HUGGINGFACE to HuggingFaceBackend(forgeClient, settingsDataStore)
+            ImageGenBackendType.HUGGINGFACE to HuggingFaceBackend(forgeClient, settingsDataStore),
+            ImageGenBackendType.NANO_GPT to NanoGptBackend(forgeClient, settingsDataStore)
         )
     }
 

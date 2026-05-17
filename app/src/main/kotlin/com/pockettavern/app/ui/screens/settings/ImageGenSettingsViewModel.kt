@@ -102,6 +102,14 @@ class ImageGenSettingsViewModel @Inject constructor(
         updateConfig { it.copy(pollinationsModel = model) }
     }
 
+    fun updateNanoGptApiKey(key: String) {
+        updateConfig { it.copy(nanoGptApiKey = key) }
+    }
+
+    fun updateNanoGptModel(model: String) {
+        updateConfig { it.copy(nanoGptModel = model) }
+    }
+
     fun updateSampler(sampler: String) {
         updateConfig { it.copy(sampler = sampler) }
     }

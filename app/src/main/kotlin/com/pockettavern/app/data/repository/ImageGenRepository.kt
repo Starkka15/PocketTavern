@@ -3,6 +3,7 @@ package com.pockettavern.app.data.repository
 import com.pockettavern.app.data.local.SettingsDataStore
 import com.pockettavern.app.data.remote.imagegen.ImageGenBackend
 import com.pockettavern.app.domain.model.*
+import com.pockettavern.app.util.DebugLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
@@ -51,11 +52,15 @@ class ImageGenRepository @Inject constructor(
     }
 
     fun generateImageWithProgress(params: ForgeGenerationParams): Flow<GenerationState> = flow {
+        val config = settingsDataStore.getImageGenConfig()
+        DebugLogger.log("ImageGen: activeBackend=${config.activeBackend}")
         val backend = getActiveBackend()
         if (backend == null) {
+            DebugLogger.log("ImageGen: no backend found for ${config.activeBackend}")
             emit(GenerationState.Error("No image generation backend configured"))
             return@flow
         }
+        DebugLogger.log("ImageGen: dispatching to ${backend.type}")
         backend.generate(params).collect { emit(it) }
     }
 

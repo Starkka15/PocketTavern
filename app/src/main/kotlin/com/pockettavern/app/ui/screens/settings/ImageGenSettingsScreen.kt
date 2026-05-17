@@ -278,10 +278,74 @@ fun ImageGenSettingsScreen(
                                     }
                                 }
                             }
+                            ImageGenBackendType.NANO_GPT -> {
+                                OutlinedTextField(
+                                    value = config.nanoGptApiKey,
+                                    onValueChange = { viewModel.updateNanoGptApiKey(it) },
+                                    label = { Text("nano-gpt API Key") },
+                                    placeholder = { Text("sk-nano-...") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    visualTransformation = PasswordVisualTransformation(),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                                    colors = imageGenTextFieldColors()
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                val nanoModels = uiState.models
+                                if (nanoModels.isNotEmpty()) {
+                                    var nanoExpanded by remember { mutableStateOf(false) }
+                                    ExposedDropdownMenuBox(
+                                        expanded = nanoExpanded,
+                                        onExpandedChange = { nanoExpanded = it }
+                                    ) {
+                                        OutlinedTextField(
+                                            value = config.nanoGptModel.ifBlank { nanoModels.first() },
+                                            onValueChange = {},
+                                            readOnly = true,
+                                            label = { Text("Model") },
+                                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(nanoExpanded) },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                            colors = imageGenTextFieldColors()
+                                        )
+                                        ExposedDropdownMenu(
+                                            expanded = nanoExpanded,
+                                            onDismissRequest = { nanoExpanded = false }
+                                        ) {
+                                            nanoModels.forEach { model ->
+                                                DropdownMenuItem(
+                                                    text = { Text(model) },
+                                                    onClick = {
+                                                        viewModel.updateNanoGptModel(model)
+                                                        nanoExpanded = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    OutlinedButton(
+                                        onClick = { viewModel.fetchModels() },
+                                        enabled = config.nanoGptApiKey.isNotBlank() && !uiState.isLoadingModels,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        if (uiState.isLoadingModels) {
+                                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                        } else {
+                                            Icon(Icons.Default.Refresh, null, Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                        }
+                                        Text("Load Models")
+                                    }
+                                }
+                            }
                         }
 
                         // Test Connection button
-                        if (caps.requiresUrl) {
+                        if (caps.requiresUrl || caps.requiresApiKey) {
                             Spacer(modifier = Modifier.height(12.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),

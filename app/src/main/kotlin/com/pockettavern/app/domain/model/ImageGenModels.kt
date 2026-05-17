@@ -8,7 +8,8 @@ enum class ImageGenBackendType {
     DALLE,
     STABILITY,
     POLLINATIONS,
-    HUGGINGFACE;
+    HUGGINGFACE,
+    NANO_GPT;
 
     val displayName: String
         get() = when (this) {
@@ -18,6 +19,7 @@ enum class ImageGenBackendType {
             STABILITY -> "Stability AI"
             POLLINATIONS -> "Pollinations"
             HUGGINGFACE -> "HuggingFace"
+            NANO_GPT -> "nano-gpt"
         }
 }
 
@@ -50,6 +52,8 @@ data class ImageGenConfig(
     val pollinationsModel: String = "flux",
     val huggingfaceApiKey: String = "",
     val huggingfaceModel: String = "stabilityai/stable-diffusion-xl-base-1.0",
+    val nanoGptApiKey: String = "",
+    val nanoGptModel: String = "chroma",
     val sampler: String = "Euler",
     val scheduler: String = "",
     val steps: Int = 20,

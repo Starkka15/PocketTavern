@@ -4,6 +4,13 @@ All notable changes to PocketTavern are documented here.
 
 ---
 
+## [2.1.5] — 2026-05-17
+
+### Added
+- **nano-gpt image generation** — new backend option in Image Generation settings; models loaded automatically from the nano-gpt API
+
+---
+
 ## [2.0.0] — 2026-02-21 — Standalone Release
 
 ### Overview
