@@ -7,7 +7,6 @@ import com.pockettavern.app.data.local.SettingsDataStore
 import com.pockettavern.app.data.remote.api.CharaVaultApi
 import com.pockettavern.app.data.remote.api.ForgeApi
 import com.pockettavern.app.data.remote.api.GitHubApi
-import com.pockettavern.app.data.repository.CardSearchRepository
 import com.pockettavern.app.data.repository.CharaVaultRepository
 import com.pockettavern.app.data.remote.imagegen.*
 import com.pockettavern.app.data.repository.ForgeRepository
@@ -179,27 +178,6 @@ object NetworkModule {
         characterStorage: CharacterStorage,
         loreBookStorage: LoreBookStorage
     ): CharaVaultRepository = CharaVaultRepository(charaVaultApiProvider, characterStorage, loreBookStorage)
-
-    // ── Card Search (multi-source) ─────────────────────────────────────────────
-
-    @Provides
-    @Singleton
-    @Named("CardSearch")
-    fun provideCardSearchOkHttpClient(
-        loggingInterceptor: HttpLoggingInterceptor
-    ): OkHttpClient = OkHttpClient.Builder()
-        .addInterceptor(loggingInterceptor)
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .build()
-
-    @Provides
-    @Singleton
-    fun provideCardSearchRepository(
-        @Named("CardSearch") okHttpClient: OkHttpClient,
-        characterStorage: CharacterStorage
-    ): CardSearchRepository = CardSearchRepository(okHttpClient, characterStorage)
 
     // ── GitHub ────────────────────────────────────────────────────────────────
 

@@ -37,7 +37,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import com.pockettavern.app.domain.model.CardSource
 import com.pockettavern.app.domain.model.CharaVaultCharacter
 import com.pockettavern.app.domain.model.CharaVaultLorebook
 import com.pockettavern.app.domain.model.CharaVaultNsfwFilter
@@ -85,19 +84,18 @@ fun CharaVaultScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    // Content type dropdown (lorebooks only available for CharaVault)
-                    val isCharaVault = uiState.selectedSource == CardSource.CHARAVAULT
+                    // Content type dropdown
                     Box {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = if (isCharaVault) Modifier.clickable { showContentTypeMenu = true } else Modifier
+                            modifier = Modifier.clickable { showContentTypeMenu = true }
                         ) {
                             Column {
-                                Text(if (isCharaVault) uiState.contentType.displayName else "Card Search")
+                                Text(uiState.contentType.displayName)
                                 val countText = when {
-                                    isCharaVault && uiState.contentType == CharaVaultContentType.CHARACTERS ->
+                                    uiState.contentType == CharaVaultContentType.CHARACTERS ->
                                         uiState.stats?.totalCards?.let { "$it cards" }
-                                    isCharaVault && uiState.contentType == CharaVaultContentType.LOREBOOKS ->
+                                    uiState.contentType == CharaVaultContentType.LOREBOOKS ->
                                         uiState.lorebookStats?.totalLorebooks?.let { "$it lorebooks" }
                                     else -> null
                                 }
@@ -109,13 +107,11 @@ fun CharaVaultScreen(
                                     )
                                 }
                             }
-                            if (isCharaVault) {
-                                Icon(
-                                    Icons.Default.ArrowDropDown,
-                                    contentDescription = "Switch content type",
-                                    modifier = Modifier.padding(start = 4.dp)
-                                )
-                            }
+                            Icon(
+                                Icons.Default.ArrowDropDown,
+                                contentDescription = "Switch content type",
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
                         }
 
                         // Content type dropdown menu (CharaVault only)
@@ -149,7 +145,7 @@ fun CharaVaultScreen(
                 },
                 actions = {
                     // Login/account button when in CharaVault.net mode
-                    if (uiState.selectedSource == CardSource.CHARAVAULT && uiState.charavaultMode == "charavault") {
+                    if (uiState.charavaultMode == "charavault") {
                         if (uiState.isLoggedIn) {
                             IconButton(onClick = { showSettingsDialog = true }) {
                                 Icon(Icons.Default.AccountCircle, contentDescription = "Account", tint = MaterialTheme.colorScheme.primary)
@@ -199,7 +195,7 @@ fun CharaVaultScreen(
             )
         }
     ) { paddingValues ->
-        if (!uiState.isServerConfigured && uiState.selectedSource == CardSource.CHARAVAULT) {
+        if (!uiState.isServerConfigured) {
             // Server not configured
             Box(
                 modifier = Modifier
@@ -239,26 +235,6 @@ fun CharaVaultScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                // Source selector row
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    CardSource.entries.forEach { source ->
-                        FilterChip(
-                            selected = uiState.selectedSource == source,
-                            onClick = { viewModel.setSource(source) },
-                            label = { Text(source.displayName) },
-                            leadingIcon = if (uiState.selectedSource == source) {
-                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                            } else null
-                        )
-                    }
-                }
-
                 // Search bar and tag selector
                 Row(
                     modifier = Modifier
@@ -274,17 +250,14 @@ fun CharaVaultScreen(
                         modifier = Modifier.weight(1f)
                     )
 
-                    // Tag selector button (CharaVault only — tags are loaded from server)
-                    if (uiState.selectedSource == CardSource.CHARAVAULT) {
-                        FilledTonalButton(
-                            onClick = { showTagSelector = true },
-                            modifier = Modifier.padding(top = 8.dp)
-                        ) {
-                            Icon(Icons.Default.Label, contentDescription = null)
-                            if (uiState.selectedTags.isNotEmpty()) {
-                                Spacer(Modifier.width(4.dp))
-                                Text("${uiState.selectedTags.size}")
-                            }
+                    FilledTonalButton(
+                        onClick = { showTagSelector = true },
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) {
+                        Icon(Icons.Default.Label, contentDescription = null)
+                        if (uiState.selectedTags.isNotEmpty()) {
+                            Spacer(Modifier.width(4.dp))
+                            Text("${uiState.selectedTags.size}")
                         }
                     }
                 }

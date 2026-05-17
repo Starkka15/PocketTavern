@@ -3,9 +3,7 @@ package com.pockettavern.app.ui.screens.charavault
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pockettavern.app.data.local.SettingsDataStore
-import com.pockettavern.app.data.repository.CardSearchRepository
 import com.pockettavern.app.data.repository.CharaVaultRepository
-import com.pockettavern.app.domain.model.CardSource
 import com.pockettavern.app.domain.model.CharaVaultCharacter
 import com.pockettavern.app.domain.model.CharaVaultNsfwFilter
 import com.pockettavern.app.domain.model.CharaVaultStats
@@ -28,10 +26,7 @@ enum class CharaVaultContentType(val displayName: String) {
 }
 
 data class CharaVaultUiState(
-    // Source selection
-    val selectedSource: CardSource = CardSource.CHARAVAULT,
-
-    // Content type switching (CharaVault only)
+    // Content type switching
     val contentType: CharaVaultContentType = CharaVaultContentType.CHARACTERS,
 
     // Common fields
@@ -78,7 +73,6 @@ data class CharaVaultUiState(
 class CharaVaultViewModel @Inject constructor(
     private val repository: CharaVaultRepository,
     private val settingsDataStore: SettingsDataStore,
-    private val cardSearchRepository: CardSearchRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CharaVaultUiState())
@@ -86,7 +80,6 @@ class CharaVaultViewModel @Inject constructor(
 
     companion object {
         const val PAGE_SIZE = 50
-        const val EXTERNAL_PAGE_SIZE = 48
     }
 
     init {
@@ -132,34 +125,6 @@ class CharaVaultViewModel @Inject constructor(
                 search()
             }
         }
-    }
-
-    fun setSource(source: CardSource) {
-        _uiState.update {
-            it.copy(
-                selectedSource = source,
-                characterResults = emptyList(),
-                lorebookResults = emptyList(),
-                currentPage = 1,
-                totalCount = 0,
-                totalPages = 1,
-                selectedTags = emptyList(),
-                error = null,
-                importSuccess = false,
-                selectedCharacter = null,
-                selectedLorebook = null,
-                contentType = CharaVaultContentType.CHARACTERS
-            )
-        }
-        if (source == CardSource.CHARAVAULT) {
-            // Re-init CharaVault (reload stats/tags if configured)
-            val state = _uiState.value
-            if (state.isServerConfigured) {
-                loadStats()
-                loadTags()
-            }
-        }
-        search()
     }
 
     fun setServerUrl(url: String) {
@@ -299,7 +264,6 @@ class CharaVaultViewModel @Inject constructor(
     }
 
     fun loadStats() {
-        if (_uiState.value.selectedSource != CardSource.CHARAVAULT) return
         viewModelScope.launch {
             when (val result = repository.getStats()) {
                 is Result.Success -> _uiState.update { it.copy(stats = result.data) }
@@ -309,7 +273,6 @@ class CharaVaultViewModel @Inject constructor(
     }
 
     fun loadTags() {
-        if (_uiState.value.selectedSource != CardSource.CHARAVAULT) return
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingTags = true) }
             when (val result = repository.getTags()) {
@@ -332,21 +295,14 @@ class CharaVaultViewModel @Inject constructor(
     }
 
     fun search(query: String = _uiState.value.searchQuery) {
-        val state = _uiState.value
-        if (state.selectedSource != CardSource.CHARAVAULT) {
-            searchCharactersExternal(query)
-            return
-        }
-        if (state.contentType == CharaVaultContentType.CHARACTERS) {
-            searchCharactersCharaVault(query)
+        if (_uiState.value.contentType == CharaVaultContentType.CHARACTERS) {
+            searchCharacters(query)
         } else {
             searchLorebooks(query)
         }
     }
 
-    // ── CharaVault character search ───────────────────────────────────────────
-
-    private fun searchCharactersCharaVault(query: String) {
+    private fun searchCharacters(query: String) {
         viewModelScope.launch {
             try {
                 DebugLogger.log("CharaVault: Starting character search, query='$query'")
@@ -383,50 +339,6 @@ class CharaVaultViewModel @Inject constructor(
             }
         }
     }
-
-    // ── External source character search ──────────────────────────────────────
-
-    private fun searchCharactersExternal(query: String) {
-        viewModelScope.launch {
-            try {
-                val source = _uiState.value.selectedSource
-                DebugLogger.log("CardSearch: Starting ${source.displayName} search, query='$query'")
-                _uiState.update {
-                    it.copy(searchQuery = query, isLoading = true, currentPage = 1, characterResults = emptyList(), error = null)
-                }
-                val state = _uiState.value
-                when (val result = cardSearchRepository.search(
-                    source = source,
-                    query = query.takeIf { it.isNotBlank() },
-                    nsfwFilter = state.nsfwFilter,
-                    tags = state.selectedTags.takeIf { it.isNotEmpty() },
-                    page = 1, limit = EXTERNAL_PAGE_SIZE
-                )) {
-                    is Result.Success -> {
-                        DebugLogger.log("CardSearch: Got ${result.data.characters.size} results from ${source.displayName}")
-                        _uiState.update {
-                            it.copy(
-                                characterResults = result.data.characters,
-                                currentPage = result.data.currentPage,
-                                totalPages = result.data.totalPages,
-                                totalCount = result.data.totalCount,
-                                isLoading = false
-                            )
-                        }
-                    }
-                    is Result.Error -> {
-                        DebugLogger.logError("CardSearch", "${source.displayName} search failed", result.exception)
-                        _uiState.update { it.copy(isLoading = false, error = result.exception.message ?: "Search failed") }
-                    }
-                }
-            } catch (e: Exception) {
-                DebugLogger.logError("CardSearch", "Uncaught exception", e)
-                _uiState.update { it.copy(isLoading = false, error = "Crash: ${e.message}") }
-            }
-        }
-    }
-
-    // ── Lorebook search (CharaVault only) ──────────────────────────────────────
 
     private fun searchLorebooks(query: String) {
         viewModelScope.launch {
@@ -471,16 +383,14 @@ class CharaVaultViewModel @Inject constructor(
     fun loadMore() {
         val state = _uiState.value
         if (state.isLoadingMore || state.currentPage >= state.totalPages) return
-        if (state.selectedSource != CardSource.CHARAVAULT) {
-            loadMoreExternal()
-        } else if (state.contentType == CharaVaultContentType.CHARACTERS) {
-            loadMoreCharactersCharaVault()
+        if (state.contentType == CharaVaultContentType.CHARACTERS) {
+            loadMoreCharacters()
         } else {
             loadMoreLorebooks()
         }
     }
 
-    private fun loadMoreCharactersCharaVault() {
+    private fun loadMoreCharacters() {
         val state = _uiState.value
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingMore = true) }
@@ -490,30 +400,6 @@ class CharaVaultViewModel @Inject constructor(
                 nsfwFilter = state.nsfwFilter,
                 tags = state.selectedTags.takeIf { it.isNotEmpty() },
                 page = nextPage, limit = PAGE_SIZE
-            )) {
-                is Result.Success -> {
-                    _uiState.update {
-                        it.copy(characterResults = it.characterResults + result.data.characters, currentPage = nextPage, isLoadingMore = false)
-                    }
-                }
-                is Result.Error -> {
-                    _uiState.update { it.copy(isLoadingMore = false, error = result.exception.message) }
-                }
-            }
-        }
-    }
-
-    private fun loadMoreExternal() {
-        val state = _uiState.value
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingMore = true) }
-            val nextPage = state.currentPage + 1
-            when (val result = cardSearchRepository.search(
-                source = state.selectedSource,
-                query = state.searchQuery.takeIf { it.isNotBlank() },
-                nsfwFilter = state.nsfwFilter,
-                tags = state.selectedTags.takeIf { it.isNotEmpty() },
-                page = nextPage, limit = EXTERNAL_PAGE_SIZE
             )) {
                 is Result.Success -> {
                     _uiState.update {
@@ -562,9 +448,7 @@ class CharaVaultViewModel @Inject constructor(
     fun goToPage(page: Int) {
         val state = _uiState.value
         if (page < 1 || page > state.totalPages || page == state.currentPage) return
-        if (state.selectedSource != CardSource.CHARAVAULT) {
-            goToExternalPage(page)
-        } else if (state.contentType == CharaVaultContentType.CHARACTERS) {
+        if (state.contentType == CharaVaultContentType.CHARACTERS) {
             goToCharacterPage(page)
         } else {
             goToLorebookPage(page)
@@ -580,30 +464,6 @@ class CharaVaultViewModel @Inject constructor(
                 nsfwFilter = state.nsfwFilter,
                 tags = state.selectedTags.takeIf { it.isNotEmpty() },
                 page = page, limit = PAGE_SIZE
-            )) {
-                is Result.Success -> {
-                    _uiState.update {
-                        it.copy(characterResults = result.data.characters, currentPage = result.data.currentPage,
-                            totalPages = result.data.totalPages, totalCount = result.data.totalCount, isLoading = false)
-                    }
-                }
-                is Result.Error -> {
-                    _uiState.update { it.copy(isLoading = false, error = result.exception.message) }
-                }
-            }
-        }
-    }
-
-    private fun goToExternalPage(page: Int) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            val state = _uiState.value
-            when (val result = cardSearchRepository.search(
-                source = state.selectedSource,
-                query = state.searchQuery.takeIf { it.isNotBlank() },
-                nsfwFilter = state.nsfwFilter,
-                tags = state.selectedTags.takeIf { it.isNotEmpty() },
-                page = page, limit = EXTERNAL_PAGE_SIZE
             )) {
                 is Result.Success -> {
                     _uiState.update {
@@ -649,15 +509,9 @@ class CharaVaultViewModel @Inject constructor(
     fun selectCharacter(character: CharaVaultCharacter) {
         viewModelScope.launch {
             _uiState.update { it.copy(selectedCharacter = character, isLoadingDetails = true, importSuccess = false) }
-
-            // Only fetch full details for CharaVault (external sources don't have a detail API)
-            if (_uiState.value.selectedSource == CardSource.CHARAVAULT) {
-                when (val result = repository.getCardDetails(character.folder, character.file)) {
-                    is Result.Success -> _uiState.update { it.copy(selectedCharacter = result.data, isLoadingDetails = false) }
-                    is Result.Error -> _uiState.update { it.copy(isLoadingDetails = false) }
-                }
-            } else {
-                _uiState.update { it.copy(isLoadingDetails = false) }
+            when (val result = repository.getCardDetails(character.folder, character.file)) {
+                is Result.Success -> _uiState.update { it.copy(selectedCharacter = result.data, isLoadingDetails = false) }
+                is Result.Error -> _uiState.update { it.copy(isLoadingDetails = false) }
             }
         }
     }
@@ -670,12 +524,7 @@ class CharaVaultViewModel @Inject constructor(
         val character = _uiState.value.selectedCharacter ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isImporting = true, error = null) }
-            val result = if (_uiState.value.selectedSource != CardSource.CHARAVAULT) {
-                cardSearchRepository.importCard(character)
-            } else {
-                repository.importCard(character)
-            }
-            when (result) {
+            when (val result = repository.importCard(character)) {
                 is Result.Success -> _uiState.update { it.copy(isImporting = false, importSuccess = true) }
                 is Result.Error -> _uiState.update { it.copy(isImporting = false, error = result.exception.message ?: "Import failed") }
             }
@@ -732,9 +581,6 @@ class CharaVaultViewModel @Inject constructor(
     // ── Image URL ──────────────────────────────────────────────────────────────
 
     fun buildImageUrl(character: CharaVaultCharacter): String {
-        // External sources provide their own image URL
-        character.externalImageUrl?.let { return it }
-
         return try {
             val baseUrl = if (_uiState.value.charavaultMode == "charavault") {
                 "https://charavault.net"
