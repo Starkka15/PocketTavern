@@ -58,7 +58,7 @@ class GroupChatViewModel @Inject constructor(
     private var generationJob: Job? = null
     private var loadedCharacters: Map<String, Character> = emptyMap()
     private var lastSpeakerFileName: String? = null   // avoid same char replying twice in a row
-    private val maxFollowUps = 2  // max auto follow-up exchanges per user turn
+    private val maxFollowUps = 3  // max auto follow-up exchanges per user turn
 
     fun loadGroup(groupId: String) {
         viewModelScope.launch {
@@ -137,23 +137,24 @@ class GroupChatViewModel @Inject constructor(
                 }
             }
             else -> {
-                // NATURAL / POOLED / MANUAL: one primary responder, then optional follow-ups
+                // NATURAL / POOLED / MANUAL: one primary responder, then follow-ups
+                val pool = enabled.filter { it != lastSpeakerFileName }.ifEmpty { enabled }
                 val first = when (group.activationStrategy) {
-                    ActivationStrategy.POOLED -> enabled.filter { it != lastSpeakerFileName }
-                        .ifEmpty { enabled }.random()
-                    else -> pickByTalkativeness(enabled.filter { it != lastSpeakerFileName }.ifEmpty { enabled })
+                    ActivationStrategy.POOLED -> pool.random()
+                    else -> pickByTalkativeness(pool)
                 }
                 val firstChar = loadedCharacters[first] ?: return
                 generateForCharacter(group, firstChar, first)
                 lastSpeakerFileName = first
 
-                // Probabilistic follow-ups: other characters may chime in
+                // Follow-ups: first one is ALWAYS guaranteed (so characters reply to each other),
+                // subsequent ones are probabilistic based on talkativeness.
                 var followUps = 0
                 while (followUps < maxFollowUps) {
                     val others = enabled.filter { it != lastSpeakerFileName }
                     if (others.isEmpty()) break
-                    // Each character's chance to jump in = talkativeness * 0.6
-                    val next = pickFollowUp(others) ?: break
+                    val guaranteed = followUps == 0   // first follow-up always fires
+                    val next = pickFollowUp(others, guaranteed) ?: break
                     val nextChar = loadedCharacters[next] ?: break
                     generateForCharacter(group, nextChar, next)
                     lastSpeakerFileName = next
@@ -177,16 +178,15 @@ class GroupChatViewModel @Inject constructor(
         return candidates.last()
     }
 
-    // Returns a character that probabilistically decides to chime in, or null if no one does.
-    private fun pickFollowUp(candidates: List<String>): String? {
-        // Shuffle so every candidate gets a fair chance
-        val shuffled = candidates.shuffled()
-        for (fileName in shuffled) {
-            val talk = loadedCharacters[fileName]?.talkativeness?.coerceIn(0f, 1f) ?: 0.5f
-            // Probability of joining = talkativeness * 0.55 (max ~55% for talkativeness=1)
-            if (Random.nextFloat() < talk * 0.55f) return fileName
-        }
-        return null
+    // Returns next character to chime in.
+    // guaranteed=true → always picks the most talkative candidate (first follow-up after primary).
+    // guaranteed=false → probabilistic: 30% base + talkativeness*60% (cap ~90%).
+    private fun pickFollowUp(candidates: List<String>, guaranteed: Boolean): String? {
+        if (candidates.isEmpty()) return null
+        val picked = pickByTalkativeness(candidates)
+        if (guaranteed) return picked
+        val talk = loadedCharacters[picked]?.talkativeness?.coerceIn(0f, 1f) ?: 0.5f
+        return if (Random.nextFloat() < 0.3f + talk * 0.6f) picked else null
     }
 
     private suspend fun generateForCharacter(
