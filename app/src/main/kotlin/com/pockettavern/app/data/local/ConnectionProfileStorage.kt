@@ -1,6 +1,8 @@
 package com.pockettavern.app.data.local
 
 import android.content.Context
+import androidx.security.crypto.EncryptedFile
+import androidx.security.crypto.MasterKeys
 import com.pockettavern.app.domain.model.ConnectionProfile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.serialization.json.Json
@@ -23,18 +25,33 @@ class ConnectionProfileStorage @Inject constructor(
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
     private val file: File get() = File(context.filesDir, "connection_profiles.json")
 
+    private fun encryptedFile() = EncryptedFile.Builder(
+        file,
+        context,
+        MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC),
+        EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB
+    ).build()
+
     fun loadProfiles(): List<ConnectionProfile> {
         if (!file.exists()) return emptyList()
         return try {
-            val arr = json.parseToJsonElement(file.readText()).jsonArray
-            arr.map { parseProfile(it.jsonObject) }
+            val text = encryptedFile().openFileInput().use { it.bufferedReader().readText() }
+            json.parseToJsonElement(text).jsonArray.map { parseProfile(it.jsonObject) }
         } catch (_: Exception) {
-            emptyList()
+            // Plaintext migration: read plain JSON, re-save encrypted
+            try {
+                val text = file.readText()
+                val profiles = json.parseToJsonElement(text).jsonArray.map { parseProfile(it.jsonObject) }
+                saveProfiles(profiles)
+                profiles
+            } catch (_: Exception) {
+                emptyList()
+            }
         }
     }
 
     fun saveProfiles(profiles: List<ConnectionProfile>) {
-        val arr: JsonArray = buildJsonArray {
+        val content: JsonArray = buildJsonArray {
             profiles.forEach { p ->
                 add(buildJsonObject {
                     put("id", p.id)
@@ -53,7 +70,9 @@ class ConnectionProfileStorage @Inject constructor(
                 })
             }
         }
-        file.writeText(arr.toString())
+        // EncryptedFile requires the file to not exist before writing
+        if (file.exists()) file.delete()
+        encryptedFile().openFileOutput().use { it.write(content.toString().toByteArray()) }
     }
 
     private fun parseProfile(obj: kotlinx.serialization.json.JsonObject): ConnectionProfile {

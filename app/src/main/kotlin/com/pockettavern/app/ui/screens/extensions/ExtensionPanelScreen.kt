@@ -974,7 +974,14 @@ private class PanelBridge(
 
                 DebugLogger.log("[BotBrowser proxy] $method $url")
 
-                val conn = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                val parsedUrl = java.net.URL(url)
+                val scheme = parsedUrl.protocol.lowercase()
+                if (scheme != "http" && scheme != "https")
+                    throw SecurityException("Blocked scheme: $scheme")
+                val host = parsedUrl.host.lowercase().trimEnd('.')
+                if (host == "localhost" || host == "::1" || host == "0.0.0.0" || host.startsWith("127."))
+                    throw SecurityException("Blocked loopback host: $host")
+                val conn = parsedUrl.openConnection() as java.net.HttpURLConnection
                 conn.requestMethod = method
                 conn.connectTimeout = timeoutMs
                 conn.readTimeout   = timeoutMs
@@ -1040,7 +1047,16 @@ private class PanelBridge(
  */
 private fun proxyRequest(url: String, corsHeaders: Map<String, String>): WebResourceResponse {
     return try {
-        val conn = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+        val parsedUrl = java.net.URL(url)
+        val scheme = parsedUrl.protocol.lowercase()
+        if (scheme != "http" && scheme != "https")
+            return WebResourceResponse("application/json", "UTF-8", 403, "Forbidden",
+                corsHeaders, """{"error":"blocked scheme"}""".byteInputStream())
+        val host = parsedUrl.host.lowercase().trimEnd('.')
+        if (host == "localhost" || host == "::1" || host == "0.0.0.0" || host.startsWith("127."))
+            return WebResourceResponse("application/json", "UTF-8", 403, "Forbidden",
+                corsHeaders, """{"error":"blocked host"}""".byteInputStream())
+        val conn = parsedUrl.openConnection() as java.net.HttpURLConnection
         conn.setRequestProperty("User-Agent", "Mozilla/5.0 (compatible; PocketTavern)")
         conn.setRequestProperty("Accept", "*/*")
         conn.connectTimeout = 15_000

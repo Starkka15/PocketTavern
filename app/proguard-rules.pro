@@ -1,3 +1,6 @@
+# Tink (transitive via security-crypto) uses errorprone annotations at compile-time only
+-dontwarn com.google.errorprone.annotations.Immutable
+
 # Retrofit
 -keepattributes Signature
 -keepattributes *Annotation*

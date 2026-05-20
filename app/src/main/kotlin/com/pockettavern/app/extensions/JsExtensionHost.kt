@@ -202,7 +202,9 @@ class JsExtensionHost @Inject constructor(
         if (!ready) return
         val safe = data?.toString()
             ?.replace("\\", "\\\\")
-            ?.replace("\"", "\\\"") ?: ""
+            ?.replace("\"", "\\\"")
+            ?.replace(" ", "\\u2028")
+            ?.replace(" ", "\\u2029") ?: ""
         val dataJson = if (data != null) "\"$safe\"" else "null"
         scope.launch {
             webView?.evaluateJavascript(
@@ -271,10 +273,11 @@ class JsExtensionHost @Inject constructor(
     /** Push a single setting change to the running JS sandbox without full reload. */
     fun updateSettingInSandbox(extensionId: String, key: String, jsonValue: String) {
         if (!ready) return
-        val safeKey = key.replace("'", "\\'")
+        val safeId  = extensionId.replace("\\", "\\\\").replace("'", "\\'")
+        val safeKey = key.replace("\\", "\\\\").replace("'", "\\'")
         scope.launch {
             webView?.evaluateJavascript(
-                "if(window.PT&&PT.extension_settings['$extensionId']){PT.extension_settings['$extensionId']['$safeKey']=$jsonValue;}", null
+                "if(window.PT&&PT.extension_settings['$safeId']){PT.extension_settings['$safeId']['$safeKey']=$jsonValue;}", null
             )
         }
     }
@@ -506,8 +509,9 @@ class JsExtensionHost @Inject constructor(
                 val script = if (rawScript.contains("import ") || rawScript.contains("export "))
                     stripEsModuleSyntax(rawScript) else rawScript
                 DebugLogger.log("[JsExtensionHost] Loading '${ext.name}' (${script.length} chars)")
-                // Tag event handlers and set base URL for import.meta.url stubs
-                wv.evaluateJavascript("window.__ptCurrentExtId='${ext.id}';window.__ptCurrentExtUrl='${extBaseUrl}index.js';", null)
+                val safeExtId  = ext.id.replace("\\", "\\\\").replace("'", "\\'")
+                val safeExtUrl = extBaseUrl.replace("\\", "\\\\").replace("'", "\\'")
+                wv.evaluateJavascript("window.__ptCurrentExtId='$safeExtId';window.__ptCurrentExtUrl='${safeExtUrl}index.js';", null)
                 wv.evaluateJavascript(script) { result ->
                     DebugLogger.log("[JsExtensionHost] '${ext.name}' result: $result")
                 }

@@ -1,6 +1,7 @@
 package com.pockettavern.app.data.local
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -9,6 +10,8 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKeys
 import com.pockettavern.app.domain.model.ApiConfiguration
 import com.pockettavern.app.domain.model.ImageGenConfig
 import com.pockettavern.app.domain.model.TtsConfig
@@ -26,6 +29,24 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 class SettingsDataStore @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+    // Encrypted storage for sensitive credentials (API keys, auth tokens)
+    private val encryptedPrefs: SharedPreferences by lazy {
+        val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
+        EncryptedSharedPreferences.create(
+            "secure_prefs",
+            masterKeyAlias,
+            context,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    }
+
+    private companion object {
+        const val SECURE_LLM_API_KEY = "llm_api_key"
+        const val SECURE_CHARAVAULT_TOKEN = "charavault_token"
+        const val SECURE_TTS_OPENAI_KEY = "tts_openai_key"
+    }
+
     private object Keys {
         // LLM backend configuration
         val LLM_MAIN_API = stringPreferencesKey("llm_main_api")
@@ -34,7 +55,7 @@ class SettingsDataStore @Inject constructor(
         val LLM_API_SERVER = stringPreferencesKey("llm_api_server")
         val LLM_CHAT_COMPLETION_SOURCE = stringPreferencesKey("llm_chat_completion_source")
         val LLM_CUSTOM_URL = stringPreferencesKey("llm_custom_url")
-        val LLM_API_KEY = stringPreferencesKey("llm_api_key")
+        val LLM_API_KEY = stringPreferencesKey("llm_api_key") // kept for migration reads only
         val LLM_CURRENT_MODEL = stringPreferencesKey("llm_current_model")
 
         // External tool URLs
@@ -52,7 +73,7 @@ class SettingsDataStore @Inject constructor(
         val CHARAVAULT_URL = stringPreferencesKey("cardvault_url")
 
         // CharaVault.net session
-        val CHARAVAULT_TOKEN = stringPreferencesKey("charavault_token")
+        val CHARAVAULT_TOKEN = stringPreferencesKey("charavault_token") // kept for migration reads only
         val CHARAVAULT_EMAIL = stringPreferencesKey("charavault_email")
         val CHARAVAULT_MODE = stringPreferencesKey("charavault_mode")
 
@@ -74,7 +95,7 @@ class SettingsDataStore @Inject constructor(
         val TTS_PROVIDER = stringPreferencesKey("tts_provider")
         val TTS_AUTO_PLAY = booleanPreferencesKey("tts_auto_play")
         val TTS_OPENAI_URL = stringPreferencesKey("tts_openai_url")
-        val TTS_OPENAI_KEY = stringPreferencesKey("tts_openai_key")
+        val TTS_OPENAI_KEY = stringPreferencesKey("tts_openai_key") // kept for migration reads only
         val TTS_OPENAI_VOICE = stringPreferencesKey("tts_openai_voice")
         val TTS_OPENAI_MODEL = stringPreferencesKey("tts_openai_model")
         val TTS_SPEED = floatPreferencesKey("tts_speed")
@@ -89,6 +110,9 @@ class SettingsDataStore @Inject constructor(
 
         // Image Generation
         val IMAGE_GEN_CONFIG = stringPreferencesKey("image_gen_config")
+
+        // Sentinel incremented when an encrypted-prefs value changes, to trigger flow re-emit
+        val SECURE_REFRESH = intPreferencesKey("secure_refresh")
     }
 
     // ── LLM Configuration ────────────────────────────────────────────────────
@@ -100,7 +124,8 @@ class SettingsDataStore @Inject constructor(
             apiServer = prefs[Keys.LLM_API_SERVER] ?: "http://127.0.0.1:5001",
             chatCompletionSource = prefs[Keys.LLM_CHAT_COMPLETION_SOURCE] ?: "openai",
             customUrl = prefs[Keys.LLM_CUSTOM_URL],
-            apiKey = prefs[Keys.LLM_API_KEY] ?: "",
+            apiKey = encryptedPrefs.getString(SECURE_LLM_API_KEY, null)
+                ?: prefs[Keys.LLM_API_KEY] ?: "",
             currentModel = prefs[Keys.LLM_CURRENT_MODEL] ?: ""
         )
     }
@@ -108,6 +133,7 @@ class SettingsDataStore @Inject constructor(
     suspend fun getLlmConfig(): ApiConfiguration = llmConfigFlow.first()
 
     suspend fun saveLlmConfig(config: ApiConfiguration) {
+        encryptedPrefs.edit().putString(SECURE_LLM_API_KEY, config.apiKey).apply()
         context.dataStore.edit { prefs ->
             prefs[Keys.LLM_MAIN_API] = config.mainApi
             prefs[Keys.LLM_TEXT_GEN_TYPE] = config.textGenType
@@ -115,16 +141,22 @@ class SettingsDataStore @Inject constructor(
             prefs[Keys.LLM_CHAT_COMPLETION_SOURCE] = config.chatCompletionSource
             if (config.customUrl != null) prefs[Keys.LLM_CUSTOM_URL] = config.customUrl
             else prefs.remove(Keys.LLM_CUSTOM_URL)
-            prefs[Keys.LLM_API_KEY] = config.apiKey
+            prefs.remove(Keys.LLM_API_KEY)
             prefs[Keys.LLM_CURRENT_MODEL] = config.currentModel
+            prefs[Keys.SECURE_REFRESH] = (prefs[Keys.SECURE_REFRESH] ?: 0) + 1
         }
     }
 
     suspend fun getLlmApiKey(): String =
-        context.dataStore.data.map { it[Keys.LLM_API_KEY] ?: "" }.first()
+        encryptedPrefs.getString(SECURE_LLM_API_KEY, null)
+            ?: context.dataStore.data.map { it[Keys.LLM_API_KEY] ?: "" }.first()
 
     suspend fun saveLlmApiKey(key: String) {
-        context.dataStore.edit { prefs -> prefs[Keys.LLM_API_KEY] = key }
+        encryptedPrefs.edit().putString(SECURE_LLM_API_KEY, key).apply()
+        context.dataStore.edit { prefs ->
+            prefs.remove(Keys.LLM_API_KEY)
+            prefs[Keys.SECURE_REFRESH] = (prefs[Keys.SECURE_REFRESH] ?: 0) + 1
+        }
     }
 
     // ── Preset Selections ────────────────────────────────────────────────────
@@ -200,7 +232,8 @@ class SettingsDataStore @Inject constructor(
     }
 
     val charavaultSessionFlow: Flow<CharaVaultSession?> = context.dataStore.data.map { prefs ->
-        val token = prefs[Keys.CHARAVAULT_TOKEN]
+        val token = encryptedPrefs.getString(SECURE_CHARAVAULT_TOKEN, null)
+            ?: prefs[Keys.CHARAVAULT_TOKEN]
         val email = prefs[Keys.CHARAVAULT_EMAIL]
         if (token != null && email != null) CharaVaultSession(token = token, email = email) else null
     }
@@ -208,16 +241,20 @@ class SettingsDataStore @Inject constructor(
     val charavaultModeFlow: Flow<String> = context.dataStore.data.map { it[Keys.CHARAVAULT_MODE] ?: "local" }
 
     suspend fun saveCharaVaultSession(token: String, email: String) {
+        encryptedPrefs.edit().putString(SECURE_CHARAVAULT_TOKEN, token).apply()
         context.dataStore.edit { prefs ->
-            prefs[Keys.CHARAVAULT_TOKEN] = token
             prefs[Keys.CHARAVAULT_EMAIL] = email
+            prefs.remove(Keys.CHARAVAULT_TOKEN)
+            prefs[Keys.SECURE_REFRESH] = (prefs[Keys.SECURE_REFRESH] ?: 0) + 1
         }
     }
 
     suspend fun clearCharaVaultSession() {
+        encryptedPrefs.edit().remove(SECURE_CHARAVAULT_TOKEN).apply()
         context.dataStore.edit { prefs ->
             prefs.remove(Keys.CHARAVAULT_TOKEN)
             prefs.remove(Keys.CHARAVAULT_EMAIL)
+            prefs[Keys.SECURE_REFRESH] = (prefs[Keys.SECURE_REFRESH] ?: 0) + 1
         }
     }
 
@@ -334,7 +371,8 @@ class SettingsDataStore @Inject constructor(
             provider = prefs[Keys.TTS_PROVIDER] ?: "system",
             autoPlay = prefs[Keys.TTS_AUTO_PLAY] ?: true,
             openAiUrl = prefs[Keys.TTS_OPENAI_URL] ?: "",
-            openAiKey = prefs[Keys.TTS_OPENAI_KEY] ?: "",
+            openAiKey = encryptedPrefs.getString(SECURE_TTS_OPENAI_KEY, null)
+                ?: prefs[Keys.TTS_OPENAI_KEY] ?: "",
             openAiVoice = prefs[Keys.TTS_OPENAI_VOICE] ?: "alloy",
             openAiModel = prefs[Keys.TTS_OPENAI_MODEL] ?: "tts-1",
             speed = prefs[Keys.TTS_SPEED] ?: 1.0f,
@@ -345,16 +383,18 @@ class SettingsDataStore @Inject constructor(
     suspend fun getTtsConfig(): TtsConfig = ttsConfigFlow.first()
 
     suspend fun saveTtsConfig(config: TtsConfig) {
+        encryptedPrefs.edit().putString(SECURE_TTS_OPENAI_KEY, config.openAiKey).apply()
         context.dataStore.edit { prefs ->
             prefs[Keys.TTS_ENABLED] = config.enabled
             prefs[Keys.TTS_PROVIDER] = config.provider
             prefs[Keys.TTS_AUTO_PLAY] = config.autoPlay
             prefs[Keys.TTS_OPENAI_URL] = config.openAiUrl
-            prefs[Keys.TTS_OPENAI_KEY] = config.openAiKey
+            prefs.remove(Keys.TTS_OPENAI_KEY)
             prefs[Keys.TTS_OPENAI_VOICE] = config.openAiVoice
             prefs[Keys.TTS_OPENAI_MODEL] = config.openAiModel
             prefs[Keys.TTS_SPEED] = config.speed
             prefs[Keys.TTS_FILTER_MODE] = config.filterMode
+            prefs[Keys.SECURE_REFRESH] = (prefs[Keys.SECURE_REFRESH] ?: 0) + 1
         }
     }
 
@@ -368,12 +408,10 @@ class SettingsDataStore @Inject constructor(
             try {
                 imageGenJson.decodeFromString<ImageGenConfig>(raw)
             } catch (_: Exception) {
-                // Migrate old forge URL if present
                 val oldUrl = prefs[Keys.FORGE_URL] ?: ""
                 ImageGenConfig(sdWebuiUrl = oldUrl)
             }
         } else {
-            // Migrate old forge URL if present
             val oldUrl = prefs[Keys.FORGE_URL] ?: ""
             ImageGenConfig(sdWebuiUrl = oldUrl)
         }
@@ -390,6 +428,7 @@ class SettingsDataStore @Inject constructor(
     }
 
     suspend fun clearAll() {
+        encryptedPrefs.edit().clear().apply()
         context.dataStore.edit { prefs -> prefs.clear() }
     }
 }

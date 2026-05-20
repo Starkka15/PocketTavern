@@ -50,7 +50,12 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideLoggingInterceptor(): HttpLoggingInterceptor =
-        HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
+        HttpLoggingInterceptor().apply {
+            level = if (com.pockettavern.app.BuildConfig.DEBUG)
+                HttpLoggingInterceptor.Level.BASIC
+            else
+                HttpLoggingInterceptor.Level.NONE
+        }
 
     // ── LLM Backend Client ────────────────────────────────────────────────────
     // Long timeouts for text generation; no auth interceptor (each request adds its own header)

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Enforce TLS for known public endpoints -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">charavault.net</domain>
+        <domain includeSubdomains="true">openai.com</domain>
+        <domain includeSubdomains="true">stability.ai</domain>
+        <domain includeSubdomains="true">nanogpt.ai</domain>
+        <domain includeSubdomains="true">huggingface.co</domain>
+        <domain includeSubdomains="true">pollinations.ai</domain>
+        <domain includeSubdomains="true">github.com</domain>
+        <domain includeSubdomains="true">api.github.com</domain>
+        <domain includeSubdomains="true">objects.githubusercontent.com</domain>
+    </domain-config>
+    <!-- Allow cleartext for user-configured local LLM servers (LAN IPs/hostnames) -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

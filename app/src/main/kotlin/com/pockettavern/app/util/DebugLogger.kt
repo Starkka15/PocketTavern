@@ -22,6 +22,10 @@ object DebugLogger {
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
 
     fun init(context: Context) {
+        if (!com.pockettavern.app.BuildConfig.DEBUG) {
+            enabled = false
+            return
+        }
         // Use Downloads folder for easy access without root
         val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(
             android.os.Environment.DIRECTORY_DOWNLOADS

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,11 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+}
+
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) load(f.inputStream())
 }
 
 android {
@@ -15,8 +22,8 @@ android {
         applicationId = "com.pockettavern.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 11
-        versionName = "2.1.5.1"
+        versionCode = 12
+        versionName = "2.1.5.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -24,9 +31,9 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file("pockettavern.keystore")
-            storePassword = "pockettavern123"
-            keyAlias = "pockettavern"
-            keyPassword = "pockettavern123"
+            storePassword = localProps.getProperty("KEYSTORE_PASSWORD", "")
+            keyAlias = localProps.getProperty("KEY_ALIAS", "pockettavern")
+            keyPassword = localProps.getProperty("KEY_PASSWORD", "")
         }
     }
 
@@ -111,4 +118,7 @@ dependencies {
 
     // SAF DocumentFile support (for folder import)
     implementation("androidx.documentfile:documentfile:1.0.1")
+
+    // Encrypted storage for API keys and tokens
+    implementation("androidx.security:security-crypto:1.0.0")
 }

@@ -71,6 +71,7 @@ class BackupViewModel @Inject constructor(
             _uiState.update { it.copy(isImporting = true, error = null) }
             try {
                 withContext(Dispatchers.IO) {
+                    val filesDir = context.filesDir.canonicalPath
                     context.contentResolver.openInputStream(uri)?.use { input ->
                         ZipInputStream(input).use { zip ->
                             var entry = zip.nextEntry
@@ -78,6 +79,11 @@ class BackupViewModel @Inject constructor(
                                 val name = entry.name
                                 if (!entry.isDirectory && name.contains("/")) {
                                     val outFile = File(context.filesDir, name)
+                                    if (!outFile.canonicalPath.startsWith(filesDir + File.separator)) {
+                                        zip.closeEntry()
+                                        entry = zip.nextEntry
+                                        continue
+                                    }
                                     outFile.parentFile?.mkdirs()
                                     outFile.outputStream().use { zip.copyTo(it) }
                                 }
