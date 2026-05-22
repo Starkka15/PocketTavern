@@ -2,6 +2,11 @@ package com.pockettavern.app.domain.prompt
 
 import com.pockettavern.app.domain.model.*
 import com.pockettavern.app.util.DebugLogger
+import java.time.Duration
+import java.time.Instant
+import java.time.ZonedDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 /**
  * Builds prompts following SillyTavern's prompt construction pipeline.
@@ -20,12 +25,18 @@ class PromptBuilder(
     private val chatContext: ChatContext,
     private val userName: String = "User",
     private val mainPromptOverride: String = "",  // OAI preset's main_prompt, takes priority over sysprompt preset
-    private val extensionInjections: List<String> = emptyList()
+    private val extensionInjections: List<String> = emptyList(),
+    private val memoryBlock: String = ""
 ) {
     private val instructTemplate = chatContext.instructTemplate
     // Combine global system prompt with character's custom system prompt.
     // Priority: OAI preset mainPrompt > sysprompt preset > instruct template system prompt
     private val systemPrompt: String
+
+    // Set at the start of each build call so substituteMacros can access them
+    // without changing all 40+ internal call sites.
+    private var _buildHistory: List<ChatMessage> = emptyList()
+    private var _buildNewMessage: String = ""
 
     init {
         // Strip ST comment macros before blank-testing the override so that
@@ -63,6 +74,8 @@ class PromptBuilder(
         chatHistory: List<ChatMessage>,
         newMessage: String
     ): String {
+        _buildHistory = chatHistory
+        _buildNewMessage = newMessage
         return if (instructTemplate != null && instructTemplate.inputSequence.isNotBlank()) {
             buildInstructPrompt(chatHistory, newMessage)
         } else {
@@ -88,6 +101,8 @@ class PromptBuilder(
         newMessage: String,
         promptOrder: List<OaiPromptOrderItem> = OaiPromptOrderItem.defaultOrder()
     ): List<PromptMessage> {
+        _buildHistory = chatHistory
+        _buildNewMessage = newMessage
         val messages = mutableListOf<PromptMessage>()
 
         // Find the chat_history pivot in the order
@@ -158,6 +173,12 @@ class PromptBuilder(
                 DebugLogger.log("  [DEFER depth=${item.injectionDepth}] ${item.id} (${item.customLabel ?: ""})")
                 continue
             }
+            // Inject memory block immediately before char_description (T13)
+            if (item.id == "char_description" && memoryBlock.isNotBlank()) {
+                messages.add(PromptMessage("system", "[Memory]\n$memoryBlock"))
+                DebugLogger.log("  [memory] injecting ${memoryBlock.length} chars before char_description")
+            }
+
             if (item.id == "chat_examples") {
                 val examples = parseMessageExamples(character.messageExample)
                 DebugLogger.log("  [chat_examples] injecting ${examples.size} example pairs")
@@ -465,6 +486,11 @@ class PromptBuilder(
     private fun buildStoryString(): String {
         val parts = mutableListOf<String>()
         val persona = chatContext.userPersona
+
+        // Memory block injected before character content (T13)
+        if (memoryBlock.isNotBlank()) {
+            parts.add("[Memory]\n$memoryBlock")
+        }
 
         // Character description
         if (character.description.isNotBlank()) {
@@ -1010,39 +1036,122 @@ class PromptBuilder(
 
     /**
      * Substitute macros like {{char}}, {{user}}, {{random:a,b,c}}, etc.
+     * Reads _buildHistory and _buildNewMessage for message-context macros.
      */
     private fun substituteMacros(text: String): String {
         if (text.isBlank()) return text
 
+        val history = _buildHistory
+        val newMsg = _buildNewMessage
         var result = text
 
         // Strip ST comment macros: {{// anything }} → empty string
         result = stripCommentMacros(result)
 
-        // {{random:a,b,c,...}} → pick one value at random from the comma-separated list
+        // {{random::a::b::c}} double-colon format (T20)
+        result = result.replace(Regex("\\{\\{random::(.*?)\\}\\}", RegexOption.IGNORE_CASE)) { match ->
+            val options = match.groupValues[1].split("::").map { it.trim() }.filter { it.isNotEmpty() }
+            if (options.isEmpty()) "" else options.random()
+        }
+        // {{random:a,b,c,...}} comma format
         result = result.replace(Regex("\\{\\{random:(.*?)\\}\\}", RegexOption.IGNORE_CASE)) { match ->
             val options = match.groupValues[1].split(",").map { it.trim() }.filter { it.isNotEmpty() }
             if (options.isEmpty()) "" else options.random()
         }
 
+        // {{roll::NdN}} and {{roll:NdN}} — both colon counts (T19)
+        result = result.replace(Regex("\\{\\{roll::?(\\d+)d(\\d+)\\}\\}", RegexOption.IGNORE_CASE)) { match ->
+            val numDice = match.groupValues[1].toIntOrNull()?.coerceIn(1, 100) ?: 1
+            val sides = match.groupValues[2].toIntOrNull()?.coerceIn(1, 1000) ?: 6
+            (1..numDice).sumOf { kotlin.random.Random.nextInt(1, sides + 1) }.toString()
+        }
+
+        // {{newline::N}} then {{newline}} (T17)
+        result = result.replace(Regex("\\{\\{newline::(\\d+)\\}\\}", RegexOption.IGNORE_CASE)) { match ->
+            "\n".repeat(match.groupValues[1].toIntOrNull()?.coerceIn(1, 20) ?: 1)
+        }
+        result = result.replace("{{newline}}", "\n", ignoreCase = true)
+
+        // {{space::N}} then {{space}} (T17)
+        result = result.replace(Regex("\\{\\{space::(\\d+)\\}\\}", RegexOption.IGNORE_CASE)) { match ->
+            " ".repeat(match.groupValues[1].toIntOrNull()?.coerceIn(1, 100) ?: 1)
+        }
+        result = result.replace("{{space}}", " ", ignoreCase = true)
+
+        // {{noop}} → empty (T17)
+        result = result.replace("{{noop}}", "", ignoreCase = true)
+
+        // Time / date macros (T18)
+        val now = ZonedDateTime.now()
+        val isoTimeFmt = DateTimeFormatter.ofPattern("HH:mm")
+        val isoDateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+        result = result.replace("{{isotime}}", now.format(isoTimeFmt), ignoreCase = true)
+        result = result.replace("{{isodate}}", now.format(isoDateFmt), ignoreCase = true)
+        result = result.replace("{{time}}", now.format(isoTimeFmt), ignoreCase = true)
+        result = result.replace("{{date}}", now.format(isoDateFmt), ignoreCase = true)
+        result = result.replace("{{weekday}}", now.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }, ignoreCase = true)
+
+        // {{time_UTC±N}} and {{time::UTC±N}} (T18)
+        result = result.replace(Regex("\\{\\{time(?:::|_)UTC([+-]\\d+)\\}\\}", RegexOption.IGNORE_CASE)) { match ->
+            val offsetHours = match.groupValues[1].toIntOrNull() ?: 0
+            val zone = try { ZoneOffset.ofHours(offsetHours) } catch (_: Exception) { ZoneOffset.UTC }
+            now.withZoneSameInstant(zone).format(isoTimeFmt)
+        }
+
+        // {{idle_duration}} / {{idleDuration}} (T18)
+        val idleDuration: String = run {
+            val lastTs = history.lastOrNull()?.timestamp
+            if (lastTs == null) {
+                "just now"
+            } else {
+                val secs = Duration.between(lastTs, Instant.now()).seconds
+                when {
+                    secs < 60 -> "just now"
+                    secs < 3600 -> "${secs / 60} minute${if (secs / 60 == 1L) "" else "s"} ago"
+                    secs < 86400 -> "${secs / 3600} hour${if (secs / 3600 == 1L) "" else "s"} ago"
+                    else -> "${secs / 86400} day${if (secs / 86400 == 1L) "" else "s"} ago"
+                }
+            }
+        }
+        result = result.replace("{{idle_duration}}", idleDuration, ignoreCase = true)
+        result = result.replace("{{idleDuration}}", idleDuration, ignoreCase = true)
+
+        // Message macros — require history (T21)
+        val lastMsg = history.lastOrNull()
+        val lastUserMsg = history.lastOrNull { it.isUser }
+        val lastCharMsg = history.lastOrNull { !it.isUser && !it.isNarrator }
+        result = result.replace("{{lastMessage}}", lastMsg?.content ?: "", ignoreCase = true)
+        result = result.replace("{{lastUserMessage}}", lastUserMsg?.content ?: "", ignoreCase = true)
+        result = result.replace("{{lastCharMessage}}", lastCharMsg?.content ?: "", ignoreCase = true)
+        result = result.replace("{{input}}", newMsg, ignoreCase = true)
+
         return result
+            // Identity macros
             .replace("{{char}}", character.name, ignoreCase = true)
             .replace("{{user}}", userName, ignoreCase = true)
             .replace("{{charname}}", character.name, ignoreCase = true)
             .replace("{{username}}", userName, ignoreCase = true)
+            // Character card field aliases (T22) — Tavo-style names + ST legacy names
+            .replace("{{charDescription}}", character.description, ignoreCase = true)
             .replace("{{description}}", character.description, ignoreCase = true)
+            .replace("{{charPersonality}}", character.personality, ignoreCase = true)
             .replace("{{personality}}", character.personality, ignoreCase = true)
+            .replace("{{charScenario}}", character.scenario, ignoreCase = true)
             .replace("{{scenario}}", character.scenario, ignoreCase = true)
+            .replace("{{charPrompt}}", character.systemPrompt, ignoreCase = true)
+            .replace("{{charInstruction}}", character.postHistoryInstructions, ignoreCase = true)
+            .replace("{{charJailbreak}}", character.postHistoryInstructions, ignoreCase = true)
+            .replace("{{creatorNotes}}", character.creatorNotes, ignoreCase = true)
+            .replace("{{charCreatorNotes}}", character.creatorNotes, ignoreCase = true)
             .replace("{{persona}}", chatContext.userPersona.description, ignoreCase = true)
+            // Message example macros
+            .replace("{{mesExamples}}", character.messageExample, ignoreCase = true)
+            .replace("{{mesExamplesRaw}}", character.messageExample, ignoreCase = true)
             .replace("{{mesexample}}", character.messageExample, ignoreCase = true)
             .replace("{{mes_example}}", character.messageExample, ignoreCase = true)
-            // Time macros
-            .replace("{{time}}", java.time.LocalTime.now().toString().substringBeforeLast(":"), ignoreCase = true)
-            .replace("{{date}}", java.time.LocalDate.now().toString(), ignoreCase = true)
-            .replace("{{weekday}}", java.time.LocalDate.now().dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }, ignoreCase = true)
-            // Trim whitespace macro - just remove it, trimming happens naturally
+            // Trim whitespace macro
             .replace("{{trim}}", "", ignoreCase = true)
-            // Original macros - leave them if we don't have a replacement
+            // {{original}} — leave blank if not in translation context
             .replace(Regex("\\{\\{original\\}\\}", RegexOption.IGNORE_CASE), "")
     }
 

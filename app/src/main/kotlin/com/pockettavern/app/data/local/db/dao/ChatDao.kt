@@ -29,4 +29,7 @@ interface ChatDao {
 
     @Query("UPDATE chats SET messageCount = :count, modifyDate = :modifyDate WHERE fileName = :fileName")
     suspend fun updateStats(fileName: String, count: Int, modifyDate: Long)
+
+    @Query("UPDATE chats SET memoryBlock = :block, summarizedTurnCount = :count WHERE fileName = :fileName")
+    suspend fun updateMemoryBlock(fileName: String, block: String, count: Int)
 }

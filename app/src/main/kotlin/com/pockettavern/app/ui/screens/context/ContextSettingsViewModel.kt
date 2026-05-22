@@ -32,6 +32,9 @@ data class ContextSettingsUiState(
     val autoContinueEnabled: Boolean = false,
     val autoContinueMinLength: Int = 200,
 
+    // Long-Term Memory
+    val memoryEnabled: Boolean = true,
+
     // UI state
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
@@ -52,6 +55,11 @@ class ContextSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             localRepository.autoContinueFlow.collect { (enabled, minLength) ->
                 _uiState.update { it.copy(autoContinueEnabled = enabled, autoContinueMinLength = minLength) }
+            }
+        }
+        viewModelScope.launch {
+            localRepository.memoryEnabledFlow.collect { enabled ->
+                _uiState.update { it.copy(memoryEnabled = enabled) }
             }
         }
     }
@@ -134,6 +142,11 @@ class ContextSettingsViewModel @Inject constructor(
         _uiState.update { it.copy(autoContinueEnabled = enabled) }
     }
 
+    // Long-Term Memory updates
+    fun updateMemoryEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(memoryEnabled = enabled) }
+    }
+
     fun updateAutoContinueMinLength(length: Int) {
         _uiState.update { it.copy(autoContinueMinLength = length) }
     }
@@ -153,6 +166,7 @@ class ContextSettingsViewModel @Inject constructor(
                 )
                 localRepository.saveUserPersona(persona)
                 localRepository.saveAutoContinueConfig(state.autoContinueEnabled, state.autoContinueMinLength)
+                localRepository.saveMemoryEnabled(state.memoryEnabled)
                 localRepository.saveGlobalAuthorsNote(AuthorsNote(
                     content = state.authorsNoteContent,
                     interval = state.authorsNoteInterval,

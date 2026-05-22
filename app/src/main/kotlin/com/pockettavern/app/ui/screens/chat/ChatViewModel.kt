@@ -32,6 +32,7 @@ import com.pockettavern.app.domain.model.Result
 import com.pockettavern.app.domain.model.StreamEvent
 import com.pockettavern.app.data.local.SettingsDataStore
 import com.pockettavern.app.domain.prompt.PromptBuilder
+import com.pockettavern.app.domain.usecase.SummarizeHistoryUseCase
 import com.pockettavern.app.ui.audio.TtsManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -110,7 +111,7 @@ data class ChatUiState(
     val searchResults: List<Int> = emptyList(),
     val currentSearchResultIndex: Int = 0,
     // Context window usage (estimated tokens)
-    val contextUsedTokens: Int = 0
+    val contextUsedTokens: Int = 0,
 )
 
 data class GalleryImage(
@@ -119,6 +120,9 @@ data class GalleryImage(
     val timestamp: Long,
     val messageIndex: Int
 )
+
+private const val CONTINUE_PROMPT =
+    "(OOC: Please continue the story from where it left off, maintaining the current tone and situation.)"
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
@@ -131,7 +135,9 @@ class ChatViewModel @Inject constructor(
     private val extensionManager: ExtensionManager,
     private val ttsManager: TtsManager,
     private val settingsDataStore: SettingsDataStore,
-    private val characterDao: com.pockettavern.app.data.local.db.dao.CharacterDao
+    private val characterDao: com.pockettavern.app.data.local.db.dao.CharacterDao,
+    private val spriteStorage: com.pockettavern.app.data.local.SpriteStorage,
+    private val summarizeHistoryUseCase: SummarizeHistoryUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -143,6 +149,11 @@ class ChatViewModel @Inject constructor(
     private var autoContinueEnabled = false
     private var autoContinueMinLength = 200
     private var autoContinueCount = 0
+
+    // Long-term memory
+    private var memoryEnabled = true
+    private var _currentMemoryBlock: String = ""
+    private var _currentSummarizedTurnCount: Int = 0
 
     // TTS auto-play state
     private var ttsAutoPlay = false
@@ -221,6 +232,10 @@ class ChatViewModel @Inject constructor(
                 autoContinueEnabled = enabled
                 autoContinueMinLength = minLength
             }
+        }
+        // Observe long-term memory setting
+        viewModelScope.launch {
+            localRepository.memoryEnabledFlow.collect { enabled -> memoryEnabled = enabled }
         }
         // Collect quick reply auto-triggers
         viewModelScope.launch {
@@ -422,7 +437,11 @@ class ChatViewModel @Inject constructor(
     private suspend fun loadExistingChat(character: Character, fileName: String) {
         when (val result = localRepository.getChat(character.name, fileName)) {
             is Result.Success -> {
-                val messages = result.data.messages
+                val chat = result.data
+                // Load memory state
+                _currentMemoryBlock = chat.memoryBlock
+                _currentSummarizedTurnCount = chat.summarizedTurnCount
+                val messages = chat.messages
                 // Restore persisted extension headers
                 val restoredHeaders = mutableMapOf<Int, List<MessageHeaderEntry>>()
                 messages.forEachIndexed { index, msg ->
@@ -483,6 +502,8 @@ class ChatViewModel @Inject constructor(
     private fun startNewChatWithGreeting(greeting: String?) {
         val character = _uiState.value.character ?: return
         viewModelScope.launch {
+            _currentMemoryBlock = ""
+            _currentSummarizedTurnCount = 0
             val fileName = localRepository.generateChatFileName(character.name)
             val userName = settingsDataStore.getUserPersonaName().ifBlank { "User" }
             val messages = if (!greeting.isNullOrBlank()) {
@@ -554,10 +575,31 @@ class ChatViewModel @Inject constructor(
     private fun sendMessageText(rawText: String) {
         val character = _uiState.value.character ?: return
 
-        // /sys prefix — insert narrator message without sending to LLM
+        // /sys <text> — insert narrator message without sending to LLM
         if (rawText.startsWith("/sys ")) {
             val narratorText = rawText.removePrefix("/sys ").trim()
             if (narratorText.isNotBlank()) insertNarratorMessage(narratorText)
+            _uiState.update { it.copy(inputText = "") }
+            return
+        }
+
+        // /ooc <text> — send OOC message to LLM without showing user bubble
+        if (rawText.startsWith("/ooc ")) {
+            val oocText = rawText.removePrefix("/ooc ").trim()
+            if (oocText.isNotBlank()) {
+                _uiState.update { it.copy(inputText = "") }
+                sendHiddenUserTurn("(OOC: $oocText)")
+            }
+            return
+        }
+
+        // /persona <name> — temporarily override persona name for the session
+        if (rawText.startsWith("/persona ")) {
+            val personaName = rawText.removePrefix("/persona ").trim()
+            if (personaName.isNotBlank()) {
+                _currentUserName = personaName
+                insertNarratorMessage("* Persona changed to: $personaName *")
+            }
             _uiState.update { it.copy(inputText = "") }
             return
         }
@@ -566,6 +608,8 @@ class ChatViewModel @Inject constructor(
 
         // Apply input regex rules
         val message = extensionManager.processInput(rawText)
+            .replace("{{char}}", character.name, ignoreCase = true)
+            .replace("{{user}}", _currentUserName, ignoreCase = true)
         val userMessage = ChatMessage(content = message, isUser = true)
         _uiState.update {
             it.copy(
@@ -635,6 +679,8 @@ class ChatViewModel @Inject constructor(
                         extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
                         generationJob = null
                         saveCurrentChat()
+                        // Trigger long-term memory summarization if threshold exceeded (T14)
+                        triggerMemorySummarizationIfNeeded()
                         // Auto-play TTS for new AI message
                         if (ttsAutoPlay) {
                             val ttsText = extensionManager.applyOutputFilters(processed)
@@ -701,7 +747,7 @@ class ChatViewModel @Inject constructor(
         val mainPromptOverride = if (config.usesChatCompletions && mainPromptItem?.enabled == true)
             mainPromptItem.content ?: "" else ""
         val extensionInjections = extensionManager.getPromptInjections()
-        val builder = PromptBuilder(character, chatContext, userName, mainPromptOverride, extensionInjections)
+        val builder = PromptBuilder(character, chatContext, userName, mainPromptOverride, extensionInjections, _currentMemoryBlock)
         val prompt = builder.buildPrompt(history, userMessage)
 
         // For chat completion APIs, also build structured messages for proper role formatting.
@@ -709,6 +755,9 @@ class ChatViewModel @Inject constructor(
             val promptOrder = oaiPreset?.promptOrder ?: com.pockettavern.app.domain.model.OaiPromptOrderItem.defaultOrder()
             builder.buildChatCompletionMessages(history, userMessage, promptOrder)
         } else null
+
+        // Notify extensions that a prompt is about to be sent (T23)
+        extensionManager.fireBeforePromptSend(prompt, messages?.size ?: 0)
 
         // Stop sequences: instruct template markers only apply to text completion backends.
         // Chat completion APIs handle turn boundaries themselves — sending [INST]/</s>/etc.
@@ -1028,6 +1077,36 @@ class ChatViewModel @Inject constructor(
             messages = _uiState.value.messages
         )
         localRepository.saveChat(chat)
+    }
+
+    private fun triggerMemorySummarizationIfNeeded() {
+        if (!memoryEnabled) return
+        val character = _uiState.value.character ?: return
+        val fileName = _uiState.value.currentChatFileName ?: return
+        val messages = _uiState.value.messages
+        val unsummarized = messages.drop(_currentSummarizedTurnCount)
+        val charCount = unsummarized.sumOf { it.content.length }
+        if (charCount < 12_000) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val config = when (val r = localRepository.getApiConfiguration()) {
+                    is com.pockettavern.app.domain.model.Result.Success -> r.data
+                    else -> return@launch
+                }
+                val summary = summarizeHistoryUseCase.summarize(unsummarized, config)
+                if (summary.isBlank()) return@launch
+                val newBlock = if (_currentMemoryBlock.isBlank()) summary
+                    else "$_currentMemoryBlock\n$summary"
+                val newCount = messages.size
+                _currentMemoryBlock = newBlock
+                _currentSummarizedTurnCount = newCount
+                localRepository.updateChatMemoryBlock(character.name, fileName, newBlock, newCount)
+                com.pockettavern.app.util.DebugLogger.log("ChatViewModel: memory summarized $newCount turns, block=${newBlock.length} chars")
+            } catch (e: Exception) {
+                com.pockettavern.app.util.DebugLogger.logError("ChatViewModel", "Memory summarization failed", e)
+            }
+        }
     }
 
     /** Snapshot current extension headers onto the corresponding ChatMessage objects. Returns true if anything changed. */
@@ -1444,55 +1523,95 @@ class ChatViewModel @Inject constructor(
         val messages = _uiState.value.messages
         if (messages.isEmpty()) return
 
-        val lastAssistantIndex = messages.indexOfLast { !it.isUser }
-        if (lastAssistantIndex == -1) return
-        val lastAssistantMessage = messages[lastAssistantIndex]
-
-        _uiState.update {
-            it.copy(isGenerating = true, streamingContent = lastAssistantMessage.content)
-        }
-
-        val userMessageIndex = (lastAssistantIndex - 1 downTo 0).firstOrNull { messages[it].isUser }
-        val userMessage = userMessageIndex?.let { messages[it].content } ?: ""
-        val historyWithoutLast = messages.subList(0, lastAssistantIndex).toList()
+        _uiState.update { it.copy(isGenerating = true, streamingContent = "") }
 
         generationJob = viewModelScope.launch {
-            doGenerate(historyWithoutLast, userMessage).collect { event ->
+            // Full history as context, hidden continue prompt as the "user" turn
+            doGenerate(messages, CONTINUE_PROMPT).collect { event ->
                 when (event) {
                     is StreamEvent.Token -> {
-                        val continued = lastAssistantMessage.content + event.accumulated
-                        _uiState.update { it.copy(streamingContent = continued) }
+                        _uiState.update { it.copy(streamingContent = event.accumulated) }
                     }
                     is StreamEvent.Complete -> {
                         val processed = trimMultiTurn(extensionManager.processOutput(event.fullText))
-                        val fullContent = lastAssistantMessage.content + processed
-                        val updatedMessages = messages.toMutableList()
-                        updatedMessages[lastAssistantIndex] = lastAssistantMessage.copy(content = fullContent)
+                        val newMessage = ChatMessage(content = processed, isUser = false)
                         _uiState.update {
-                            it.copy(messages = updatedMessages, isGenerating = false, streamingContent = "")
-                        }
-                        // Apply JS output filters to strip metadata tags from display
-                        val displayContent = extensionManager.applyOutputFilters(fullContent)
-                        if (displayContent != fullContent) {
-                            val msgs = _uiState.value.messages.toMutableList()
-                            msgs[lastAssistantIndex] = msgs[lastAssistantIndex].copy(
-                                content = displayContent,
-                                rawContent = fullContent
+                            it.copy(
+                                messages = it.messages + newMessage,
+                                isGenerating = false,
+                                streamingContent = ""
                             )
-                            _uiState.update { it.copy(messages = msgs) }
                         }
-                        // Refresh context and persist extension headers
+                        // Apply JS output filters
+                        val displayContent = extensionManager.applyOutputFilters(processed)
+                        if (displayContent != processed) {
+                            val msgs = _uiState.value.messages.toMutableList()
+                            val idx = msgs.indexOfLast { !it.isUser }
+                            if (idx >= 0) {
+                                msgs[idx] = msgs[idx].copy(content = displayContent, rawContent = processed)
+                                _uiState.update { it.copy(messages = msgs) }
+                            }
+                        }
                         pushExtensionContext()
                         persistExtensionHeaders()
                         extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
                         generationJob = null
                         saveCurrentChat()
-                        // Auto-continue: check new tokens added in this continuation
                         val estimatedTokens = extensionManager.tokenCounter.estimateTokens(processed)
                         if (autoContinueEnabled && autoContinueCount < 3 && estimatedTokens < autoContinueMinLength) {
                             autoContinueCount++
                             continueGeneration()
                         }
+                    }
+                    is StreamEvent.Error -> {
+                        _uiState.update {
+                            it.copy(isGenerating = false, streamingContent = "", error = event.message)
+                        }
+                        extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
+                        generationJob = null
+                    }
+                }
+            }
+        }
+    }
+
+    // Send a hidden user turn (e.g. OOC) — no user bubble, generates a new AI message
+    private fun sendHiddenUserTurn(userTurn: String) {
+        if (_uiState.value.character == null) return
+        val messages = _uiState.value.messages
+        _uiState.update { it.copy(isGenerating = true, streamingContent = "") }
+        extensionManager.emit(ExtensionEvent.GENERATION_STARTED)
+
+        generationJob = viewModelScope.launch {
+            doGenerate(messages, userTurn).collect { event ->
+                when (event) {
+                    is StreamEvent.Token -> {
+                        _uiState.update { it.copy(streamingContent = event.accumulated) }
+                    }
+                    is StreamEvent.Complete -> {
+                        val processed = trimMultiTurn(extensionManager.processOutput(event.fullText))
+                        val newMessage = ChatMessage(content = processed, isUser = false)
+                        _uiState.update {
+                            it.copy(
+                                messages = it.messages + newMessage,
+                                isGenerating = false,
+                                streamingContent = ""
+                            )
+                        }
+                        val displayContent = extensionManager.applyOutputFilters(processed)
+                        if (displayContent != processed) {
+                            val msgs = _uiState.value.messages.toMutableList()
+                            val idx = msgs.indexOfLast { !it.isUser }
+                            if (idx >= 0) {
+                                msgs[idx] = msgs[idx].copy(content = displayContent, rawContent = processed)
+                                _uiState.update { it.copy(messages = msgs) }
+                            }
+                        }
+                        pushExtensionContext()
+                        persistExtensionHeaders()
+                        extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
+                        generationJob = null
+                        saveCurrentChat()
                     }
                     is StreamEvent.Error -> {
                         _uiState.update {
@@ -1623,5 +1742,11 @@ class ChatViewModel @Inject constructor(
         val stopPattern = Regex("""\n\s*(User|You|Human$extras)\s*:""")
         val match = stopPattern.find(text) ?: return text
         return text.substring(0, match.range.first).trimEnd()
+    }
+
+    // Extract the last <img src=(name)> sprite tag from message text
+    fun getSpriteFile(spriteName: String): java.io.File? {
+        val charName = _uiState.value.character?.name ?: return null
+        return spriteStorage.getFile(charName, spriteName)
     }
 }

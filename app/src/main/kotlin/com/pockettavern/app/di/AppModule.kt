@@ -7,6 +7,7 @@ import com.pockettavern.app.data.local.ChatStorage
 import com.pockettavern.app.data.local.LoreBookStorage
 import com.pockettavern.app.data.local.ConnectionProfileStorage
 import com.pockettavern.app.data.local.PresetStorage
+import com.pockettavern.app.data.local.SpriteStorage
 import com.pockettavern.app.data.local.SettingsDataStore
 import com.pockettavern.app.data.local.db.AppDatabase
 import com.pockettavern.app.data.local.db.dao.CharacterDao
@@ -44,7 +45,7 @@ object AppModule {
         context,
         AppDatabase::class.java,
         "pockettavern.db"
-    ).addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3).fallbackToDestructiveMigration().build()
+    ).addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5).fallbackToDestructiveMigration().build()
 
     @Provides
     @Singleton
@@ -58,8 +59,9 @@ object AppModule {
     @Singleton
     fun provideCharacterStorage(
         @ApplicationContext context: Context,
-        characterDao: CharacterDao
-    ): CharacterStorage = CharacterStorage(context, characterDao)
+        characterDao: CharacterDao,
+        spriteStorage: SpriteStorage
+    ): CharacterStorage = CharacterStorage(context, characterDao, spriteStorage)
 
     @Provides
     @Singleton

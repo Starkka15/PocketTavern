@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.characters
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -28,6 +30,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.pockettavern.app.domain.model.Character
 import com.pockettavern.app.domain.model.Group
+import com.pockettavern.app.domain.usecase.TranslateCardUseCase
 import com.pockettavern.app.ui.components.*
 import com.pockettavern.app.ui.screens.groups.GroupsViewModel
 import com.pockettavern.app.ui.theme.*
@@ -49,6 +52,11 @@ fun CharactersScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val groupsState by groupsViewModel.uiState.collectAsStateWithLifecycle()
+
+    // File picker for local PNG/.charx import
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { viewModel.importLocalCharacter(it) }
+    }
 
     // Refresh when requested
     LaunchedEffect(shouldRefresh) {
@@ -113,6 +121,9 @@ fun CharactersScreen(
                 },
                 actions = {
                     if (uiState.activeTab == CharactersTab.CHARACTERS) {
+                        IconButton(onClick = { importLauncher.launch("*/*") }) {
+                            Icon(Icons.Default.FileOpen, "Import character file")
+                        }
                         IconButton(onClick = onNavigateToCreateCharacter) {
                             Icon(Icons.Default.Add, "Create Character")
                         }
@@ -198,6 +209,16 @@ fun CharactersScreen(
                             Icon(Icons.Default.Tune, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Character Settings")
+                        }
+                        TextButton(
+                            onClick = {
+                                viewModel.requestTranslateExisting(character)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Translate, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Translate to English")
                         }
                         TextButton(
                             onClick = {
@@ -318,6 +339,95 @@ fun CharactersScreen(
             }
         )
     }
+
+    // Import progress indicator
+    if (uiState.isImportingLocal) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Importing...") },
+            text = { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) },
+            confirmButton = {}
+        )
+    }
+
+    // Translation dialog (V8: shown only when non-ASCII ratio > 0.15)
+    if (uiState.showTranslateDialog) {
+        TranslationDialog(
+            isTranslating = uiState.isTranslating,
+            error = uiState.translateError,
+            initialFields = uiState.pendingTranslateFields,
+            onTranslate = { fields -> viewModel.translateImportedCard(fields) },
+            onDismiss = { viewModel.dismissTranslateDialog() }
+        )
+    }
+
+    // Translate success
+    if (uiState.translateSuccess) {
+        LaunchedEffect(Unit) { viewModel.clearTranslateSuccess() }
+        AlertDialog(
+            onDismissRequest = { viewModel.clearTranslateSuccess() },
+            title = { Text("Translated") },
+            text = { Text("Card fields translated successfully.") },
+            confirmButton = { TextButton(onClick = { viewModel.clearTranslateSuccess() }) { Text("OK") } }
+        )
+    }
+}
+
+@Composable
+private fun TranslationDialog(
+    isTranslating: Boolean,
+    error: String?,
+    initialFields: Set<TranslateCardUseCase.Field>,
+    onTranslate: (List<TranslateCardUseCase.Field>) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val allFields = TranslateCardUseCase.Field.entries
+    val selected = remember(initialFields) { mutableStateMapOf<TranslateCardUseCase.Field, Boolean>().also { m ->
+        allFields.forEach { m[it] = it in initialFields }
+    } }
+
+    AlertDialog(
+        onDismissRequest = { if (!isTranslating) onDismiss() },
+        title = { Text("Non-English Card Detected") },
+        text = {
+            Column {
+                Text("Translate card fields using your configured AI connection?",
+                    style = MaterialTheme.typography.bodyMedium)
+                Spacer(modifier = Modifier.height(12.dp))
+                allFields.forEach { field ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = selected[field] == true,
+                            onCheckedChange = { selected[field] = it },
+                            enabled = !isTranslating
+                        )
+                        Text(field.label, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                if (isTranslating) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+                error?.let {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(it, color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onTranslate(allFields.filter { selected[it] == true }) },
+                enabled = !isTranslating && selected.values.any { it }
+            ) { Text("Translate") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isTranslating) { Text("Skip") }
+        }
+    )
 }
 
 @Composable

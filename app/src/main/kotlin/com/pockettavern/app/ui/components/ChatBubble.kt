@@ -19,6 +19,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import java.io.File
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -46,7 +49,8 @@ fun ChatBubble(
     onHeaderLongPress: ((String) -> Unit)? = null,
     onHeaderActionClick: ((String, String) -> Unit)? = null,
     onBubbleLongPress: (() -> Unit)? = null,
-    onImageAction: (() -> Unit)? = null
+    onImageAction: (() -> Unit)? = null,
+    getSpriteFile: ((String) -> File?)? = null
 ) {
     // Narrator/system messages render as full-width centered italic text
     if (message.isNarrator) {
@@ -298,11 +302,35 @@ fun ChatBubble(
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = formatMessage(message.content),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = textColor
-                )
+                val chunks = remember(message.content) { splitIntoChunks(message.content) }
+                val context = LocalContext.current
+                chunks.forEach { chunk ->
+                    when (chunk) {
+                        is MessageChunk.TextChunk -> Text(
+                            text = formatMessage(chunk.text),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = textColor
+                        )
+                        is MessageChunk.SpriteChunk -> {
+                            val file = getSpriteFile?.invoke(chunk.name)
+                            if (file != null) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context)
+                                        .data(file)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = chunk.name,
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.85f)
+                                        .align(Alignment.CenterHorizontally)
+                                        .padding(vertical = 4.dp),
+                                    contentScale = ContentScale.FillWidth
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -340,13 +368,37 @@ fun StreamingChatBubble(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = formatMessage(content + "▌"),
+                    text = formatMessage(SPRITE_REGEX.replace(content, "") + "▌"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = ptColors.assistantBubbleText
                 )
             }
         }
     }
+}
+
+// Matches <img src=(name)>, < img src=(name)>, and bare img src=(name) (model often omits brackets)
+private val SPRITE_REGEX = Regex("""<\s*img\s+src=\(([^)]+)\)\s*>|\bimg\s+src=\(([^)]+)\)""")
+
+private sealed class MessageChunk {
+    data class TextChunk(val text: String) : MessageChunk()
+    data class SpriteChunk(val name: String) : MessageChunk()
+}
+
+private fun splitIntoChunks(text: String): List<MessageChunk> {
+    val chunks = mutableListOf<MessageChunk>()
+    var lastEnd = 0
+    for (match in SPRITE_REGEX.findAll(text)) {
+        val before = text.substring(lastEnd, match.range.first).trim()
+        if (before.isNotEmpty()) chunks.add(MessageChunk.TextChunk(before))
+        val name = (match.groupValues[1].ifEmpty { match.groupValues[2] }).trim()
+        if (name.isNotEmpty()) chunks.add(MessageChunk.SpriteChunk(name))
+        lastEnd = match.range.last + 1
+    }
+    val after = text.substring(lastEnd).trim()
+    if (after.isNotEmpty()) chunks.add(MessageChunk.TextChunk(after))
+    if (chunks.isEmpty()) chunks.add(MessageChunk.TextChunk(text))
+    return chunks
 }
 
 // Represents a parsed markdown segment

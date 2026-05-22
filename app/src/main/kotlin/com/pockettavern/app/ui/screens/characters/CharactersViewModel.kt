@@ -1,13 +1,18 @@
 package com.pockettavern.app.ui.screens.characters
 
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.pockettavern.app.data.local.SettingsDataStore
 import com.pockettavern.app.data.repository.CharaVaultRepository
+import com.pockettavern.app.data.repository.LlmRepository
 import com.pockettavern.app.data.repository.LocalRepository
 import com.pockettavern.app.domain.model.Character
 import com.pockettavern.app.domain.model.Group
 import com.pockettavern.app.domain.model.Result
+import com.pockettavern.app.domain.usecase.TranslateCardUseCase
+import com.pockettavern.app.util.PngCharacterCard
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -30,6 +35,14 @@ data class CharactersUiState(
     val error: String? = null,
     val isUploading: Boolean = false,
     val uploadSuccess: String? = null,
+    // Local file import + translation
+    val isImportingLocal: Boolean = false,
+    val showTranslateDialog: Boolean = false,
+    val pendingTranslateFileName: String? = null,
+    val pendingTranslateFields: Set<TranslateCardUseCase.Field> = emptySet(),
+    val isTranslating: Boolean = false,
+    val translateError: String? = null,
+    val translateSuccess: Boolean = false,
     // Groups
     val groups: List<Group> = emptyList(),
     val groupAvatarUrls: Map<String, List<String?>> = emptyMap(),
@@ -43,7 +56,10 @@ data class CharactersUiState(
 @HiltViewModel
 class CharactersViewModel @Inject constructor(
     private val localRepository: LocalRepository,
-    private val charaVaultRepository: CharaVaultRepository
+    private val charaVaultRepository: CharaVaultRepository,
+    private val llmRepository: LlmRepository,
+    private val settingsDataStore: SettingsDataStore,
+    private val translateCardUseCase: TranslateCardUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CharactersUiState())
@@ -216,6 +232,140 @@ class CharactersViewModel @Inject constructor(
                 error = "Group chats are not yet supported in standalone mode"
             )
         }
+    }
+
+    // ===== Local file import (PNG or charx) =====
+
+    fun importLocalCharacter(uri: Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isImportingLocal = true, error = null) }
+            when (val result = localRepository.importCharacterCard(uri)) {
+                is Result.Success -> {
+                    val fileName = result.data
+                    _uiState.update { it.copy(isImportingLocal = false) }
+                    loadCharacters()
+                    // V8: detect non-English fields, offer translation dialog
+                    val nonEnglishFields = detectNonEnglishFields(fileName)
+                    if (nonEnglishFields.isNotEmpty()) {
+                        _uiState.update {
+                            it.copy(
+                                showTranslateDialog = true,
+                                pendingTranslateFileName = fileName,
+                                pendingTranslateFields = nonEnglishFields
+                            )
+                        }
+                    }
+                }
+                is Result.Error -> _uiState.update {
+                    it.copy(isImportingLocal = false, error = "Import failed: ${result.exception.message}")
+                }
+            }
+        }
+    }
+
+    fun dismissTranslateDialog() {
+        _uiState.update {
+            it.copy(
+                showTranslateDialog = false,
+                pendingTranslateFileName = null,
+                pendingTranslateFields = emptySet(),
+                translateError = null
+            )
+        }
+    }
+
+    fun translateImportedCard(fields: List<TranslateCardUseCase.Field>) {
+        val fileName = _uiState.value.pendingTranslateFileName ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isTranslating = true, translateError = null) }
+            try {
+                val config = settingsDataStore.getLlmConfig()
+                val charResult = localRepository.getCharacter(fileName)
+                if (charResult !is Result.Success) {
+                    _uiState.update { it.copy(isTranslating = false, translateError = "Character not found") }
+                    return@launch
+                }
+                val character = charResult.data
+
+                // Build card data from character
+                val cardData = com.pockettavern.app.util.CharacterCardData(
+                    name = character.name,
+                    description = character.description,
+                    personality = character.personality,
+                    scenario = character.scenario,
+                    firstMes = character.firstMessage,
+                    mesExample = character.messageExample,
+                    creatorNotes = character.creatorNotes,
+                    systemPrompt = character.systemPrompt,
+                    postHistoryInstructions = character.postHistoryInstructions,
+                    alternateGreetings = character.alternateGreetings,
+                    tags = character.tags
+                )
+
+                // V9: translate all fields first, then save
+                val translated = translateCardUseCase.translate(cardData, fields, config)
+                val updatedChar = character.copy(
+                    description = translated.description,
+                    personality = translated.personality,
+                    scenario = translated.scenario,
+                    firstMessage = translated.firstMes,
+                    messageExample = translated.mesExample,
+                    creatorNotes = translated.creatorNotes,
+                    alternateGreetings = translated.alternateGreetings
+                )
+                localRepository.editCharacter(fileName, updatedChar)
+                loadCharacters()
+                _uiState.update {
+                    it.copy(
+                        isTranslating = false,
+                        showTranslateDialog = false,
+                        pendingTranslateFileName = null,
+                        translateSuccess = true
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Translation failed", e)
+                _uiState.update { it.copy(isTranslating = false, translateError = e.message ?: "Translation failed") }
+            }
+        }
+    }
+
+    fun clearTranslateSuccess() {
+        _uiState.update { it.copy(translateSuccess = false) }
+    }
+
+    // Trigger translate dialog for an already-imported character (from long-press menu)
+    fun requestTranslateExisting(character: Character) {
+        val fileName = character.avatar ?: "${character.name}.png"
+        viewModelScope.launch {
+            val fields = detectNonEnglishFields(fileName)
+            _uiState.update {
+                it.copy(
+                    showActionMenu = false,
+                    actionMenuCharacter = null,
+                    pendingTranslateFileName = fileName,
+                    pendingTranslateFields = fields,
+                    showTranslateDialog = true
+                )
+            }
+        }
+    }
+
+    // V8: detect which fields have > 0.15 non-ASCII ratio
+    private suspend fun detectNonEnglishFields(fileName: String): Set<TranslateCardUseCase.Field> {
+        val charResult = localRepository.getCharacter(fileName)
+        if (charResult !is Result.Success) return emptySet()
+        val c = charResult.data
+        val fieldMap = mapOf(
+            TranslateCardUseCase.Field.FIRST_MES to c.firstMessage,
+            TranslateCardUseCase.Field.DESCRIPTION to c.description,
+            TranslateCardUseCase.Field.PERSONALITY to c.personality,
+            TranslateCardUseCase.Field.SCENARIO to c.scenario,
+            TranslateCardUseCase.Field.MES_EXAMPLE to c.messageExample,
+            TranslateCardUseCase.Field.CREATOR_NOTES to c.creatorNotes,
+            TranslateCardUseCase.Field.ALTERNATE_GREETINGS to c.alternateGreetings.joinToString("\n")
+        )
+        return fieldMap.filterValues { translateCardUseCase.isNonEnglish(it) }.keys
     }
 
     fun uploadToCharaVault(character: Character) {

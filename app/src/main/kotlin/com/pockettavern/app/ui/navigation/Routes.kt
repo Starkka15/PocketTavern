@@ -102,4 +102,7 @@ sealed class Route {
 
     @Serializable
     data object Backup : Route()
+
+    @Serializable
+    data object RisuRealm : Route()
 }

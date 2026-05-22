@@ -63,6 +63,11 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
@@ -534,7 +539,8 @@ fun ChatScreen(
                                     } else {
                                         viewModel.swipeRight(index)
                                     }
-                                }
+                                },
+                                getSpriteFile = { viewModel.getSpriteFile(it) }
                             )
                         }
 
@@ -829,7 +835,8 @@ private fun MessageWithActions(
     onHeaderLongPress: ((String) -> Unit)? = null,
     onHeaderActionClick: ((String, String) -> Unit)? = null,
     onSwipeLeft: () -> Unit,
-    onSwipeRight: () -> Unit
+    onSwipeRight: () -> Unit,
+    getSpriteFile: ((String) -> File?)? = null
 ) {
     Column {
         Box(
@@ -864,7 +871,8 @@ private fun MessageWithActions(
                 onHeaderLongPress = onHeaderLongPress,
                 onHeaderActionClick = onHeaderActionClick,
                 onBubbleLongPress = onLongPress,
-                onImageAction = if (message.imagePath != null) onLongPress else null
+                onImageAction = if (message.imagePath != null) onLongPress else null,
+                getSpriteFile = getSpriteFile
             )
         }
 
@@ -1395,3 +1403,4 @@ private fun GalleryThumbnail(
         }
     }
 }
+

@@ -92,6 +92,14 @@ fun ContextSettingsScreen(
                     onMinLengthChange = viewModel::updateAutoContinueMinLength
                 )
 
+                HorizontalDivider()
+
+                // Long-Term Memory Section
+                LongTermMemorySection(
+                    enabled = uiState.memoryEnabled,
+                    onEnabledChange = viewModel::updateMemoryEnabled
+                )
+
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Save Button
@@ -388,6 +396,40 @@ private fun AutoContinueSection(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline
             )
+        }
+    }
+}
+
+@Composable
+private fun LongTermMemorySection(
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Long-Term Memory",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = "Summarize old messages so the AI remembers past sessions. " +
+                "When chat history exceeds ~3,000 tokens the oldest turns are " +
+                "compressed into a bullet-point memory block injected at the start of every prompt.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Enable Long-Term Memory",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            Switch(checked = enabled, onCheckedChange = onEnabledChange)
         }
     }
 }

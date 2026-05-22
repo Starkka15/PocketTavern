@@ -10,5 +10,7 @@ data class ChatEntity(
     val characterName: String,
     val createDate: Long = 0,       // Epoch millis
     val modifyDate: Long = 0,       // Epoch millis (file last modified)
-    val messageCount: Int = 0
+    val messageCount: Int = 0,
+    val memoryBlock: String = "",           // Persisted long-term memory summary
+    val summarizedTurnCount: Int = 0        // How many turns have been folded into memoryBlock
 )

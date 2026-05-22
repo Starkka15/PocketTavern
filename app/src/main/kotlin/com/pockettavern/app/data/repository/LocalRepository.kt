@@ -62,10 +62,17 @@ class LocalRepository @Inject constructor(
         characterStorage.deleteCharacter(fileName)
     }
 
-    /** Import a character PNG card from a content URI. */
+    /** Import a character card (PNG or .charx) from a content URI. */
     suspend fun importCharacterCard(uri: Uri): Result<String> = withResult {
         characterStorage.importCharacterCard(uri)
-            ?: throw Exception("Failed to import character card")
+    }
+
+    suspend fun importCharacterCardBytes(bytes: ByteArray): Result<String> = withResult {
+        characterStorage.importCharacterCardBytes(bytes)
+    }
+
+    suspend fun importCharacterCardFile(file: java.io.File): Result<String> = withResult {
+        characterStorage.importCharacterCardFile(file)
     }
 
     /** Get raw PNG bytes for a character (for export). */
@@ -406,6 +413,16 @@ class LocalRepository @Inject constructor(
 
     suspend fun saveAutoContinueConfig(enabled: Boolean, minLength: Int) =
         settingsDataStore.saveAutoContinueConfig(enabled, minLength)
+
+    // ── Long-Term Memory ──────────────────────────────────────────────────────
+
+    val memoryEnabledFlow: kotlinx.coroutines.flow.Flow<Boolean> =
+        settingsDataStore.memoryEnabledFlow
+
+    suspend fun getMemoryEnabled(): Boolean = settingsDataStore.getMemoryEnabled()
+    suspend fun saveMemoryEnabled(enabled: Boolean) = settingsDataStore.saveMemoryEnabled(enabled)
+    suspend fun updateChatMemoryBlock(characterName: String, fileName: String, block: String, count: Int) =
+        chatStorage.updateMemoryBlock(characterName, fileName, block, count)
 
     // ── Connection Profiles ───────────────────────────────────────────────────
 

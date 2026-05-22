@@ -72,11 +72,23 @@ PocketTavern's chat screen is built around a natural, responsive conversation fl
 - **Regenerate** — Remove the last AI message and re-generate a fresh response
 - **Narrator mode** — Insert narrator/system messages rendered as full-width centered italic text (also via the `/sys` input prefix)
 - **Author's Note** — Inject custom text into the context at a configurable depth, interval, position (Before Char, After Char, Top/Bottom of AN, At Depth), and role (System/User/Assistant)
+- **Long-Term Memory** — When unsummarized chat history exceeds ~3,000 tokens, the oldest turns are automatically compressed into a bullet-point memory block by your active LLM and injected at the top of every prompt. The AI retains facts across sessions that would otherwise fall outside the context window. Enable/disable in **Settings → Context Settings**
+- **Expression sprites** — Characters that use RisuAI-format sprite tags (`<img src=(name)>` in their responses) display expression images in a portrait panel above the chat input. The panel animates on sprite changes and can be tapped to dismiss. Sprites are stored from imported `.charx` cards and looked up case-insensitively
 - **Character backgrounds** — Display per-character background images behind the chat (upload from gallery or set a generated image)
 - **Multiple chats per character** — Start fresh conversations or continue any previous one via the chat selector
 - **Alternate greeting picker** — When a character has multiple greetings, a picker dialog appears on new chat creation
 - **Background generation** — Long-running generations continue in a foreground service so Android won't kill them
 - **Rich text rendering** — Bold, italic, inline code, quoted dialogue highlighting, all with theme-aware colors
+
+### Slash Commands
+
+Type these directly in the chat input field:
+
+| Command | What it does |
+|---------|-------------|
+| `/sys <text>` | Insert a narrator message into the chat without sending anything to the AI. Rendered as full-width centered italic text. |
+| `/ooc <text>` | Send an out-of-character note to the AI without showing a user bubble. Useful for giving instructions mid-scene ("stop using the word 'suddenly'") or asking meta questions without breaking immersion. |
+| `/persona <name>` | Temporarily change your persona name for the current session. Inserts a narrator note confirming the change. Resets to your configured persona the next time you open the chat. |
 
 ### Group Chat
 
@@ -189,7 +201,7 @@ Save multiple backend configurations and switch between them instantly — usefu
 
 Characters are stored as PNG files with embedded metadata (V2 spec) — the same format SillyTavern uses. Every card you import or create stays on your device and can be exported at any time.
 
-- Import any `.png` character card by tapping the import button or sharing a card to PocketTavern
+- Import `.png` or `.charx` character cards by tapping the import button or sharing a card to PocketTavern
 - Create characters from scratch with a tabbed editor:
   - **Basic** — Name, avatar (pick from gallery or generate with AI)
   - **Personality** — Description, Personality, Scenario
@@ -212,6 +224,16 @@ Each character can have its own overrides:
 - Image generation: toggle whether the avatar is used as an img2img reference
 - Extension toggles: enable/disable individual JS extensions per character
 
+### Importing `.charx` Cards (RisuAI Format)
+
+`.charx` is the character card format used by RisuAI. PocketTavern supports it natively:
+
+- Import `.charx` files directly from your file manager or share sheet — no conversion needed
+- Sprites (expression images) embedded in the card are automatically extracted and stored per-character
+- If the card is in a non-English language, PocketTavern detects this (non-ASCII ratio check) and offers to auto-translate the card fields using your active LLM connection before saving
+
+**Auto-translation:** After import, a dialog lets you choose which fields to translate (Description, First Message, Personality, Scenario, etc.). Translation preserves template variables (`{{user}}`, `{{char}}`), sprite tags (`<img src=(name)>`), and markdown markers verbatim. If translation fails, the original card is kept untouched.
+
 ### Browse CharaVault
 
 Browse thousands of community characters directly in the app:
@@ -223,6 +245,10 @@ Browse thousands of community characters directly in the app:
 - Preview full card details (description, first message, tags)
 - One-tap import into PocketTavern
 - Upload your own characters to CharaVault directly from the character list
+
+### Browse RisuRealm
+
+**RisuRealm** is an in-app browser pointed at [realm.risuai.net](https://realm.risuai.net/). Browse and download `.charx` cards directly — PocketTavern intercepts the download and imports the card automatically, including sprite extraction.
 
 </details>
 
@@ -279,6 +305,55 @@ Ready-to-use system prompts: Roleplay - Immersive, Assistant - Expert, Chain of 
 
 ### OpenAI / Chat Completion Presets
 For chat-completion APIs (OpenAI, Claude, etc.), configure a prompt order: drag and reorder system prompt blocks, world info injection points, character description, chat history, and custom injections. Each block has configurable role (system / user / assistant) and injection position (in-order or at a specific depth into chat history).
+
+### Macro Reference
+
+Macros are substituted everywhere text appears in prompts — system prompts, character descriptions, author's notes, and user messages. All macros are **case-insensitive**. Macros typed in the chat input are also substituted in the displayed chat bubble.
+
+#### Character & Persona
+| Macro | Resolves to |
+|-------|------------|
+| `{{char}}` | Character's name |
+| `{{user}}` | Your persona name |
+| `{{charDescription}}` | Character's description field |
+| `{{charPersonality}}` | Character's personality field |
+| `{{charScenario}}` | Character's scenario field |
+| `{{charPrompt}}` | Character's system prompt |
+| `{{charInstruction}}` / `{{charJailbreak}}` | Character's post-history instructions |
+| `{{creatorNotes}}` / `{{charCreatorNotes}}` | Character's creator notes |
+
+#### Time & Date
+| Macro | Resolves to |
+|-------|------------|
+| `{{date}}` | Current date (locale format) |
+| `{{time}}` | Current time (locale format) |
+| `{{isodate}}` | Current date as `yyyy-MM-dd` |
+| `{{isotime}}` | Current time as `HH:mm` |
+| `{{time_UTC±N}}` / `{{time::UTC±N}}` | Current time adjusted by UTC offset |
+| `{{idle_duration}}` / `{{idleDuration}}` | Time since last message ("just now", "5 minutes ago", "2 hours ago") |
+
+#### Formatting
+| Macro | Resolves to |
+|-------|------------|
+| `{{newline}}` | Newline (`\n`) |
+| `{{newline::N}}` | N newlines |
+| `{{space}}` | Space |
+| `{{space::N}}` | N spaces |
+| `{{noop}}` | Empty string (comment placeholder) |
+
+#### Chat History
+| Macro | Resolves to |
+|-------|------------|
+| `{{lastMessage}}` | Content of the most recent message (any sender) |
+| `{{lastUserMessage}}` | Content of the most recent user message |
+| `{{lastCharMessage}}` | Content of the most recent AI character message |
+| `{{input}}` | The current message being typed (at substitution time) |
+
+#### Random & Dice
+| Macro | Resolves to |
+|-------|------------|
+| `{{random:a,b,c}}` / `{{random::a::b::c}}` | One random item from the list |
+| `{{roll:NdN}}` / `{{roll::NdN}}` | Dice roll — e.g. `{{roll:2d6}}` rolls 2 six-sided dice and returns the sum. Clamped to 1–100 dice, 1–1000 sides. |
 
 </details>
 
@@ -555,13 +630,32 @@ Set up a persona to tell the AI who it's talking to:
 - Per-block role and injection mode controls
 - Works with any chat-completion-style API
 
+### Context Settings
+
+Go to **Settings → Context Settings** to configure per-session context injection:
+
+**Author's Note**
+- Free-text note injected at a configurable position (Before Char, After Char, At Depth) and role (System/User/Assistant)
+- Interval: inject every N messages (0 = every message)
+- Depth: how many messages from the bottom to inject at (for At Depth position)
+
+**Auto-Continue**
+- When enabled, PocketTavern automatically sends a continuation request if the AI response is shorter than the configured minimum token length
+- Maximum 3 auto-continues per turn to prevent runaway loops
+
+**Long-Term Memory**
+- When unsummarized chat history exceeds ~3,000 tokens (~12,000 characters), the oldest un-summarized turns are sent to your active LLM with a summarization prompt
+- The result is stored as a bullet-point memory block in the chat's database record and re-injected as a system message at the top of every subsequent prompt
+- Summarization runs in the background after the AI response is saved — it never blocks the chat
+- Toggle off to disable both injection and background summarization
+
 ### Settings Categories
 
 Settings are organized into five groups:
 
 - **Connection** — API Configuration, Connection Profiles, Image Generation
 - **Generation** — Text Generation Parameters, Chat Completion Presets, Formatting
-- **World & Characters** — World Info / Lorebooks, Context Settings (Author's Note), Personas
+- **World & Characters** — World Info / Lorebooks, Context Settings (Author's Note, Auto-Continue, Long-Term Memory), Personas
 - **Appearance & Audio** — Themes, Text-to-Speech
 - **Utilities** — Extensions, Import from SillyTavern, Help
 

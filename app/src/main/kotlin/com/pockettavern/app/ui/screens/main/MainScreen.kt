@@ -8,10 +8,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Update
@@ -53,6 +55,7 @@ fun MainScreen(
     onNavigateToRecentChats: () -> Unit,
     onNavigateToCreateCharacter: () -> Unit,
     onNavigateToCharaVault: () -> Unit,
+    onNavigateToRisuRealm: () -> Unit = {},
     onNavigateToSettings: () -> Unit,
     onNavigateToProfile: () -> Unit,
     onNavigateToExtensionPanel: (String) -> Unit = {},
@@ -204,18 +207,14 @@ fun MainScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // CharaVault - always available in standalone mode
-                if (true) {
-                    NavigationCard(
-                        icon = Icons.Default.Storage,
-                        title = "Browse CharaVault",
-                        description = "Browse and download character cards from CharaVault",
-                        iconColor = MaterialTheme.colorScheme.primary,
-                        onClick = onNavigateToCharaVault
-                    )
+                // Card search — CharaVault or RisuRealm
+                SearchCardsCard(
+                    iconColor = MaterialTheme.colorScheme.primary,
+                    onNavigateToCharaVault = onNavigateToCharaVault,
+                    onNavigateToRisuRealm = onNavigateToRisuRealm
+                )
 
-                    Spacer(modifier = Modifier.height(20.dp))
-                }
+                Spacer(modifier = Modifier.height(20.dp))
 
                 NavigationCard(
                     icon = Icons.Default.Settings,
@@ -298,6 +297,109 @@ fun MainScreen(
         )
     }
     } // Box
+}
+
+@Composable
+private fun SearchCardsCard(
+    iconColor: Color,
+    onNavigateToCharaVault: () -> Unit,
+    onNavigateToRisuRealm: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var selectedIndex by remember { mutableStateOf(0) }
+    val options = listOf("CharaVault", "RisuRealm")
+
+    val onNavigate = if (selectedIndex == 0) onNavigateToCharaVault else onNavigateToRisuRealm
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .border(
+                width = 1.5.dp,
+                brush = Brush.linearGradient(
+                    colors = listOf(iconColor.copy(alpha = 0.6f), iconColor.copy(alpha = 0.2f))
+                ),
+                shape = RoundedCornerShape(16.dp)
+            )
+            .clickable(onClick = onNavigate),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp, horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                iconColor.copy(alpha = 0.5f),
+                                iconColor.copy(alpha = 0.15f),
+                                Color.Transparent
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    tint = iconColor,
+                    modifier = Modifier.size(34.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(18.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Search cards",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                // Source selector dropdown
+                Box {
+                    Row(
+                        modifier = Modifier.clickable { expanded = true },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = options[selectedIndex],
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = iconColor
+                        )
+                        Icon(
+                            Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            tint = iconColor,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        options.forEachIndexed { index, label ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    selectedIndex = index
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

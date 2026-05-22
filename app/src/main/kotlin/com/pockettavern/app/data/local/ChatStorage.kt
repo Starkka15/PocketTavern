@@ -104,12 +104,24 @@ class ChatStorage @Inject constructor(
         }
     }
 
-    /** Load a full chat from a JSONL file. */
+    /** Load a full chat from a JSONL file. Memory fields loaded from Room. */
     suspend fun loadChat(characterName: String, fileName: String): Chat? = withContext(Dispatchers.IO) {
         val file = File(characterDir(characterName), fileName)
         if (!file.exists()) return@withContext null
-        parseChat(file, characterName)
+        val chat = parseChat(file, characterName) ?: return@withContext null
+        val entity = chatDao.getByFileName(fileName)
+        chat.copy(
+            memoryBlock = entity?.memoryBlock ?: "",
+            summarizedTurnCount = entity?.summarizedTurnCount ?: 0
+        )
     }
+
+    /** Persist the memory summary for a chat without rewriting the JSONL file. */
+    suspend fun updateMemoryBlock(characterName: String, fileName: String, block: String, count: Int) =
+        withContext(Dispatchers.IO) {
+            chatDao.updateMemoryBlock(fileName, block, count)
+            DebugLogger.log("ChatStorage: memoryBlock updated for $fileName (${block.length} chars, $count turns summarized)")
+        }
 
     /** Save a chat to JSONL format. Creates file if it doesn't exist. */
     suspend fun saveChat(chat: Chat, userName: String = "User"): String = withContext(Dispatchers.IO) {

@@ -113,4 +113,15 @@ class ExtensionManager @Inject constructor(
     fun clearCharacterFilter() {
         jsHost.updateDisabledExtensions(emptyList())
     }
+
+    /**
+     * Fire PROMPT_BEFORE_SEND to all extensions (fire-and-forget).
+     * Returns the original prompt/messages unchanged — JS extensions can use
+     * prompt injections or output filters for content modification.
+     * The event payload is a JSON string: { "prompt": "...", "messageCount": N }.
+     */
+    fun fireBeforePromptSend(prompt: String, messageCount: Int) {
+        val payload = """{"prompt":${org.json.JSONObject.quote(prompt.take(500))},"messageCount":$messageCount}"""
+        emitJson(ExtensionEvent.PROMPT_BEFORE_SEND, payload)
+    }
 }

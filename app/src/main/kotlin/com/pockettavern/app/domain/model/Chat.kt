@@ -6,7 +6,9 @@ data class Chat(
     val fileName: String,
     val characterName: String,
     val messages: List<ChatMessage> = emptyList(),
-    val createDate: Instant = Instant.now()
+    val createDate: Instant = Instant.now(),
+    val memoryBlock: String = "",
+    val summarizedTurnCount: Int = 0
 )
 
 data class ChatInfo(

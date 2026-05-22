@@ -40,6 +40,7 @@ import com.pockettavern.app.ui.screens.theme.ThemeScreen
 import com.pockettavern.app.ui.screens.settings.ImageGenSettingsScreen
 import com.pockettavern.app.ui.screens.settings.TtsSettingsScreen
 import com.pockettavern.app.ui.screens.backup.BackupScreen
+import com.pockettavern.app.ui.screens.risuRealm.RisuRealmBrowserScreen
 import com.pockettavern.app.ui.audio.ThemeAudioManager
 
 @Composable
@@ -67,6 +68,9 @@ fun SillyTavernNavGraph(
                 },
                 onNavigateToCharaVault = {
                     navController.navigate(Route.CharaVault)
+                },
+                onNavigateToRisuRealm = {
+                    navController.navigate(Route.RisuRealm)
                 },
                 onNavigateToSettings = {
                     navController.navigate(Route.SettingsHub)
@@ -101,6 +105,15 @@ fun SillyTavernNavGraph(
                 },
                 shouldRefresh = shouldRefreshCharacters,
                 onRefreshHandled = { shouldRefreshCharacters = false }
+            )
+        }
+
+        composable<Route.RisuRealm> {
+            RisuRealmBrowserScreen(
+                onBack = {
+                    shouldRefreshCharacters = true
+                    navController.popBackStack()
+                }
             )
         }
 

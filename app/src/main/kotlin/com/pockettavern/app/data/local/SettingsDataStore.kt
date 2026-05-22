@@ -111,6 +111,9 @@ class SettingsDataStore @Inject constructor(
         // Image Generation
         val IMAGE_GEN_CONFIG = stringPreferencesKey("image_gen_config")
 
+        // Long-Term Memory
+        val MEMORY_ENABLED = booleanPreferencesKey("memory_enabled")
+
         // Sentinel incremented when an encrypted-prefs value changes, to trigger flow re-emit
         val SECURE_REFRESH = intPreferencesKey("secure_refresh")
     }
@@ -430,6 +433,18 @@ class SettingsDataStore @Inject constructor(
     suspend fun clearAll() {
         encryptedPrefs.edit().clear().apply()
         context.dataStore.edit { prefs -> prefs.clear() }
+    }
+
+    // ── Long-Term Memory ─────────────────────────────────────────────────────
+
+    val memoryEnabledFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[Keys.MEMORY_ENABLED] ?: true
+    }
+
+    suspend fun getMemoryEnabled(): Boolean = memoryEnabledFlow.first()
+
+    suspend fun saveMemoryEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[Keys.MEMORY_ENABLED] = enabled }
     }
 }
 
