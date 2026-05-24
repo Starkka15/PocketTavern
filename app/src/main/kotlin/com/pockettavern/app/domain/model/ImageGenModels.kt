@@ -54,6 +54,7 @@ data class ImageGenConfig(
     val huggingfaceModel: String = "stabilityai/stable-diffusion-xl-base-1.0",
     val nanoGptApiKey: String = "",
     val nanoGptModel: String = "chroma",
+    val sdModel: String = "",
     val sampler: String = "Euler",
     val scheduler: String = "",
     val steps: Int = 20,

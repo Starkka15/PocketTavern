@@ -2,6 +2,7 @@ package com.pockettavern.app.data.remote.imagegen
 
 import com.pockettavern.app.data.remote.api.ForgeApi
 import com.pockettavern.app.data.remote.dto.forge.Img2ImgRequest
+import com.pockettavern.app.data.remote.dto.forge.SetOptionsRequest
 import com.pockettavern.app.data.remote.dto.forge.Txt2ImgRequest
 import com.pockettavern.app.domain.model.*
 import kotlinx.coroutines.flow.Flow
@@ -113,6 +114,15 @@ class SdWebuiBackend(
             Result.Success(Unit)
         } catch (e: Exception) {
             Result.Error(Exception("Failed to interrupt: ${e.message}", e))
+        }
+    }
+
+    override suspend fun setModel(model: String): Result<Unit> {
+        return try {
+            api.setOptions(SetOptionsRequest(sdModelCheckpoint = model))
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(Exception("Failed to set model: ${e.message}", e))
         }
     }
 }

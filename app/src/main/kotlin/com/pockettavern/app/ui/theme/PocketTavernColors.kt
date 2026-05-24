@@ -9,11 +9,13 @@ import androidx.compose.ui.unit.dp
 
 enum class AvatarShape {
     CIRCLE,
-    ROUNDED_SQUARE;
+    ROUNDED_SQUARE,
+    SQUARE;
 
     fun toShape(): Shape = when (this) {
         CIRCLE         -> CircleShape
-        ROUNDED_SQUARE -> RoundedCornerShape(12.dp)
+        ROUNDED_SQUARE -> RoundedCornerShape(6.dp)
+        SQUARE         -> RoundedCornerShape(0.dp)
     }
 }
 

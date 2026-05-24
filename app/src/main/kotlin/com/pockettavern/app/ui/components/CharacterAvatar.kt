@@ -12,11 +12,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import coil.size.Size
 import com.pockettavern.app.ui.theme.LocalPocketTavernColors
 
 @Composable
@@ -26,14 +26,13 @@ fun CharacterAvatar(
     modifier: Modifier = Modifier,
     size: Dp = 48.dp
 ) {
-    val avatarShape = LocalPocketTavernColors.current.avatarShape.toShape()
+    val ptColors = LocalPocketTavernColors.current
+    val avatarShape = ptColors.avatarShape.toShape()
 
     if (imageUrl != null) {
         val context = LocalContext.current
         val density = LocalDensity.current
-        // Tell Coil exactly what pixel size to decode at — enables BitmapFactory subsampling
-        // so we never decode a full 800×1200 card PNG just to show a 48dp thumbnail.
-        val px = with(density) { (size * 2).toPx().toInt() } // 2× for display density headroom
+        val px = with(density) { (size * 2).toPx().toInt() }
         AsyncImage(
             model = ImageRequest.Builder(context)
                 .data(imageUrl)
@@ -47,7 +46,6 @@ fun CharacterAvatar(
             contentScale = ContentScale.Crop
         )
     } else {
-        // Fallback to initial letter
         Box(
             modifier = modifier
                 .size(size)

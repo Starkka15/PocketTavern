@@ -69,4 +69,10 @@ class ImageGenRepository @Inject constructor(
             ?: return Result.Error(Exception("No backend configured"))
         return backend.interrupt()
     }
+
+    suspend fun setModel(model: String): Result<Unit> {
+        val backend = getActiveBackend()
+            ?: return Result.Error(Exception("No backend configured"))
+        return backend.setModel(model)
+    }
 }

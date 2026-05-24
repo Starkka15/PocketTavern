@@ -45,7 +45,11 @@ object StThemeParser {
         val inputBackground = lerp(surface, Color.White, 0.10f)
 
         // Avatar shape: 0 = circle (default), 1 = rounded square
-        val avatarShape = if (intField("avatar_style") == 1) AvatarShape.ROUNDED_SQUARE else AvatarShape.CIRCLE
+        val avatarShape = when (intField("avatar_style")) {
+            1    -> AvatarShape.ROUNDED_SQUARE
+            2    -> AvatarShape.SQUARE
+            else -> AvatarShape.CIRCLE
+        }
 
         // Border color: use explicit ST field if visible; otherwise derive a subtle separator
         val borderRaw = color("border_color")

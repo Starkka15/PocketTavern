@@ -329,6 +329,22 @@ fun ChatBubble(
                                 )
                             }
                         }
+                        is MessageChunk.ImageChunk -> {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(chunk.url)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = chunk.alt.ifEmpty { "image" },
+                                modifier = Modifier
+                                    .fillMaxWidth(0.85f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .align(Alignment.CenterHorizontally)
+                                    .padding(vertical = 4.dp),
+                                contentScale = ContentScale.FillWidth
+                            )
+                        }
                     }
                 }
             }
@@ -368,7 +384,7 @@ fun StreamingChatBubble(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = formatMessage(SPRITE_REGEX.replace(content, "") + "▌"),
+                    text = formatMessage(HTML_IMG_REGEX.replace(MD_IMAGE_REGEX.replace(SPRITE_REGEX.replace(content, ""), ""), "") + "▌"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = ptColors.assistantBubbleText
                 )
@@ -380,20 +396,60 @@ fun StreamingChatBubble(
 // Matches <img src=(name)>, < img src=(name)>, and bare img src=(name) (model often omits brackets)
 private val SPRITE_REGEX = Regex("""<\s*img\s+src=\(([^)]+)\)\s*>|\bimg\s+src=\(([^)]+)\)""")
 
+// Matches markdown images: ![alt text](url)
+private val MD_IMAGE_REGEX = Regex("""!\[([^\]]*)\]\(([^)]+)\)""")
+
+// Matches HTML img tags in all common malformed variants:
+//   <img src="url">, < img src='url'>, <img src=url>, <img=url>, < img=url>
+// Group 1: src=... form  |  Group 2: img=... form (no "src" keyword)
+private val HTML_IMG_REGEX = Regex(
+    """<\s*img[^>]*\bsrc=["']?(https?://[^"'\s>]+)["']?[^>]*>""" +
+    """|<\s*img\s*=\s*["']?(https?://[^"'\s>"']+)["']?\s*/?>""",
+    RegexOption.IGNORE_CASE
+)
+
 private sealed class MessageChunk {
     data class TextChunk(val text: String) : MessageChunk()
     data class SpriteChunk(val name: String) : MessageChunk()
+    data class ImageChunk(val url: String, val alt: String) : MessageChunk()
 }
 
 private fun splitIntoChunks(text: String): List<MessageChunk> {
+    // Collect all matches from both patterns, tagged by type, sorted by position
+    data class RawMatch(val start: Int, val end: Int, val chunk: MessageChunk)
+    val matches = mutableListOf<RawMatch>()
+    for (m in SPRITE_REGEX.findAll(text)) {
+        val name = (m.groupValues[1].ifEmpty { m.groupValues[2] }).trim()
+        if (name.isNotEmpty()) {
+            // If the "sprite name" is actually a URL, treat it as a remote image
+            val chunk = if (name.startsWith("http://") || name.startsWith("https://"))
+                MessageChunk.ImageChunk(name, "")
+            else
+                MessageChunk.SpriteChunk(name)
+            matches.add(RawMatch(m.range.first, m.range.last + 1, chunk))
+        }
+    }
+    for (m in MD_IMAGE_REGEX.findAll(text)) {
+        val url = m.groupValues[2].trim()
+        val alt = m.groupValues[1].trim()
+        if (url.isNotEmpty()) matches.add(RawMatch(m.range.first, m.range.last + 1, MessageChunk.ImageChunk(url, alt)))
+    }
+    for (m in HTML_IMG_REGEX.findAll(text)) {
+        val url = (m.groupValues[1].ifEmpty { m.groupValues[2] }).trim()
+        // Skip ST macro URLs like {{random:...}}
+        if (url.isNotEmpty() && !url.startsWith("{{"))
+            matches.add(RawMatch(m.range.first, m.range.last + 1, MessageChunk.ImageChunk(url, "")))
+    }
+    matches.sortBy { it.start }
+
     val chunks = mutableListOf<MessageChunk>()
     var lastEnd = 0
-    for (match in SPRITE_REGEX.findAll(text)) {
-        val before = text.substring(lastEnd, match.range.first).trim()
+    for (match in matches) {
+        if (match.start < lastEnd) continue // overlapping match, skip
+        val before = text.substring(lastEnd, match.start).trim()
         if (before.isNotEmpty()) chunks.add(MessageChunk.TextChunk(before))
-        val name = (match.groupValues[1].ifEmpty { match.groupValues[2] }).trim()
-        if (name.isNotEmpty()) chunks.add(MessageChunk.SpriteChunk(name))
-        lastEnd = match.range.last + 1
+        chunks.add(match.chunk)
+        lastEnd = match.end
     }
     val after = text.substring(lastEnd).trim()
     if (after.isNotEmpty()) chunks.add(MessageChunk.TextChunk(after))

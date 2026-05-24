@@ -172,6 +172,13 @@ class ImageGenSettingsViewModel @Inject constructor(
         }
     }
 
+    fun updateSdModel(model: String) {
+        updateConfig { it.copy(sdModel = model) }
+        viewModelScope.launch {
+            imageGenRepository.setModel(model)
+        }
+    }
+
     private fun updateConfig(transform: (ImageGenConfig) -> ImageGenConfig) {
         val newConfig = transform(_uiState.value.config)
         _uiState.update { it.copy(config = newConfig) }

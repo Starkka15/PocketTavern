@@ -36,11 +36,13 @@ import com.pockettavern.app.ui.screens.extensions.quickreply.QuickReplySettingsS
 import com.pockettavern.app.ui.screens.extensions.regex.RegexSettingsScreen
 import com.pockettavern.app.ui.screens.connectionprofiles.ConnectionProfilesScreen
 import com.pockettavern.app.ui.screens.debug.DebugLogScreen
+import com.pockettavern.app.ui.screens.theme.ThemeBuilderScreen
 import com.pockettavern.app.ui.screens.theme.ThemeScreen
 import com.pockettavern.app.ui.screens.settings.ImageGenSettingsScreen
 import com.pockettavern.app.ui.screens.settings.TtsSettingsScreen
 import com.pockettavern.app.ui.screens.backup.BackupScreen
 import com.pockettavern.app.ui.screens.risuRealm.RisuRealmBrowserScreen
+import com.pockettavern.app.ui.screens.botBooru.BotBooruBrowserScreen
 import com.pockettavern.app.ui.audio.ThemeAudioManager
 
 @Composable
@@ -71,6 +73,9 @@ fun SillyTavernNavGraph(
                 },
                 onNavigateToRisuRealm = {
                     navController.navigate(Route.RisuRealm)
+                },
+                onNavigateToBotBooru = {
+                    navController.navigate(Route.BotBooru)
                 },
                 onNavigateToSettings = {
                     navController.navigate(Route.SettingsHub)
@@ -110,6 +115,15 @@ fun SillyTavernNavGraph(
 
         composable<Route.RisuRealm> {
             RisuRealmBrowserScreen(
+                onBack = {
+                    shouldRefreshCharacters = true
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable<Route.BotBooru> {
+            BotBooruBrowserScreen(
                 onBack = {
                     shouldRefreshCharacters = true
                     navController.popBackStack()
@@ -308,7 +322,17 @@ fun SillyTavernNavGraph(
         }
 
         composable<Route.ThemeSettings> {
-            ThemeScreen(onBack = { navController.popBackStack() })
+            ThemeScreen(
+                onBack = { navController.popBackStack() },
+                onCreateTheme = { navController.navigate(Route.ThemeBuilder) }
+            )
+        }
+
+        composable<Route.ThemeBuilder> {
+            ThemeBuilderScreen(
+                onBack = { navController.popBackStack() },
+                onSaved = { navController.popBackStack() }
+            )
         }
 
         composable<Route.TtsSettings> {

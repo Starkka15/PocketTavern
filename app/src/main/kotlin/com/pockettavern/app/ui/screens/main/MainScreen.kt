@@ -56,6 +56,7 @@ fun MainScreen(
     onNavigateToCreateCharacter: () -> Unit,
     onNavigateToCharaVault: () -> Unit,
     onNavigateToRisuRealm: () -> Unit = {},
+    onNavigateToBotBooru: () -> Unit = {},
     onNavigateToSettings: () -> Unit,
     onNavigateToProfile: () -> Unit,
     onNavigateToExtensionPanel: (String) -> Unit = {},
@@ -211,7 +212,8 @@ fun MainScreen(
                 SearchCardsCard(
                     iconColor = MaterialTheme.colorScheme.primary,
                     onNavigateToCharaVault = onNavigateToCharaVault,
-                    onNavigateToRisuRealm = onNavigateToRisuRealm
+                    onNavigateToRisuRealm = onNavigateToRisuRealm,
+                    onNavigateToBotBooru = onNavigateToBotBooru
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -303,13 +305,18 @@ fun MainScreen(
 private fun SearchCardsCard(
     iconColor: Color,
     onNavigateToCharaVault: () -> Unit,
-    onNavigateToRisuRealm: () -> Unit
+    onNavigateToRisuRealm: () -> Unit,
+    onNavigateToBotBooru: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     var selectedIndex by remember { mutableStateOf(0) }
-    val options = listOf("CharaVault", "RisuRealm")
+    val options = listOf("CharaVault", "RisuRealm", "BotBooru")
 
-    val onNavigate = if (selectedIndex == 0) onNavigateToCharaVault else onNavigateToRisuRealm
+    val onNavigate = when (selectedIndex) {
+        1    -> onNavigateToRisuRealm
+        2    -> onNavigateToBotBooru
+        else -> onNavigateToCharaVault
+    }
 
     Surface(
         modifier = Modifier

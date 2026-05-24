@@ -85,7 +85,7 @@ data class OptionsDto(
     @SerialName("sd_vae")
     val sdVae: String? = null,
     @SerialName("CLIP_stop_at_last_layers")
-    val clipStopAtLastLayers: Int? = null
+    val clipStopAtLastLayers: Double? = null
 )
 
 @Serializable

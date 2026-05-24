@@ -17,4 +17,5 @@ interface ImageGenBackend {
     suspend fun getModels(): Result<List<String>>
     fun generate(params: ForgeGenerationParams): Flow<GenerationState>
     suspend fun interrupt(): Result<Unit>
+    suspend fun setModel(model: String): Result<Unit> = Result.Success(Unit)
 }

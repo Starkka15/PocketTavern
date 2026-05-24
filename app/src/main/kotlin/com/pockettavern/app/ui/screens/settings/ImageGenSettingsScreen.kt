@@ -451,7 +451,7 @@ fun ImageGenSettingsScreen(
                                 onExpandedChange = { modelExpanded = it }
                             ) {
                                 OutlinedTextField(
-                                    value = uiState.models.firstOrNull() ?: "Default",
+                                    value = config.sdModel.ifBlank { uiState.models.firstOrNull() ?: "Default" },
                                     onValueChange = {},
                                     readOnly = true,
                                     label = { Text("Model") },
@@ -468,7 +468,10 @@ fun ImageGenSettingsScreen(
                                     uiState.models.forEach { model ->
                                         DropdownMenuItem(
                                             text = { Text(model) },
-                                            onClick = { modelExpanded = false }
+                                            onClick = {
+                                                viewModel.updateSdModel(model)
+                                                modelExpanded = false
+                                            }
                                         )
                                     }
                                 }

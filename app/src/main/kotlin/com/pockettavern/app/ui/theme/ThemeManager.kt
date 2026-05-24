@@ -109,6 +109,26 @@ class ThemeManager @Inject constructor(
         null
     }
 
+    /** Import JSON + optional background image bytes, save to disk, return the generated id or null. */
+    fun importThemeWithBackground(
+        json: String,
+        backgroundBytes: ByteArray?,
+        backgroundExt: String?
+    ): String? = try {
+        val name = extractName(json) ?: "imported"
+        val id = generateId(name)
+        val themeDir = File(themesDir, id).also { it.mkdirs() }
+        File(themeDir, "theme.json").writeText(json)
+        if (backgroundBytes != null && !backgroundExt.isNullOrEmpty()) {
+            File(themeDir, "background.$backgroundExt").writeBytes(backgroundBytes)
+        }
+        DebugLogger.log("[ThemeManager] Imported '$name' with background as '$id'")
+        id
+    } catch (e: Exception) {
+        DebugLogger.log("[ThemeManager] Import with background failed: ${e.message}")
+        null
+    }
+
     /** Import a ZIP bundle containing theme.json + optional images. */
     fun importThemeZip(inputStream: InputStream): String? = try {
         val tempDir = File(context.cacheDir, "theme_import_${System.currentTimeMillis()}")

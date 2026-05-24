@@ -33,6 +33,12 @@ class PromptBuilder(
     // Priority: OAI preset mainPrompt > sysprompt preset > instruct template system prompt
     private val systemPrompt: String
 
+    // Injected at both system-prompt level and post-history level when "don't speak for user" is on.
+    // Using macros here — substituteMacros() resolves them at build time.
+    private val noSpeakConstraint: String? = if (chatContext.userPersona.noSpeakForUser)
+        "[IMPORTANT — NEVER BREAK THIS RULE]: You are STRICTLY FORBIDDEN from writing any dialogue, actions, or inner thoughts for {{user}}. Only {{user}} (the human player) decides what {{user}} says or does. Write only for {{char}} and other NPCs. Stop your response after {{char}}'s turn and wait for {{user}} to reply."
+    else null
+
     // Set at the start of each build call so substituteMacros can access them
     // without changing all 40+ internal call sites.
     private var _buildHistory: List<ChatMessage> = emptyList()
@@ -62,9 +68,9 @@ class PromptBuilder(
                 if (isNotBlank()) append("\n\n")
                 append(characterPrompt)
             }
-            if (chatContext.userPersona.noSpeakForUser) {
+            noSpeakConstraint?.let {
                 if (isNotBlank()) append("\n\n")
-                append("Never speak, act, or make decisions for {{user}}. Write only {{char}}'s dialogue and actions.")
+                append(it)
             }
         }
 
@@ -125,7 +131,13 @@ class PromptBuilder(
                     // All other content blocks: use preset text; fall back to character field for post-history
                     "post_history_instructions" -> {
                         val text = presetText.ifBlank { character.postHistoryInstructions }
-                        if (text.isNotBlank()) substituteMacros(text).trim() else ""
+                        buildString {
+                            if (text.isNotBlank()) append(substituteMacros(text).trim())
+                            noSpeakConstraint?.let {
+                                if (isNotBlank()) append("\n\n")
+                                append(substituteMacros(it))
+                            }
+                        }.ifBlank { "" }
                     }
                     else -> if (presetText.isNotBlank()) substituteMacros(presetText).trim() else ""
                 }
@@ -414,8 +426,16 @@ class PromptBuilder(
         sb.append("\n")
 
         // === POST-HISTORY INSTRUCTIONS (injected as system message before assistant turn) ===
-        if (character.postHistoryInstructions.isNotBlank()) {
-            sb.append(wrapAsSystem(substituteMacros(character.postHistoryInstructions), template))
+        val phiText = buildString {
+            if (character.postHistoryInstructions.isNotBlank())
+                append(substituteMacros(character.postHistoryInstructions))
+            noSpeakConstraint?.let {
+                if (isNotBlank()) append("\n\n")
+                append(substituteMacros(it))
+            }
+        }
+        if (phiText.isNotBlank()) {
+            sb.append(wrapAsSystem(phiText, template))
         }
 
         // === START ASSISTANT RESPONSE ===
@@ -478,6 +498,7 @@ class PromptBuilder(
 
         // New message
         sb.append("$userName: ${substituteMacros(newMessage)}\n")
+        noSpeakConstraint?.let { sb.append("[${substituteMacros(it)}]\n") }
         sb.append("${character.name}:")
 
         return sb.toString()

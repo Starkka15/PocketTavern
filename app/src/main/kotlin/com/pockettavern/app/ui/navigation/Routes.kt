@@ -92,6 +92,9 @@ sealed class Route {
     data object ThemeSettings : Route()
 
     @Serializable
+    data object ThemeBuilder : Route()
+
+    @Serializable
     data object TtsSettings : Route()
 
     @Serializable
@@ -105,4 +108,7 @@ sealed class Route {
 
     @Serializable
     data object RisuRealm : Route()
+
+    @Serializable
+    data object BotBooru : Route()
 }
