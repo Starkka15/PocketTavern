@@ -255,7 +255,9 @@ class LocalRepository @Inject constructor(
             name = settingsDataStore.getUserPersonaName(),
             description = settingsDataStore.getUserPersonaDesc(),
             position = settingsDataStore.getUserPersonaPosition(),
-            depth = settingsDataStore.getUserPersonaDepth()
+            depth = settingsDataStore.getUserPersonaDepth(),
+            avatarPath = settingsDataStore.getUserPersonaAvatarPath(),
+            noSpeakForUser = settingsDataStore.getNoSpeakForUser()
         )
     }
 
@@ -264,6 +266,8 @@ class LocalRepository @Inject constructor(
         settingsDataStore.saveUserPersonaDesc(persona.description)
         settingsDataStore.saveUserPersonaPosition(persona.position)
         settingsDataStore.saveUserPersonaDepth(persona.depth)
+        settingsDataStore.saveUserPersonaAvatarPath(persona.avatarPath)
+        settingsDataStore.saveNoSpeakForUser(persona.noSpeakForUser)
     }
 
     // ── API Configuration ────────────────────────────────────────────────────
@@ -301,7 +305,9 @@ class LocalRepository @Inject constructor(
 
         val persona = UserPersona(
             name = settingsDataStore.getUserPersonaName(),
-            description = settingsDataStore.getUserPersonaDesc()
+            description = settingsDataStore.getUserPersonaDesc(),
+            avatarPath = settingsDataStore.getUserPersonaAvatarPath(),
+            noSpeakForUser = settingsDataStore.getNoSpeakForUser()
         )
 
         // Load global author's note from settings (fallback)

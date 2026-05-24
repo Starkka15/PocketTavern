@@ -1,11 +1,14 @@
 package com.pockettavern.app.ui.screens.persona
 
+import android.content.Context
 import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pockettavern.app.data.repository.ForgeRepository
 import com.pockettavern.app.data.repository.LocalRepository
 import com.pockettavern.app.data.repository.SettingsRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
 import com.pockettavern.app.domain.model.ForgeGenerationParams
 import com.pockettavern.app.domain.model.GenerationState
 import com.pockettavern.app.domain.model.Persona
@@ -50,6 +53,7 @@ data class PersonaUiState(
 
 @HiltViewModel
 class PersonaViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val localRepository: LocalRepository,
     private val settingsRepository: SettingsRepository,
     private val forgeRepository: ForgeRepository
@@ -251,10 +255,15 @@ class PersonaViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
             try {
-                // In standalone mode, "creating" a persona just updates the single UserPersona
+                val avatarPath = state.createImageBytes?.let { bytes ->
+                    val file = File(context.filesDir, "persona_avatar.png")
+                    file.writeBytes(bytes)
+                    file.absolutePath
+                }
                 val updated = UserPersona(
                     name = state.createName.trim(),
-                    description = state.createDescription
+                    description = state.createDescription,
+                    avatarPath = avatarPath
                 )
                 localRepository.saveUserPersona(updated)
                 _uiState.update {
@@ -338,7 +347,7 @@ class PersonaViewModel @Inject constructor(
 
     // Convert UserPersona to Persona (domain model used by the UI)
     private fun UserPersona.toPersona(): Persona = Persona(
-        avatarId = "local_persona",
+        avatarId = avatarPath ?: "",
         name = name,
         description = description,
         position = PersonaPosition.fromInt(position),

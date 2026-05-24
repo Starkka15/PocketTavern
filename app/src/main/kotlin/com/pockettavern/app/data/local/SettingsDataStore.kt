@@ -89,6 +89,8 @@ class SettingsDataStore @Inject constructor(
         val USER_PERSONA_DESC = stringPreferencesKey("user_persona_desc")
         val USER_PERSONA_POSITION = intPreferencesKey("user_persona_position")
         val USER_PERSONA_DEPTH = intPreferencesKey("user_persona_depth")
+        val USER_PERSONA_AVATAR = stringPreferencesKey("user_persona_avatar")
+        val USER_PERSONA_NO_SPEAK = booleanPreferencesKey("user_persona_no_speak")
 
         // TTS
         val TTS_ENABLED = booleanPreferencesKey("tts_enabled")
@@ -297,6 +299,23 @@ class SettingsDataStore @Inject constructor(
 
     suspend fun saveUserPersonaDepth(depth: Int) {
         context.dataStore.edit { prefs -> prefs[Keys.USER_PERSONA_DEPTH] = depth }
+    }
+
+    suspend fun getUserPersonaAvatarPath(): String? =
+        context.dataStore.data.map { it[Keys.USER_PERSONA_AVATAR] }.first()
+
+    suspend fun saveUserPersonaAvatarPath(path: String?) {
+        context.dataStore.edit { prefs ->
+            if (path != null) prefs[Keys.USER_PERSONA_AVATAR] = path
+            else prefs.remove(Keys.USER_PERSONA_AVATAR)
+        }
+    }
+
+    suspend fun getNoSpeakForUser(): Boolean =
+        context.dataStore.data.map { it[Keys.USER_PERSONA_NO_SPEAK] ?: false }.first()
+
+    suspend fun saveNoSpeakForUser(value: Boolean) {
+        context.dataStore.edit { prefs -> prefs[Keys.USER_PERSONA_NO_SPEAK] = value }
     }
 
     suspend fun getCustomSystemPrompt(): String =

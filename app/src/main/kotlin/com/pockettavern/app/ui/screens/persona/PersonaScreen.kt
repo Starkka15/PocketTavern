@@ -3,6 +3,7 @@ package com.pockettavern.app.ui.screens.persona
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import java.io.File
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -134,7 +135,6 @@ fun PersonaScreen(
                         item {
                             SelectedPersonaCard(
                                 persona = selected,
-                                serverUrl = uiState.serverUrl,
                                 onEdit = { viewModel.showEditDialog(selected) }
                             )
                         }
@@ -153,7 +153,6 @@ fun PersonaScreen(
                     items(uiState.personas) { persona ->
                         PersonaListItem(
                             persona = persona,
-                            serverUrl = uiState.serverUrl,
                             isSelected = persona.isSelected,
                             onSelect = { viewModel.selectPersona(persona) },
                             onEdit = { viewModel.showEditDialog(persona) },
@@ -248,7 +247,6 @@ fun PersonaScreen(
 @Composable
 private fun SelectedPersonaCard(
     persona: Persona,
-    serverUrl: String,
     onEdit: () -> Unit
 ) {
     val avatarShape = LocalPocketTavernColors.current.avatarShape.toShape()
@@ -264,15 +262,33 @@ private fun SelectedPersonaCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = "$serverUrl/User Avatars/${persona.avatarId}",
-                contentDescription = "Avatar",
-                modifier = Modifier
-                    .size(72.dp)
-                    .clip(avatarShape)
-                    .border(3.dp, MaterialTheme.colorScheme.primary, avatarShape),
-                contentScale = ContentScale.Crop
-            )
+            if (persona.avatarId.isNotEmpty()) {
+                AsyncImage(
+                    model = File(persona.avatarId),
+                    contentDescription = "Avatar",
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(avatarShape)
+                        .border(3.dp, MaterialTheme.colorScheme.primary, avatarShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(avatarShape)
+                        .border(3.dp, MaterialTheme.colorScheme.primary, avatarShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = "Avatar",
+                        modifier = Modifier.size(40.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
 
             Spacer(Modifier.width(16.dp))
 
@@ -313,7 +329,6 @@ private fun SelectedPersonaCard(
 @Composable
 private fun PersonaListItem(
     persona: Persona,
-    serverUrl: String,
     isSelected: Boolean,
     onSelect: () -> Unit,
     onEdit: () -> Unit,
@@ -338,21 +353,45 @@ private fun PersonaListItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = "$serverUrl/User Avatars/${persona.avatarId}",
-                contentDescription = "Avatar",
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(avatarShape)
-                    .then(
-                        if (isSelected) {
-                            Modifier.border(2.dp, MaterialTheme.colorScheme.primary, avatarShape)
-                        } else {
-                            Modifier
-                        }
-                    ),
-                contentScale = ContentScale.Crop
-            )
+            if (persona.avatarId.isNotEmpty()) {
+                AsyncImage(
+                    model = File(persona.avatarId),
+                    contentDescription = "Avatar",
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(avatarShape)
+                        .then(
+                            if (isSelected) {
+                                Modifier.border(2.dp, MaterialTheme.colorScheme.primary, avatarShape)
+                            } else {
+                                Modifier
+                            }
+                        ),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(avatarShape)
+                        .then(
+                            if (isSelected) {
+                                Modifier.border(2.dp, MaterialTheme.colorScheme.primary, avatarShape)
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = "Avatar",
+                        modifier = Modifier.size(28.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
 
             Spacer(Modifier.width(12.dp))
 
@@ -424,6 +463,7 @@ private fun EditPersonaDialog(
                     value = description,
                     onValueChange = onDescriptionChange,
                     label = { Text("Description") },
+                    placeholder = { Text("Describe how {{user}} speaks, behaves, or should be portrayed in the story...") },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3,
                     maxLines = 5
@@ -772,6 +812,7 @@ private fun CreatePersonaDialog(
                     value = description,
                     onValueChange = onDescriptionChange,
                     label = { Text("Description (optional)") },
+                    placeholder = { Text("Describe how {{user}} speaks, behaves, or should be portrayed in the story...") },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2,
                     maxLines = 3,
@@ -782,7 +823,7 @@ private fun CreatePersonaDialog(
         confirmButton = {
             Button(
                 onClick = onCreate,
-                enabled = !isSaving && !isGenerating && imageBytes != null && name.isNotBlank()
+                enabled = !isSaving && !isGenerating && name.isNotBlank()
             ) {
                 if (isSaving) {
                     CircularProgressIndicator(

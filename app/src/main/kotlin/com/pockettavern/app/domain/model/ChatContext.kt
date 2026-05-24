@@ -44,7 +44,9 @@ data class UserPersona(
     val description: String = "",
     val position: Int = 0,  // 0 = in prompt, 1 = in chat @ depth, 2 = top of AN, 3 = bottom of AN
     val depth: Int = 2,
-    val role: Int = 0       // 0 = system, 1 = user, 2 = assistant
+    val role: Int = 0,      // 0 = system, 1 = user, 2 = assistant
+    val avatarPath: String? = null,
+    val noSpeakForUser: Boolean = false
 )
 
 data class AuthorsNote(

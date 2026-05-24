@@ -100,6 +100,14 @@ fun ContextSettingsScreen(
                     onEnabledChange = viewModel::updateMemoryEnabled
                 )
 
+                HorizontalDivider()
+
+                // Roleplay Behavior Section
+                RoleplayBehaviorSection(
+                    noSpeakForUser = uiState.noSpeakForUser,
+                    onNoSpeakForUserChange = viewModel::updateNoSpeakForUser
+                )
+
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Save Button
@@ -430,6 +438,41 @@ private fun LongTermMemorySection(
                 modifier = Modifier.weight(1f)
             )
             Switch(checked = enabled, onCheckedChange = onEnabledChange)
+        }
+    }
+}
+
+@Composable
+private fun RoleplayBehaviorSection(
+    noSpeakForUser: Boolean,
+    onNoSpeakForUserChange: (Boolean) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Roleplay Behavior",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Don't speak or act for user",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Instructs the AI to never write dialogue or actions on behalf of your character.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Switch(checked = noSpeakForUser, onCheckedChange = onNoSpeakForUserChange)
         }
     }
 }

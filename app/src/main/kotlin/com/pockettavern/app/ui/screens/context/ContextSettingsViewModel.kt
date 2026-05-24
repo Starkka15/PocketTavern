@@ -35,6 +35,9 @@ data class ContextSettingsUiState(
     // Long-Term Memory
     val memoryEnabled: Boolean = true,
 
+    // Roleplay behavior
+    val noSpeakForUser: Boolean = false,
+
     // UI state
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
@@ -78,6 +81,7 @@ class ContextSettingsViewModel @Inject constructor(
                             personaDescription = persona.description,
                             personaPosition = persona.position,
                             personaDepth = persona.depth,
+                            noSpeakForUser = persona.noSpeakForUser,
                             authorsNoteContent = note.content,
                             authorsNoteInterval = note.interval,
                             authorsNoteDepth = note.depth,
@@ -147,6 +151,11 @@ class ContextSettingsViewModel @Inject constructor(
         _uiState.update { it.copy(memoryEnabled = enabled) }
     }
 
+    // Roleplay behavior
+    fun updateNoSpeakForUser(value: Boolean) {
+        _uiState.update { it.copy(noSpeakForUser = value) }
+    }
+
     fun updateAutoContinueMinLength(length: Int) {
         _uiState.update { it.copy(autoContinueMinLength = length) }
     }
@@ -162,7 +171,8 @@ class ContextSettingsViewModel @Inject constructor(
                     name = state.personaName,
                     description = state.personaDescription,
                     position = state.personaPosition,
-                    depth = state.personaDepth
+                    depth = state.personaDepth,
+                    noSpeakForUser = state.noSpeakForUser
                 )
                 localRepository.saveUserPersona(persona)
                 localRepository.saveAutoContinueConfig(state.autoContinueEnabled, state.autoContinueMinLength)

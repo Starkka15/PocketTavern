@@ -62,6 +62,10 @@ class PromptBuilder(
                 if (isNotBlank()) append("\n\n")
                 append(characterPrompt)
             }
+            if (chatContext.userPersona.noSpeakForUser) {
+                if (isNotBlank()) append("\n\n")
+                append("Never speak, act, or make decisions for {{user}}. Write only {{char}}'s dialogue and actions.")
+            }
         }
 
         DebugLogger.logKeyValue("Combined system prompt length", systemPrompt.length)
