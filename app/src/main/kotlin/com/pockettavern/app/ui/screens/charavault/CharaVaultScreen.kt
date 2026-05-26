@@ -18,6 +18,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -97,12 +102,13 @@ fun CharaVaultScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(uiState.contentType.displayName)
-                                val countText = when {
-                                    uiState.contentType == CharaVaultContentType.CHARACTERS ->
+                                val countText = when (uiState.contentType) {
+                                    CharaVaultContentType.CHARACTERS ->
                                         uiState.stats?.totalCards?.let { "$it cards" }
-                                    uiState.contentType == CharaVaultContentType.LOREBOOKS ->
+                                    CharaVaultContentType.LOREBOOKS ->
                                         uiState.lorebookStats?.totalLorebooks?.let { "$it lorebooks" }
-                                    else -> null
+                                    CharaVaultContentType.MY_UPLOADS ->
+                                        if (uiState.totalCount > 0) "${uiState.totalCount} uploaded" else null
                                 }
                                 countText?.let {
                                     Text(
@@ -125,6 +131,9 @@ fun CharaVaultScreen(
                             onDismissRequest = { showContentTypeMenu = false }
                         ) {
                             CharaVaultContentType.entries.forEach { type ->
+                                // Only show My Uploads when logged in to charavault.net
+                                if (type == CharaVaultContentType.MY_UPLOADS &&
+                                    !(uiState.charavaultMode == "charavault" && uiState.isLoggedIn)) return@forEach
                                 DropdownMenuItem(
                                     text = { Text(type.displayName) },
                                     onClick = {
@@ -143,7 +152,7 @@ fun CharaVaultScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
@@ -257,7 +266,7 @@ fun CharaVaultScreen(
                         onClick = { showTagSelector = true },
                         modifier = Modifier.padding(top = 8.dp)
                     ) {
-                        Icon(Icons.Default.Label, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null)
                         if (uiState.selectedTags.isNotEmpty()) {
                             Spacer(Modifier.width(4.dp))
                             Text("${uiState.selectedTags.size}")
@@ -294,10 +303,12 @@ fun CharaVaultScreen(
                 val isEmpty = when (uiState.contentType) {
                     CharaVaultContentType.CHARACTERS -> uiState.characterResults.isEmpty()
                     CharaVaultContentType.LOREBOOKS -> uiState.lorebookResults.isEmpty()
+                    CharaVaultContentType.MY_UPLOADS -> uiState.myUploadResults.isEmpty()
                 }
                 val emptyText = when (uiState.contentType) {
                     CharaVaultContentType.CHARACTERS -> "No cards found"
                     CharaVaultContentType.LOREBOOKS -> "No lorebooks found"
+                    CharaVaultContentType.MY_UPLOADS -> "No uploads yet"
                 }
 
                 if (uiState.isLoading && isEmpty) {
@@ -352,6 +363,19 @@ fun CharaVaultScreen(
                                         CharaVaultLorebookCard(
                                             lorebook = lorebook,
                                             onClick = { viewModel.selectLorebook(lorebook) }
+                                        )
+                                    }
+                                }
+                                CharaVaultContentType.MY_UPLOADS -> {
+                                    items(
+                                        count = uiState.myUploadResults.size,
+                                        key = { index -> "up_${index}_${uiState.myUploadResults[index].id}" }
+                                    ) { index ->
+                                        val character = uiState.myUploadResults[index]
+                                        CharaVaultCharacterCard(
+                                            character = character,
+                                            imageUrl = viewModel.buildImageUrl(character),
+                                            onClick = { viewModel.selectCharacter(character) }
                                         )
                                     }
                                 }
@@ -1024,7 +1048,7 @@ private fun ServerSettingsDialog(
                             onClick = onLogout,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Default.Logout, null, Modifier.size(16.dp))
+                            Icon(Icons.AutoMirrored.Filled.Logout, null, Modifier.size(16.dp))
                             Spacer(Modifier.width(8.dp))
                             Text("Logout")
                         }
@@ -1039,7 +1063,7 @@ private fun ServerSettingsDialog(
                             onClick = onLogin,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Default.Login, null, Modifier.size(16.dp))
+                            Icon(Icons.AutoMirrored.Filled.Login, null, Modifier.size(16.dp))
                             Spacer(Modifier.width(8.dp))
                             Text("Login to CharaVault.net")
                         }
@@ -1386,7 +1410,7 @@ private fun CharaVaultLorebookCard(
                 // Entry count
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        Icons.Default.List,
+                        Icons.AutoMirrored.Filled.List,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1514,7 +1538,7 @@ private fun LorebookPreviewSheet(
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                Icons.Default.List,
+                                Icons.AutoMirrored.Filled.List,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant

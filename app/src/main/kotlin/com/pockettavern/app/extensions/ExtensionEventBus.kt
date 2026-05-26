@@ -13,7 +13,9 @@ enum class ExtensionEvent {
     GENERATION_STARTED,
     GENERATION_STOPPED,
     CHAT_CHANGED,
+    CHAT_STARTED,          // new chat created (first message not yet sent)
     CHARACTER_CHANGED,
+    CHARACTER_LOADED,      // card loaded (fires after CHAT_CHANGED, with vars ready)
     PROMPT_ABOUT_TO_BUILD,
     PROMPT_BEFORE_SEND,
     BUTTON_CLICKED,

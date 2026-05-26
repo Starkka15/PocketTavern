@@ -37,6 +37,7 @@ import com.pockettavern.app.data.local.SettingsDataStore
 import com.pockettavern.app.domain.prompt.PromptBuilder
 import com.pockettavern.app.domain.usecase.SummarizeHistoryUseCase
 import com.pockettavern.app.ui.audio.TtsManager
+import com.pockettavern.app.util.PngCharacterCard
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -123,6 +124,10 @@ data class ChatUiState(
     val scanloreEntries: List<String> = emptyList(),
     val scanloreLoading: Boolean = false,
     val scanloreError: String? = null,
+    // Model picker
+    val showModelPicker: Boolean = false,
+    val availableModels: List<String> = emptyList(),
+    val modelPickerLoading: Boolean = false,
 )
 
 data class GalleryImage(
@@ -149,7 +154,8 @@ class ChatViewModel @Inject constructor(
     private val characterDao: com.pockettavern.app.data.local.db.dao.CharacterDao,
     private val spriteStorage: com.pockettavern.app.data.local.SpriteStorage,
     private val summarizeHistoryUseCase: SummarizeHistoryUseCase,
-    private val groupStorage: GroupStorage
+    private val groupStorage: GroupStorage,
+    private val cardExtensionSettings: com.pockettavern.app.data.local.CardExtensionSettings
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -223,6 +229,14 @@ class ChatViewModel @Inject constructor(
             extensionManager.jsHost.editDialogRequest.collect { request ->
                 _uiState.update { it.copy(editDialogRequest = request) }
             }
+        }
+        // Wire model list callback so PT.getAvailableModels() works
+        extensionManager.jsHost.getAvailableModelsCallback = { callbackId ->
+            viewModelScope.launch { doExtensionGetModels(callbackId) }
+        }
+        // Wire model set callback so PT.setCurrentModel() works
+        extensionManager.jsHost.setCurrentModelCallback = { modelName, callbackId ->
+            viewModelScope.launch { doExtensionSetModel(modelName, callbackId) }
         }
         // Wire hidden generate callback so PT.generateHidden() works
         extensionManager.jsHost.hiddenGenerateCallback = { prompt, callbackId ->
@@ -386,6 +400,8 @@ class ChatViewModel @Inject constructor(
                     }
                     // Update per-character extension filter
                     extensionManager.updateCharacterFilter(avatarUrl)
+                    // Load card-embedded extension script (if present)
+                    loadCardExtension(character)
                     // Load linked group world book
                     val charFileName = character.avatar ?: "$avatarUrl"
                     val linkedGroup = groupStorage.getGroupsForCharacter(charFileName).firstOrNull()
@@ -402,6 +418,37 @@ class ChatViewModel @Inject constructor(
                         it.copy(isLoading = false, error = result.exception.message)
                     }
                 }
+            }
+        }
+    }
+
+    private suspend fun loadCardExtension(character: Character) {
+        val fileName = character.avatar ?: return
+        withContext(Dispatchers.IO) {
+            try {
+                val bytesResult = localRepository.exportCharacterCard(fileName)
+                val bytes = (bytesResult as? Result.Success)?.data ?: return@withContext
+                val card = PngCharacterCard.extractCharacterData(bytes) ?: return@withContext
+                val ptExtJson = card.data.extensions["pockettavern"] ?: run {
+                    extensionManager.unloadCardScript()
+                    return@withContext
+                }
+                val ptExt = org.json.JSONObject(ptExtJson.toString())
+                val script = ptExt.optString("script", "")
+                if (script.isBlank()) {
+                    extensionManager.unloadCardScript()
+                    return@withContext
+                }
+                if (!cardExtensionSettings.isEnabled(fileName)) {
+                    extensionManager.unloadCardScript()
+                    com.pockettavern.app.util.DebugLogger.log("[ChatViewModel] Card script disabled for $fileName")
+                    return@withContext
+                }
+                val scriptName = ptExt.optString("script_name", character.name)
+                com.pockettavern.app.util.DebugLogger.log("[ChatViewModel] Card script found: '$scriptName' (${script.length} chars)")
+                extensionManager.loadCardScript(script, scriptName, character.name)
+            } catch (e: Exception) {
+                com.pockettavern.app.util.DebugLogger.log("[ChatViewModel] Card script load error: ${e.message}")
             }
         }
     }
@@ -485,6 +532,11 @@ class ChatViewModel @Inject constructor(
                         visibleHeaderButtons = emptySet()
                     )
                 }
+                // Load vars for this chat (must happen before CHAT_CHANGED fires)
+                val charName = character.name
+                withContext(Dispatchers.IO) {
+                    extensionManager.varsLoad(charName, fileName)
+                }
                 pushExtensionContext()
                 extensionManager.emit(ExtensionEvent.CHAT_CHANGED, fileName)
                 extensionManager.restoreMessageHeaders(restoredHeaders)
@@ -549,6 +601,10 @@ class ChatViewModel @Inject constructor(
                     messageHeaders = emptyMap(),
                     visibleHeaderButtons = emptySet()
                 )
+            }
+            // New chat — clear vars store (fresh state)
+            withContext(Dispatchers.IO) {
+                extensionManager.varsLoad(character.name, fileName)
             }
             pushExtensionContext()
             extensionManager.emit(ExtensionEvent.CHAT_CHANGED, fileName)
@@ -1027,6 +1083,40 @@ No preamble, no explanation. Just the numbered list."""
         _uiState.update { it.copy(showGallery = false) }
     }
 
+    // ── LLM model picker ──────────────────────────────────────────────────
+
+    fun showModelPicker() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(showModelPicker = true, modelPickerLoading = true, availableModels = emptyList()) }
+            val config = when (val r = localRepository.getApiConfiguration()) {
+                is Result.Success -> r.data
+                else -> { _uiState.update { it.copy(modelPickerLoading = false) }; return@launch }
+            }
+            val models = try {
+                withContext(Dispatchers.IO) { llmRepository.getAvailableModels(config) }.map { it.id }
+            } catch (e: Exception) {
+                emptyList()
+            }
+            _uiState.update { it.copy(availableModels = models, modelPickerLoading = false) }
+        }
+    }
+
+    fun dismissModelPicker() {
+        _uiState.update { it.copy(showModelPicker = false) }
+    }
+
+    fun applyModelChange(modelName: String) {
+        _uiState.update { it.copy(showModelPicker = false) }
+        viewModelScope.launch {
+            val config = when (val r = localRepository.getApiConfiguration()) {
+                is Result.Success -> r.data
+                else -> return@launch
+            }
+            localRepository.saveApiConfiguration(config.copy(currentModel = modelName))
+            // apiConfigFlow updates currentModelName in UiState automatically
+        }
+    }
+
     private suspend fun collectCharacterImages(characterName: String): List<GalleryImage> {
         val chats = localRepository.getCharacterChats(characterName).getOrNull() ?: return emptyList()
         val images = mutableListOf<GalleryImage>()
@@ -1433,6 +1523,8 @@ No preamble, no explanation. Just the numbered list."""
             val height = options.optInt("height", imageGenConfig.height)
             val negativePrompt = options.optString("negativePrompt", imageGenConfig.negativePrompt)
             val seed = options.optInt("seed", imageGenConfig.seed)
+            val sourceImageBase64 = options.optString("sourceImageBase64").ifEmpty { null }
+            val denoisingStrength = options.optDouble("denoisingStrength", 0.55).toFloat()
 
             val params = ForgeGenerationParams(
                 prompt = prompt,
@@ -1442,7 +1534,9 @@ No preamble, no explanation. Just the numbered list."""
                 steps = imageGenConfig.steps,
                 cfgScale = imageGenConfig.cfgScale,
                 sampler = imageGenConfig.sampler,
-                seed = seed
+                seed = seed,
+                sourceImageBase64 = sourceImageBase64,
+                denoisingStrength = denoisingStrength
             )
 
             var resultBase64 = ""
@@ -1454,6 +1548,39 @@ No preamble, no explanation. Just the numbered list."""
             extensionManager.jsHost.completeImageGenerate(callbackId, resultBase64)
         } catch (e: Exception) {
             extensionManager.jsHost.completeImageGenerate(callbackId, "")
+        }
+    }
+
+    // ── Model get/set (JS extension) ─────────────────────────────────────
+
+    private suspend fun doExtensionGetModels(callbackId: String) {
+        try {
+            // Try active ImageGen backend first; fall back to ForgeRepository if empty/failed
+            val models: List<String> = run {
+                val r = imageGenRepository.getModels()
+                if (r is com.pockettavern.app.domain.model.Result.Success && r.data.isNotEmpty()) return@run r.data
+                val fr = forgeRepository.getModels()
+                if (fr is com.pockettavern.app.domain.model.Result.Success) fr.data else emptyList()
+            }
+            val json = "[" + models.joinToString(",") { "\"${it.replace("\"", "\\\"")}\"" } + "]"
+            extensionManager.jsHost.completeGetModels(callbackId, json)
+        } catch (e: Exception) {
+            extensionManager.jsHost.completeGetModels(callbackId, "[]")
+        }
+    }
+
+    private suspend fun doExtensionSetModel(modelName: String, callbackId: String) {
+        try {
+            // Try active ImageGen backend first; fall back to ForgeRepository
+            val r = imageGenRepository.setModel(modelName)
+            val success = if (r is com.pockettavern.app.domain.model.Result.Success) {
+                true
+            } else {
+                forgeRepository.setCurrentModel(modelName) is com.pockettavern.app.domain.model.Result.Success
+            }
+            extensionManager.jsHost.completeSetModel(callbackId, success)
+        } catch (e: Exception) {
+            extensionManager.jsHost.completeSetModel(callbackId, false)
         }
     }
 
@@ -1545,6 +1672,9 @@ No preamble, no explanation. Just the numbered list."""
         val fileName = _uiState.value.currentChatFileName ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(showDeleteDialog = false, isLoading = true) }
+            withContext(Dispatchers.IO) {
+                extensionManager.varsDeleteForChat(character.name, fileName)
+            }
             when (localRepository.deleteChat(character.name, fileName)) {
                 is Result.Success -> {
                     when (val chatsResult = localRepository.getCharacterChats(character.name)) {

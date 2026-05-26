@@ -430,6 +430,40 @@ class CharaVaultRepository @Inject constructor(
         }
     }
 
+    suspend fun getMyUploads(page: Int = 1, limit: Int = 50): Result<CharaVaultSearchResult> = withContext(Dispatchers.IO) {
+        try {
+            val offset = (page - 1) * limit
+            val response = charaVaultApi.getMyUploads(limit = limit, offset = offset)
+            if (!response.isSuccessful) {
+                return@withContext Result.Error(Exception("My uploads failed: ${response.code()}"))
+            }
+            val body = response.body() ?: return@withContext Result.Error(Exception("Empty response"))
+            val characters = body.results.map { dto ->
+                CharaVaultCharacter(
+                    file = dto.file,
+                    folder = dto.folder,
+                    name = dto.name,
+                    creator = dto.creator,
+                    tags = dto.tags,
+                    nsfw = dto.nsfw,
+                    descriptionPreview = dto.descriptionPreview,
+                    firstMesPreview = dto.firstMesPreview
+                )
+            }
+            val totalPages = if (limit > 0) ((body.total + limit - 1) / limit) else 1
+            Result.Success(CharaVaultSearchResult(
+                characters = characters,
+                totalCount = body.total,
+                currentPage = page,
+                totalPages = totalPages,
+                limit = limit
+            ))
+        } catch (e: Exception) {
+            Log.e(TAG, "getMyUploads error", e)
+            Result.Error(e)
+        }
+    }
+
     // ===== LOREBOOK METHODS =====
 
     /**

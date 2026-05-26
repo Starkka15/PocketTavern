@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Numbers
 import androidx.compose.material3.*
+import com.pockettavern.app.ui.screens.extensions.CardExtensionUiItem
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material.icons.filled.SmartToy
 import com.pockettavern.app.extensions.JsExtension
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -156,6 +158,48 @@ fun ExtensionsScreen(
                         onEnabledChange = { viewModel.setJsExtensionEnabled(ext.id, it) },
                         onUninstall = { viewModel.uninstall(ext.id) },
                         onSettingChange = { key, value -> viewModel.updateJsSetting(ext.id, key, value) }
+                    )
+                }
+            }
+
+            // ── Card Extensions ───────────────────────────────────────────────
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Card Extensions",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (uiState.cardExtensionsLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    }
+                }
+            }
+            if (!uiState.cardExtensionsLoading && uiState.cardExtensions.isEmpty()) {
+                item {
+                    Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No character cards with embedded scripts found.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            } else {
+                items(uiState.cardExtensions, key = { it.meta.characterFile }) { item ->
+                    CardExtensionCard(
+                        item = item,
+                        onEnabledChange = { viewModel.setCardExtensionEnabled(item.meta.characterFile, it) }
                     )
                 }
             }
@@ -431,6 +475,66 @@ private fun JsExtensionCard(
                 TextButton(onClick = { showUninstallDialog = false }) { Text("Cancel") }
             }
         )
+    }
+}
+
+@Composable
+private fun CardExtensionCard(
+    item: CardExtensionUiItem,
+    onEnabledChange: (Boolean) -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.SmartToy, contentDescription = null)
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(item.meta.scriptName, style = MaterialTheme.typography.titleMedium)
+                    if (item.meta.scriptVersion.isNotBlank()) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "v${item.meta.scriptVersion}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (item.isActive) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = MaterialTheme.shapes.small
+                        ) {
+                            Text(
+                                "Active",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+                Text(
+                    item.meta.characterName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (item.meta.scriptDescription.isNotBlank()) {
+                    Text(
+                        item.meta.scriptDescription,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Switch(checked = item.enabled, onCheckedChange = onEnabledChange)
+        }
     }
 }
 

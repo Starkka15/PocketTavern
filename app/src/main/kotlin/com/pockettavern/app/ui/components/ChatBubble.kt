@@ -400,13 +400,17 @@ fun StreamingChatBubble(
 //   Group 4: <img cmd=(name)>       parentheses
 //   Group 5: <img src=(name)>       SillyTavern classic
 //   Group 6: bare img src=(name)    model often omits brackets
+//   Group 7: <img src='name'>       single-quoted src (SillyTavern emotion format)
+//   Group 8: <img src="name">       double-quoted src (non-URL)
 private val SPRITE_REGEX = Regex(
     """<\s*img\s+cmd="([^"]+)"[^>]*>""" +
     """|<\s*img\s+cmd=''([^']+)''[^>]*>""" +
     """|<\s*img\s+cmd=<<([^>]+)>>[^>]*>""" +
     """|<\s*img\s+cmd=\(([^)]+)\)[^>]*>""" +
     """|<\s*img\s+src=\(([^)]+)\)\s*>""" +
-    """|\bimg\s+src=\(([^)]+)\)""",
+    """|\bimg\s+src=\(([^)]+)\)""" +
+    """|<\s*img\s+src='([^']+)'\s*/?>""" +
+    """|<\s*img\s+src="([^"]+)"\s*/?>""",
     RegexOption.IGNORE_CASE
 )
 
@@ -434,7 +438,8 @@ private fun splitIntoChunks(text: String): List<MessageChunk> {
     val matches = mutableListOf<RawMatch>()
     for (m in SPRITE_REGEX.findAll(text)) {
         val name = (m.groupValues[1].ifEmpty { m.groupValues[2] }.ifEmpty { m.groupValues[3] }
-            .ifEmpty { m.groupValues[4] }.ifEmpty { m.groupValues[5] }.ifEmpty { m.groupValues[6] }).trim()
+            .ifEmpty { m.groupValues[4] }.ifEmpty { m.groupValues[5] }.ifEmpty { m.groupValues[6] }
+            .ifEmpty { m.groupValues[7] }.ifEmpty { m.groupValues[8] }).trim()
         if (name.isNotEmpty()) {
             // If the "sprite name" is actually a URL, treat it as a remote image
             val chunk = if (name.startsWith("http://") || name.startsWith("https://"))

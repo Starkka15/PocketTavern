@@ -57,6 +57,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -144,11 +146,42 @@ fun ChatScreen(
         }
     }
 
-    // Keep scrolled to bottom during streaming - scroll to bottom of the streaming message
+    // Track whether the user has intentionally scrolled away from the bottom.
+    // Upward scroll during streaming disables auto-follow; scrolling back to the
+    // bottom (or a new generation starting) re-enables it.
+    var userScrolledAway by remember { mutableStateOf(false) }
+    LaunchedEffect(listState) {
+        var prevIndex = listState.firstVisibleItemIndex
+        var prevOffset = listState.firstVisibleItemScrollOffset
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { pair ->
+                val index = pair.first
+                val offset = pair.second
+                // Upward scroll can only come from the user — auto-scroll only goes downward
+                val scrolledUp = index < prevIndex || (index == prevIndex && offset < prevOffset)
+                if (scrolledUp && listState.isScrollInProgress) {
+                    userScrolledAway = true
+                }
+                // Re-enable if last item's bottom is within the viewport
+                val info = listState.layoutInfo
+                val lastItem = info.visibleItemsInfo.lastOrNull()
+                if (lastItem != null &&
+                    lastItem.index >= info.totalItemsCount - 1 &&
+                    lastItem.offset + lastItem.size <= info.viewportEndOffset + 4) {
+                    userScrolledAway = false
+                }
+                prevIndex = index
+                prevOffset = offset
+            }
+    }
+    // Reset when a new generation starts (user sent a message)
+    LaunchedEffect(uiState.isGenerating) {
+        if (uiState.isGenerating) userScrolledAway = false
+    }
+    // Auto-follow during streaming unless the user has scrolled away
     LaunchedEffect(uiState.streamingContent) {
-        if (uiState.isGenerating && uiState.streamingContent.isNotEmpty()) {
+        if (uiState.isGenerating && uiState.streamingContent.isNotEmpty() && !userScrolledAway) {
             val itemCount = uiState.messages.size + 1
-            // Use a large offset to always show the bottom of the streaming content
             listState.scrollToItem(itemCount - 1, scrollOffset = Int.MAX_VALUE)
         }
     }
@@ -250,6 +283,14 @@ fun ChatScreen(
                                     leadingIcon = { Icon(Icons.Default.Delete, null) }
                                 )
                             }
+                            DropdownMenuItem(
+                                text = { Text("Change Model") },
+                                onClick = {
+                                    showSettingsMenu = false
+                                    viewModel.showModelPicker()
+                                },
+                                leadingIcon = { Icon(Icons.Default.AutoAwesome, null) }
+                            )
                             DropdownMenuItem(
                                 text = { Text("Image Gallery") },
                                 onClick = {
@@ -636,6 +677,16 @@ fun ChatScreen(
     }
 
     // Image gallery
+    if (uiState.showModelPicker) {
+        ModelPickerDialog(
+            models = uiState.availableModels,
+            currentModel = uiState.currentModelName,
+            isLoading = uiState.modelPickerLoading,
+            onSelect = { viewModel.applyModelChange(it) },
+            onDismiss = { viewModel.dismissModelPicker() }
+        )
+    }
+
     if (uiState.showGallery) {
         ImageGalleryDialog(
             images = uiState.galleryImages,
@@ -862,22 +913,42 @@ private fun MessageWithActions(
             modifier = Modifier
                 .pointerInput(swipeInfo, isLastAssistantMessage) {
                     if (message.isUser) return@pointerInput
-                    var accumulated = 0f
-                    detectHorizontalDragGestures(
-                        onDragStart = { accumulated = 0f },
-                        onHorizontalDrag = { change, dragAmount ->
-                            change.consume()
-                            accumulated += dragAmount
-                            val threshold = 60.dp.toPx()
-                            if (accumulated < -threshold) {
-                                accumulated = 0f
-                                onSwipeLeft()
-                            } else if (accumulated > threshold) {
-                                accumulated = 0f
-                                onSwipeRight()
+                    val threshold = 60.dp.toPx()
+                    val directionSlop = 10.dp.toPx()
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        var accX = 0f
+                        var accY = 0f
+                        var locked = false   // true = horizontal lock confirmed
+                        var cancelled = false
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: break
+                            if (!change.pressed) break
+                            accX += change.position.x - change.previousPosition.x
+                            accY += change.position.y - change.previousPosition.y
+                            val absX = kotlin.math.abs(accX)
+                            val absY = kotlin.math.abs(accY)
+                            if (!locked) {
+                                // Vertical motion dominates → cancel gesture
+                                if (absY > directionSlop && absY >= absX) {
+                                    cancelled = true; break
+                                }
+                                // Horizontal motion dominates → lock in
+                                if (absX > directionSlop && absX > absY) {
+                                    locked = true
+                                }
+                            }
+                            if (locked) change.consume()
+                        }
+                        if (!cancelled && locked) {
+                            val absX = kotlin.math.abs(accX)
+                            val absY = kotlin.math.abs(accY)
+                            if (absX > threshold && absX > absY) {
+                                if (accX < 0) onSwipeLeft() else onSwipeRight()
                             }
                         }
-                    )
+                    }
                 }
         ) {
             ChatBubble(
@@ -1274,6 +1345,7 @@ private fun QuickReplyBar(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ExtensionEditDialog(
     title: String,
@@ -1286,6 +1358,7 @@ private fun ExtensionEditDialog(
             fields.forEach { put(it.key, it.value) }
         }
     }
+    val expandedDropdown = remember { mutableStateMapOf<String, Boolean>() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1293,13 +1366,45 @@ private fun ExtensionEditDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 fields.forEach { field ->
-                    OutlinedTextField(
-                        value = fieldValues[field.key] ?: "",
-                        onValueChange = { fieldValues[field.key] = it },
-                        label = { Text(field.label) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    if (field.type == "select" && field.options.isNotEmpty()) {
+                        val isExpanded = expandedDropdown[field.key] ?: false
+                        ExposedDropdownMenuBox(
+                            expanded = isExpanded,
+                            onExpandedChange = { expandedDropdown[field.key] = it },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedTextField(
+                                value = fieldValues[field.key] ?: field.options.firstOrNull() ?: "",
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text(field.label) },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isExpanded) },
+                                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth()
+                            )
+                            ExposedDropdownMenu(
+                                expanded = isExpanded,
+                                onDismissRequest = { expandedDropdown[field.key] = false }
+                            ) {
+                                field.options.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option) },
+                                        onClick = {
+                                            fieldValues[field.key] = option
+                                            expandedDropdown[field.key] = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        OutlinedTextField(
+                            value = fieldValues[field.key] ?: "",
+                            onValueChange = { fieldValues[field.key] = it },
+                            label = { Text(field.label) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
         },
@@ -1308,6 +1413,58 @@ private fun ExtensionEditDialog(
                 Text("Save")
             }
         },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun ModelPickerDialog(
+    models: List<String>,
+    currentModel: String,
+    isLoading: Boolean,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Change Model") },
+        text = {
+            if (isLoading) {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (models.isEmpty()) {
+                Text("No models available. Check API URL, API key, and Debug Log.")
+            } else {
+                LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                    items(models) { model ->
+                        val isSelected = model == currentModel
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelect(model) }
+                                .padding(vertical = 12.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = { onSelect(model) }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = model,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }

@@ -22,7 +22,8 @@ import javax.inject.Inject
 
 enum class CharaVaultContentType(val displayName: String) {
     CHARACTERS("Character Cards"),
-    LOREBOOKS("Lorebooks")
+    LOREBOOKS("Lorebooks"),
+    MY_UPLOADS("My Uploads")
 }
 
 data class CharaVaultUiState(
@@ -62,6 +63,9 @@ data class CharaVaultUiState(
     val characterResults: List<CharaVaultCharacter> = emptyList(),
     val selectedCharacter: CharaVaultCharacter? = null,
     val stats: CharaVaultStats? = null,
+
+    // My Uploads
+    val myUploadResults: List<CharaVaultCharacter> = emptyList(),
 
     // Lorebook-specific
     val lorebookResults: List<CharaVaultLorebook> = emptyList(),
@@ -287,18 +291,41 @@ class CharaVaultViewModel @Inject constructor(
             it.copy(
                 contentType = type, searchQuery = "", currentPage = 1,
                 totalCount = 0, characterResults = emptyList(), lorebookResults = emptyList(),
-                selectedCharacter = null, selectedLorebook = null
+                myUploadResults = emptyList(), selectedCharacter = null, selectedLorebook = null
             )
         }
-        search()
-        if (type == CharaVaultContentType.LOREBOOKS) loadLorebookStats()
+        when (type) {
+            CharaVaultContentType.MY_UPLOADS -> loadMyUploads()
+            CharaVaultContentType.LOREBOOKS -> { search(); loadLorebookStats() }
+            else -> search()
+        }
     }
 
     fun search(query: String = _uiState.value.searchQuery) {
-        if (_uiState.value.contentType == CharaVaultContentType.CHARACTERS) {
-            searchCharacters(query)
-        } else {
-            searchLorebooks(query)
+        when (_uiState.value.contentType) {
+            CharaVaultContentType.CHARACTERS -> searchCharacters(query)
+            CharaVaultContentType.LOREBOOKS -> searchLorebooks(query)
+            CharaVaultContentType.MY_UPLOADS -> loadMyUploads()
+        }
+    }
+
+    fun loadMyUploads() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            when (val result = repository.getMyUploads(page = 1, limit = PAGE_SIZE)) {
+                is Result.Success -> _uiState.update {
+                    it.copy(
+                        myUploadResults = result.data.characters,
+                        currentPage = result.data.currentPage,
+                        totalPages = result.data.totalPages,
+                        totalCount = result.data.totalCount,
+                        isLoading = false
+                    )
+                }
+                is Result.Error -> _uiState.update {
+                    it.copy(isLoading = false, error = result.exception.message ?: "Failed to load uploads")
+                }
+            }
         }
     }
 

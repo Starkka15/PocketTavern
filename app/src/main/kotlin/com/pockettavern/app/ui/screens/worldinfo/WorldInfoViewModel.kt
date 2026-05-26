@@ -21,7 +21,9 @@ data class WorldInfoUiState(
     val expandedEntryId: String? = null,
     val isLoading: Boolean = false,
     val isLoadingEntries: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val editingEntry: WorldInfoEntry? = null,
+    val deleteLorebookConfirm: String? = null
 )
 
 @HiltViewModel
@@ -111,5 +113,85 @@ class WorldInfoViewModel @Inject constructor(
                 entries = emptyList()
             )
         }
+    }
+
+    fun importJson(name: String, bytes: ByteArray) {
+        viewModelScope.launch {
+            when (val result = localRepository.importWorldInfoJson(name, bytes)) {
+                is Result.Success -> loadLorebooks()
+                is Result.Error -> _uiState.update { it.copy(error = "Import failed: ${result.exception.message}") }
+            }
+        }
+    }
+
+    fun requestDeleteLorebook(name: String) {
+        _uiState.update { it.copy(deleteLorebookConfirm = name) }
+    }
+
+    fun dismissDeleteLorebook() {
+        _uiState.update { it.copy(deleteLorebookConfirm = null) }
+    }
+
+    fun confirmDeleteLorebook() {
+        val name = _uiState.value.deleteLorebookConfirm ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(deleteLorebookConfirm = null) }
+            when (val result = localRepository.deleteWorldInfo(name)) {
+                is Result.Success -> {
+                    if (_uiState.value.selectedLorebook == name) {
+                        _uiState.update { it.copy(selectedLorebook = null, entries = emptyList()) }
+                    }
+                    loadLorebooks()
+                }
+                is Result.Error -> _uiState.update { it.copy(error = result.exception.message) }
+            }
+        }
+    }
+
+    fun startEditEntry(entry: WorldInfoEntry) {
+        _uiState.update { it.copy(editingEntry = entry) }
+    }
+
+    fun dismissEditEntry() {
+        _uiState.update { it.copy(editingEntry = null) }
+    }
+
+    fun saveEntry(entry: WorldInfoEntry) {
+        val name = _uiState.value.selectedLorebook ?: return
+        viewModelScope.launch {
+            val current = _uiState.value.entries.toMutableList()
+            val idx = current.indexOfFirst { it.uid == entry.uid }
+            if (idx >= 0) current[idx] = entry else current.add(entry)
+            _uiState.update { it.copy(editingEntry = null, entries = current.sortedBy { it.order }) }
+            when (val result = localRepository.saveWorldInfo(name, current)) {
+                is Result.Error -> _uiState.update { it.copy(error = result.exception.message) }
+                else -> {}
+            }
+        }
+    }
+
+    fun deleteEntry(uid: String) {
+        val name = _uiState.value.selectedLorebook ?: return
+        viewModelScope.launch {
+            val updated = _uiState.value.entries.filter { it.uid != uid }
+            _uiState.update { it.copy(entries = updated, editingEntry = null) }
+            when (val result = localRepository.saveWorldInfo(name, updated)) {
+                is Result.Error -> _uiState.update { it.copy(error = result.exception.message) }
+                else -> {}
+            }
+        }
+    }
+
+    fun addNewEntry() {
+        val newEntry = WorldInfoEntry(
+            uid = System.currentTimeMillis().toString(),
+            key = emptyList(),
+            keysecondary = emptyList(),
+            content = "",
+            comment = "New Entry",
+            enabled = true,
+            order = (_uiState.value.entries.maxOfOrNull { it.order } ?: 0) + 10
+        )
+        _uiState.update { it.copy(editingEntry = newEntry) }
     }
 }

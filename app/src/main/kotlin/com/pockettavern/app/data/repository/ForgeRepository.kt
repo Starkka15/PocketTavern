@@ -38,6 +38,24 @@ class ForgeRepository @Inject constructor(
         }
     }
 
+    suspend fun getCurrentModel(): Result<String> {
+        return try {
+            val opts = api.getOptions()
+            Result.Success(opts.sdModelCheckpoint ?: "")
+        } catch (e: Exception) {
+            Result.Error(Exception("Failed to get current model: ${e.message}", e))
+        }
+    }
+
+    suspend fun setCurrentModel(modelName: String): Result<Unit> {
+        return try {
+            api.setOptions(com.pockettavern.app.data.remote.dto.forge.SetOptionsRequest(sdModelCheckpoint = modelName))
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(Exception("Failed to set model: ${e.message}", e))
+        }
+    }
+
     fun generateImageWithProgress(params: ForgeGenerationParams): Flow<GenerationState> = flow {
         emit(GenerationState.Starting)
 

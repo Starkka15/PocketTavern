@@ -3,6 +3,7 @@ package com.pockettavern.app.data.repository
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
+import com.pockettavern.app.data.local.CardExtensionMeta
 import com.pockettavern.app.data.local.CharacterStorage
 import com.pockettavern.app.data.local.ChatStorage
 import com.pockettavern.app.data.local.LoreBookStorage
@@ -81,6 +82,10 @@ class LocalRepository @Inject constructor(
             ?: throw Exception("Character file not found: $fileName")
     }
 
+    /** Scan all character PNGs and return metadata for those with embedded PT scripts. */
+    suspend fun listCardExtensions(): List<CardExtensionMeta> =
+        characterStorage.listCardExtensions()
+
     /** Get local URI for a character's avatar PNG. */
     fun getAvatarUri(fileName: String): Uri = characterStorage.getAvatarUri(fileName)
 
@@ -126,6 +131,10 @@ class LocalRepository @Inject constructor(
 
     suspend fun deleteWorldInfo(name: String): Result<Unit> = withResult {
         loreBookStorage.deleteLorebook(name)
+    }
+
+    suspend fun importWorldInfoJson(name: String, bytes: ByteArray): Result<Unit> = withResult {
+        loreBookStorage.saveRawLorebook(name, bytes)
     }
 
     // ── Formatting / Presets ─────────────────────────────────────────────────

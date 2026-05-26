@@ -18,11 +18,20 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
+
+data class CardExtensionMeta(
+    val characterFile: String,
+    val characterName: String,
+    val scriptName: String,
+    val scriptVersion: String,
+    val scriptDescription: String
+)
 
 @Singleton
 class CharacterStorage @Inject constructor(
@@ -381,6 +390,28 @@ class CharacterStorage @Inject constructor(
         // 1x1 transparent PNG
         val bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
         return bitmapToPng(bitmap)
+    }
+
+    /** Scan all character PNGs and return metadata for those with embedded PT scripts. */
+    suspend fun listCardExtensions(): List<CardExtensionMeta> = withContext(Dispatchers.IO) {
+        val entities = characterDao.getAll()
+        entities.mapNotNull { entity ->
+            try {
+                val file = File(charactersDir, entity.fileName)
+                if (!file.exists()) return@mapNotNull null
+                val card = PngCharacterCard.extractCharacterData(file.readBytes()) ?: return@mapNotNull null
+                val ptExtJson = card.data.extensions["pockettavern"] ?: return@mapNotNull null
+                val ptExt = JSONObject(ptExtJson.toString())
+                if (ptExt.optString("script", "").isBlank()) return@mapNotNull null
+                CardExtensionMeta(
+                    characterFile   = entity.fileName,
+                    characterName   = entity.name,
+                    scriptName      = ptExt.optString("script_name", entity.name),
+                    scriptVersion   = ptExt.optString("script_version", ""),
+                    scriptDescription = ptExt.optString("script_description", "")
+                )
+            } catch (_: Exception) { null }
+        }
     }
 
     private fun sanitizeFileName(name: String): String =

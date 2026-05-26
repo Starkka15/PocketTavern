@@ -96,7 +96,9 @@
             GENERATION_STARTED: 'GENERATION_STARTED',
             GENERATION_STOPPED: 'GENERATION_STOPPED',
             CHAT_CHANGED:       'CHAT_CHANGED',
+            CHAT_STARTED:       'CHAT_STARTED',
             CHARACTER_CHANGED:  'CHARACTER_CHANGED',
+            CHARACTER_LOADED:   'CHARACTER_LOADED',
             BUTTON_CLICKED:       'BUTTON_CLICKED',
             HEADER_LONG_PRESSED:  'HEADER_LONG_PRESSED',
             MESSAGE_LONG_PRESSED: 'MESSAGE_LONG_PRESSED'
@@ -522,7 +524,225 @@
         isEnabled: function (extensionId) {
             var disabled = window.__ptDisabledExtensions || [];
             return disabled.indexOf(extensionId) === -1;
-        }
+        },
+
+        /**
+         * Returns the current character's avatar as a base64-encoded PNG string.
+         * Returns empty string if no character is loaded or avatar not found.
+         *
+         * @returns {string}  Base64 PNG, or '' if unavailable.
+         */
+        getCharacterAvatar: function () {
+            if (window.PtBridge) {
+                return PtBridge.getCharacterAvatar() || '';
+            }
+            return '';
+        },
+
+        /**
+         * Fetch the list of models available from the configured image generation backend.
+         * @returns {Promise<string[]>}  Resolves with array of model name strings, or [] on error.
+         */
+        getAvailableModels: function () {
+            return new Promise(function (resolve) {
+                if (!window.PtBridge) { resolve([]); return; }
+                var id = 'cb_' + (++_callbackCounter);
+                _pendingCallbacks[id] = function (models) { resolve(Array.isArray(models) ? models : []); };
+                PtBridge.getAvailableModels(id);
+            });
+        },
+
+        /**
+         * Switch the image generation backend to a different model.
+         * @param {string} modelName  Exact model name as returned by getAvailableModels().
+         * @returns {Promise<boolean>}  Resolves true on success, false on failure.
+         */
+        setCurrentModel: function (modelName) {
+            return new Promise(function (resolve) {
+                if (!window.PtBridge) { resolve(false); return; }
+                var id = 'cb_' + (++_callbackCounter);
+                _pendingCallbacks[id] = function (success) { resolve(!!success); };
+                PtBridge.setCurrentModel(modelName, id);
+            });
+        },
+
+        // ── Per-chat variable store (pt-variables) ───────────────────────────
+
+        /**
+         * PT.cardExtensionId — injected by Kotlin before the card script runs.
+         * Identifies this card's extension: "{script_name}:{characterName}".
+         * Null when no card script is active or when called from a regular extension.
+         */
+        cardExtensionId: null,
+
+        /**
+         * Per-chat key-value store. Values survive chat switches and are cleared
+         * when the chat is deleted. Backed by a .vars.json sidecar file on disk.
+         *
+         * Injection: call PT.vars.setInjection(true) to auto-insert current state
+         * into every generation prompt so the AI always sees world state.
+         *
+         * @example
+         *   PT.vars.set('wishes', 100);
+         *   PT.vars.increment('wishes', -1);
+         *   PT.vars.get('wishes');           // 99
+         *   PT.vars.setInjection(true);      // inject state into every prompt
+         */
+        vars: (function () {
+            var _injectionEnabled = false;
+            var _injectionFormatter = null;
+            var _injectionPosition = 1;  // AFTER_CHAR_DEFS by default
+            var VARS_EXT_ID = 'pt-variables';
+
+            function _bridgeGet(key) {
+                if (!window.PtBridge) return null;
+                try { return JSON.parse(PtBridge.varsGet(key)); } catch (e) { return null; }
+            }
+
+            function _bridgeSet(key, value) {
+                if (!window.PtBridge) return;
+                PtBridge.varsSet(key, JSON.stringify(value));
+            }
+
+            function _bridgeDelete(key) {
+                if (!window.PtBridge) return;
+                PtBridge.varsDelete(key);
+            }
+
+            function _bridgeGetAll() {
+                if (!window.PtBridge) return {};
+                try { return JSON.parse(PtBridge.varsGetAll()); } catch (e) { return {}; }
+            }
+
+            function _bridgeClear() {
+                if (!window.PtBridge) return;
+                PtBridge.varsClear();
+            }
+
+            function _updateInjection() {
+                if (!_injectionEnabled) {
+                    window.PT.setExtensionPrompt(VARS_EXT_ID, '', _injectionPosition, 0);
+                    return;
+                }
+                var all = _bridgeGetAll();
+                var text;
+                if (typeof _injectionFormatter === 'function') {
+                    text = _injectionFormatter(all);
+                } else {
+                    var lines = ['[Current World State]'];
+                    var keys = Object.keys(all);
+                    for (var i = 0; i < keys.length; i++) {
+                        var v = all[keys[i]];
+                        lines.push(keys[i] + ': ' + (typeof v === 'object' ? JSON.stringify(v) : String(v)));
+                    }
+                    text = lines.join('\n');
+                }
+                window.PT.setExtensionPrompt(VARS_EXT_ID, text, _injectionPosition, 0);
+            }
+
+            return {
+                /**
+                 * Get the value of a key.
+                 * @param {string} key
+                 * @param {*} [defaultValue]  Returned when key is missing.
+                 * @returns {*}
+                 */
+                get: function (key, defaultValue) {
+                    var v = _bridgeGet(key);
+                    return (v === null || v === undefined) ? defaultValue : v;
+                },
+
+                /**
+                 * Set a key to any JSON-serializable value.
+                 * @param {string} key
+                 * @param {*} value
+                 */
+                set: function (key, value) {
+                    _bridgeSet(key, value);
+                    _updateInjection();
+                },
+
+                /**
+                 * Delete a key.
+                 * @param {string} key
+                 */
+                delete: function (key) {
+                    _bridgeDelete(key);
+                    _updateInjection();
+                },
+
+                /**
+                 * Returns a copy of the full store object.
+                 * @returns {object}
+                 */
+                getAll: function () { return _bridgeGetAll(); },
+
+                /**
+                 * Wipe all vars for the current chat.
+                 */
+                clear: function () {
+                    _bridgeClear();
+                    _updateInjection();
+                },
+
+                /**
+                 * Increment a numeric key by `by` (default 1). Creates the key if missing.
+                 * @param {string} key
+                 * @param {number} [by=1]
+                 */
+                increment: function (key, by) {
+                    var delta = (by !== undefined && by !== null) ? Number(by) : 1;
+                    var current = Number(_bridgeGet(key)) || 0;
+                    _bridgeSet(key, current + delta);
+                    _updateInjection();
+                },
+
+                /**
+                 * Decrement a numeric key by `by` (default 1). Creates the key if missing.
+                 * @param {string} key
+                 * @param {number} [by=1]
+                 */
+                decrement: function (key, by) {
+                    var delta = (by !== undefined && by !== null) ? Number(by) : 1;
+                    var current = Number(_bridgeGet(key)) || 0;
+                    _bridgeSet(key, current - delta);
+                    _updateInjection();
+                },
+
+                /**
+                 * Enable or disable automatic context injection.
+                 * When enabled, current vars are injected into every generation prompt.
+                 * @param {boolean} enabled
+                 */
+                setInjection: function (enabled) {
+                    _injectionEnabled = !!enabled;
+                    _updateInjection();
+                },
+
+                /**
+                 * Set a custom formatter for the injected text.
+                 * @param {Function} fn  Called with the full vars object; must return a string.
+                 *
+                 * @example
+                 *   PT.vars.setInjectionFormat(function(vars) {
+                 *       return '[Wishes remaining: ' + vars.wishes + ']';
+                 *   });
+                 */
+                setInjectionFormat: function (fn) {
+                    _injectionFormatter = (typeof fn === 'function') ? fn : null;
+                    _updateInjection();
+                },
+
+                /**
+                 * Set where the vars injection appears in the prompt.
+                 * @param {number} pos  PT.INJECTION_POSITION.* (default: AFTER_CHAR_DEFS)
+                 */
+                setInjectionPosition: function (pos) {
+                    _injectionPosition = (pos !== undefined && pos !== null) ? pos : 1;
+                    _updateInjection();
+                }
+            };
+        })()
     };
 
     // ── Callback infrastructure for async bridge results ──────────────────
@@ -554,6 +774,24 @@
         if (cb) {
             delete _pendingCallbacks[callbackId];
             cb(base64 || '');
+        }
+    };
+
+    /** Called by Kotlin with the model list array. */
+    window.__ptGetModelsResult = function (callbackId, models) {
+        var cb = _pendingCallbacks[callbackId];
+        if (cb) {
+            delete _pendingCallbacks[callbackId];
+            cb(models || []);
+        }
+    };
+
+    /** Called by Kotlin after setCurrentModel completes. */
+    window.__ptSetModelResult = function (callbackId, success) {
+        var cb = _pendingCallbacks[callbackId];
+        if (cb) {
+            delete _pendingCallbacks[callbackId];
+            cb(success);
         }
     };
 

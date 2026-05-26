@@ -3,7 +3,10 @@ package com.pockettavern.app.ui.screens.extensions
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.pockettavern.app.data.local.CardExtensionMeta
+import com.pockettavern.app.data.local.CardExtensionSettings
 import com.pockettavern.app.data.local.JsExtensionStorage
+import com.pockettavern.app.data.repository.LocalRepository
 import com.pockettavern.app.extensions.ExtensionManager
 import com.pockettavern.app.extensions.JsExtension
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,6 +18,12 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
 import javax.inject.Inject
 
+data class CardExtensionUiItem(
+    val meta: CardExtensionMeta,
+    val enabled: Boolean,
+    val isActive: Boolean
+)
+
 data class ExtensionsUiState(
     val quickReplyEnabled: Boolean = true,
     val regexEnabled: Boolean = true,
@@ -23,13 +32,17 @@ data class ExtensionsUiState(
     val isInstalling: Boolean = false,
     val installError: String? = null,
     /** Per-extension settings: extensionId → (key → JsonPrimitive) */
-    val jsExtensionSettings: Map<String, Map<String, JsonPrimitive>> = emptyMap()
+    val jsExtensionSettings: Map<String, Map<String, JsonPrimitive>> = emptyMap(),
+    val cardExtensions: List<CardExtensionUiItem> = emptyList(),
+    val cardExtensionsLoading: Boolean = false
 )
 
 @HiltViewModel
 class ExtensionsViewModel @Inject constructor(
     private val extensionManager: ExtensionManager,
-    private val jsExtensionStorage: JsExtensionStorage
+    private val jsExtensionStorage: JsExtensionStorage,
+    private val localRepository: LocalRepository,
+    private val cardExtensionSettings: CardExtensionSettings
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ExtensionsUiState())
@@ -47,6 +60,32 @@ class ExtensionsViewModel @Inject constructor(
                 jsExtensions        = extensions,
                 jsExtensionSettings = settings
             )
+        }
+        loadCardExtensions()
+    }
+
+    fun loadCardExtensions() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(cardExtensionsLoading = true) }
+            val cards = localRepository.listCardExtensions()
+            val activeExtId = extensionManager.jsHost.activeCardExtId
+            val items = cards.map { meta ->
+                CardExtensionUiItem(
+                    meta      = meta,
+                    enabled   = cardExtensionSettings.isEnabled(meta.characterFile),
+                    isActive  = activeExtId?.contains(":${meta.characterName}") == true
+                )
+            }
+            _uiState.update { it.copy(cardExtensions = items, cardExtensionsLoading = false) }
+        }
+    }
+
+    fun setCardExtensionEnabled(characterFile: String, enabled: Boolean) {
+        cardExtensionSettings.setEnabled(characterFile, enabled)
+        _uiState.update {
+            it.copy(cardExtensions = it.cardExtensions.map { item ->
+                if (item.meta.characterFile == characterFile) item.copy(enabled = enabled) else item
+            })
         }
     }
 

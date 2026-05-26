@@ -116,6 +116,15 @@ interface CharaVaultApi {
     suspend fun getMe(): Response<CharaVaultUserResponse>
 
     /**
+     * Get cards uploaded by the authenticated user.
+     */
+    @GET("api/cards/my-uploads")
+    suspend fun getMyUploads(
+        @Query("limit") limit: Int = 50,
+        @Query("offset") offset: Int = 0
+    ): Response<CharaVaultSearchResponse>
+
+    /**
      * Verify age (18+) to unlock NSFW content.
      */
     @POST("api/auth/verify-age")

@@ -261,3 +261,7 @@ object PngCharacterCard {
         }
     }
 }
+
+private val HTML_TAG_REGEX = Regex("<[^>]*>", RegexOption.IGNORE_CASE)
+
+fun String.stripHtml(): String = replace(HTML_TAG_REGEX, "")

@@ -114,6 +114,25 @@ class ExtensionManager @Inject constructor(
         jsHost.updateDisabledExtensions(emptyList())
     }
 
+    // ── pt-variables ──────────────────────────────────────────────────────────
+
+    /** Load vars for a chat. Must be called on IO dispatcher before CHAT_CHANGED fires. */
+    fun varsLoad(characterName: String, chatFileName: String) =
+        jsHost.varsLoad(characterName, chatFileName)
+
+    /** Delete the vars sidecar when a chat is deleted. */
+    fun varsDeleteForChat(characterName: String, chatFileName: String) =
+        jsHost.varsDeleteForChat(characterName, chatFileName)
+
+    // ── Card script loader ────────────────────────────────────────────────────
+
+    /** Inject and run a card-embedded extension script. */
+    fun loadCardScript(script: String, scriptName: String, characterName: String) =
+        jsHost.loadCardScript(script, scriptName, characterName)
+
+    /** Disable the active card script (no script in this character's card). */
+    fun unloadCardScript() = jsHost.unloadCardScript()
+
     /**
      * Fire PROMPT_BEFORE_SEND to all extensions (fire-and-forget).
      * Returns the original prompt/messages unchanged — JS extensions can use

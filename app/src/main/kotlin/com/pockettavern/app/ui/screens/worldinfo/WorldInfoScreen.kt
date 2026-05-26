@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.worldinfo
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -10,7 +12,9 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.MenuBook
@@ -21,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -38,8 +43,34 @@ fun WorldInfoScreen(
     viewModel: WorldInfoViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        val bytes = context.contentResolver.openInputStream(uri)?.readBytes() ?: return@rememberLauncherForActivityResult
+        val name = uri.lastPathSegment
+            ?.substringAfterLast('/')
+            ?.substringAfterLast('%')
+            ?.removeSuffix(".json")
+            ?.ifBlank { null }
+            ?: "Imported Lorebook"
+        viewModel.importJson(name, bytes)
+    }
 
     Scaffold(
+        floatingActionButton = {
+            if (uiState.selectedLorebook == null) {
+                FloatingActionButton(onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) }) {
+                    Icon(Icons.Default.FileOpen, contentDescription = "Import lorebook")
+                }
+            } else {
+                FloatingActionButton(onClick = { viewModel.addNewEntry() }) {
+                    Icon(Icons.Default.Add, contentDescription = "Add entry")
+                }
+            }
+        },
         topBar = {
             TopAppBar(
                 title = {
@@ -71,38 +102,59 @@ fun WorldInfoScreen(
     ) { padding ->
         if (uiState.isLoading) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
+                modifier = Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator()
             }
         } else if (uiState.selectedLorebook != null) {
-            // Show entries for selected lorebook
             WorldInfoEntriesList(
                 entries = uiState.entries,
                 isLoading = uiState.isLoadingEntries,
                 expandedEntryId = uiState.expandedEntryId,
                 onToggleExpand = { viewModel.toggleEntryExpanded(it) },
+                onEditEntry = { viewModel.startEditEntry(it) },
                 modifier = Modifier.padding(padding)
             )
         } else {
-            // Show lorebook list
             LorebookList(
                 lorebooks = uiState.lorebooks,
                 onSelect = { viewModel.selectLorebook(it.name) },
+                onDelete = { viewModel.requestDeleteLorebook(it.name) },
                 modifier = Modifier.padding(padding)
             )
         }
     }
 
-    // Error Dialog
-    uiState.error?.let { error ->
-        ErrorDialog(
-            message = error,
-            onDismiss = { viewModel.clearError() }
+    // Delete lorebook confirm dialog
+    uiState.deleteLorebookConfirm?.let { name ->
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissDeleteLorebook() },
+            title = { Text("Delete Lorebook") },
+            text = { Text("Delete \"$name\"? This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.confirmDeleteLorebook() }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissDeleteLorebook() }) { Text("Cancel") }
+            }
         )
+    }
+
+    // Entry edit dialog
+    uiState.editingEntry?.let { entry ->
+        WorldInfoEntryEditDialog(
+            entry = entry,
+            onSave = { viewModel.saveEntry(it) },
+            onDelete = { viewModel.deleteEntry(entry.uid) },
+            onDismiss = { viewModel.dismissEditEntry() }
+        )
+    }
+
+    uiState.error?.let { error ->
+        ErrorDialog(message = error, onDismiss = { viewModel.clearError() })
     }
 }
 
@@ -110,13 +162,11 @@ fun WorldInfoScreen(
 private fun LorebookList(
     lorebooks: List<WorldInfoListItem>,
     onSelect: (WorldInfoListItem) -> Unit,
+    onDelete: (WorldInfoListItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (lorebooks.isEmpty()) {
-        Box(
-            modifier = modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
+        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -133,7 +183,7 @@ private fun LorebookList(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    "Create lorebooks in SillyTavern to see them here",
+                    "Import a JSON lorebook or create one in SillyTavern",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -148,7 +198,8 @@ private fun LorebookList(
             items(lorebooks) { lorebook ->
                 LorebookCard(
                     lorebook = lorebook,
-                    onClick = { onSelect(lorebook) }
+                    onClick = { onSelect(lorebook) },
+                    onDelete = { onDelete(lorebook) }
                 )
             }
         }
@@ -158,20 +209,15 @@ private fun LorebookList(
 @Composable
 private fun LorebookCard(
     lorebook: WorldInfoListItem,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDelete: () -> Unit
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        )
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -193,6 +239,13 @@ private fun LorebookCard(
                     color = MaterialTheme.colorScheme.outline
                 )
             }
+            IconButton(onClick = onDelete) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Delete lorebook",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
             Icon(
                 Icons.Default.ChevronRight,
                 contentDescription = null,
@@ -208,20 +261,15 @@ private fun WorldInfoEntriesList(
     isLoading: Boolean,
     expandedEntryId: String?,
     onToggleExpand: (String) -> Unit,
+    onEditEntry: (WorldInfoEntry) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (isLoading) {
-        Box(
-            modifier = modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
+        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
     } else if (entries.isEmpty()) {
-        Box(
-            modifier = modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
+        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -233,9 +281,14 @@ private fun WorldInfoEntriesList(
                     tint = MaterialTheme.colorScheme.outline
                 )
                 Text(
-                    "No entries in this lorebook",
+                    "No entries yet",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Tap + to add an entry",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.outline
                 )
             }
         }
@@ -245,17 +298,10 @@ private fun WorldInfoEntriesList(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Summary header
             item {
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         StatItem("Total", entries.size.toString())
@@ -264,12 +310,12 @@ private fun WorldInfoEntriesList(
                     }
                 }
             }
-
             items(entries, key = { it.uid }) { entry ->
                 WorldInfoEntryCard(
                     entry = entry,
                     isExpanded = expandedEntryId == entry.uid,
-                    onToggleExpand = { onToggleExpand(entry.uid) }
+                    onToggleExpand = { onToggleExpand(entry.uid) },
+                    onEdit = { onEditEntry(entry) }
                 )
             }
         }
@@ -298,42 +344,32 @@ private fun StatItem(label: String, value: String) {
 private fun WorldInfoEntryCard(
     entry: WorldInfoEntry,
     isExpanded: Boolean,
-    onToggleExpand: () -> Unit
+    onToggleExpand: () -> Unit,
+    onEdit: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (entry.enabled) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.5f)
+            containerColor = if (entry.enabled)
+                MaterialTheme.colorScheme.surfaceContainerLow
+            else
+                MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.5f)
         )
     ) {
-        Column(
-            modifier = Modifier.clickable(onClick = onToggleExpand)
-        ) {
-            // Header row
+        Column(modifier = Modifier.clickable(onClick = onToggleExpand)) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
+                modifier = Modifier.fillMaxWidth().padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Status indicators
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    if (entry.constant) {
-                        StatusBadge("C", MaterialTheme.colorScheme.primary, "Constant")
-                    }
-                    if (entry.selective) {
-                        StatusBadge("S", MaterialTheme.colorScheme.primary, "Selective")
-                    }
-                    if (!entry.enabled) {
-                        StatusBadge("D", MaterialTheme.colorScheme.error, "Disabled")
-                    }
+                    if (entry.constant) StatusBadge("C", MaterialTheme.colorScheme.primary, "Constant")
+                    if (entry.selective) StatusBadge("S", MaterialTheme.colorScheme.primary, "Selective")
+                    if (!entry.enabled) StatusBadge("D", MaterialTheme.colorScheme.error, "Disabled")
                 }
-
-                // Entry info
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = entry.comment.ifBlank { "Entry ${entry.uid}" },
@@ -343,15 +379,13 @@ private fun WorldInfoEntryCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "Keys: ${entry.key.joinToString(", ")}",
+                        text = if (entry.key.isEmpty()) "No keys (constant)" else "Keys: ${entry.key.joinToString(", ")}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-
-                // Order badge
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
@@ -364,8 +398,6 @@ private fun WorldInfoEntryCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-
-                // Expand icon
                 Icon(
                     if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                     contentDescription = if (isExpanded) "Collapse" else "Expand",
@@ -373,7 +405,6 @@ private fun WorldInfoEntryCard(
                 )
             }
 
-            // Expanded content
             AnimatedVisibility(
                 visible = isExpanded,
                 enter = expandVertically(),
@@ -386,35 +417,26 @@ private fun WorldInfoEntryCard(
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Keys
                     if (entry.key.isNotEmpty()) {
                         DetailSection("Primary Keys") {
                             FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                entry.key.forEach { key ->
-                                    KeyChip(key, MaterialTheme.colorScheme.primary)
-                                }
+                                entry.key.forEach { key -> KeyChip(key, MaterialTheme.colorScheme.primary) }
                             }
                         }
                     }
-
-                    // Secondary keys (if selective)
                     if (entry.selective && entry.keysecondary.isNotEmpty()) {
                         DetailSection("Secondary Keys (AND)") {
                             FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                entry.keysecondary.forEach { key ->
-                                    KeyChip(key, MaterialTheme.colorScheme.primary)
-                                }
+                                entry.keysecondary.forEach { key -> KeyChip(key, MaterialTheme.colorScheme.primary) }
                             }
                         }
                     }
-
-                    // Content
                     DetailSection("Content") {
                         Text(
                             text = entry.content.ifBlank { "(empty)" },
@@ -422,8 +444,6 @@ private fun WorldInfoEntryCard(
                             color = if (entry.content.isNotBlank()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
                         )
                     }
-
-                    // Settings
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -433,7 +453,6 @@ private fun WorldInfoEntryCard(
                         SettingItem("Depth", entry.depth.toString())
                         SettingItem("Probability", "${entry.probability}%")
                     }
-
                     if (entry.group.isNotBlank()) {
                         Text(
                             text = "Group: ${entry.group}",
@@ -441,9 +460,150 @@ private fun WorldInfoEntryCard(
                             color = MaterialTheme.colorScheme.outline
                         )
                     }
+                    // Edit button
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        OutlinedButton(
+                            onClick = onEdit,
+                            modifier = Modifier.height(36.dp)
+                        ) {
+                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Edit", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WorldInfoEntryEditDialog(
+    entry: WorldInfoEntry,
+    onSave: (WorldInfoEntry) -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var comment by remember(entry.uid) { mutableStateOf(entry.comment) }
+    var primaryKeys by remember(entry.uid) { mutableStateOf(entry.key.joinToString(", ")) }
+    var secondaryKeys by remember(entry.uid) { mutableStateOf(entry.keysecondary.joinToString(", ")) }
+    var content by remember(entry.uid) { mutableStateOf(entry.content) }
+    var constant by remember(entry.uid) { mutableStateOf(entry.constant) }
+    var enabled by remember(entry.uid) { mutableStateOf(entry.enabled) }
+    var selective by remember(entry.uid) { mutableStateOf(entry.selective) }
+    var orderText by remember(entry.uid) { mutableStateOf(entry.order.toString()) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    fun parseKeys(raw: String) = raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (entry.content.isEmpty() && entry.comment == "New Entry") "New Entry" else "Edit Entry") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedTextField(
+                    value = comment,
+                    onValueChange = { comment = it },
+                    label = { Text("Name / Comment") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = primaryKeys,
+                    onValueChange = { primaryKeys = it },
+                    label = { Text("Primary Keys (comma-separated)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = selective, onCheckedChange = { selective = it })
+                    Spacer(Modifier.width(8.dp))
+                    Text("Selective (AND with secondary keys)", style = MaterialTheme.typography.bodyMedium)
+                }
+                if (selective) {
+                    OutlinedTextField(
+                        value = secondaryKeys,
+                        onValueChange = { secondaryKeys = it },
+                        label = { Text("Secondary Keys (comma-separated)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+                OutlinedTextField(
+                    value = content,
+                    onValueChange = { content = it },
+                    label = { Text("Content") },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                    minLines = 4
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = constant, onCheckedChange = { constant = it })
+                    Spacer(Modifier.width(8.dp))
+                    Text("Constant (always inject)", style = MaterialTheme.typography.bodyMedium)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = enabled, onCheckedChange = { enabled = it })
+                    Spacer(Modifier.width(8.dp))
+                    Text("Enabled", style = MaterialTheme.typography.bodyMedium)
+                }
+                OutlinedTextField(
+                    value = orderText,
+                    onValueChange = { orderText = it.filter { c -> c.isDigit() } },
+                    label = { Text("Order") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                // Delete button
+                OutlinedButton(
+                    onClick = { showDeleteConfirm = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Delete Entry")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onSave(
+                    entry.copy(
+                        comment = comment,
+                        key = parseKeys(primaryKeys),
+                        keysecondary = parseKeys(secondaryKeys),
+                        content = content,
+                        constant = constant,
+                        enabled = enabled,
+                        selective = selective,
+                        order = orderText.toIntOrNull() ?: entry.order
+                    )
+                )
+            }) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete Entry") },
+            text = { Text("Delete \"${entry.comment.ifBlank { "this entry" }}\"? This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = { onDelete() }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+            }
+        )
     }
 }
 
@@ -477,19 +637,12 @@ private fun KeyChip(key: String, color: androidx.compose.ui.graphics.Color) {
             .background(color.copy(alpha = 0.15f))
             .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
-        Text(
-            text = key,
-            style = MaterialTheme.typography.labelMedium,
-            color = color
-        )
+        Text(text = key, style = MaterialTheme.typography.labelMedium, color = color)
     }
 }
 
 @Composable
-private fun DetailSection(
-    title: String,
-    content: @Composable () -> Unit
-) {
+private fun DetailSection(title: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
             text = title,

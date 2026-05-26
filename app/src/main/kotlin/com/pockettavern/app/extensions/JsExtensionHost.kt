@@ -10,6 +10,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.pockettavern.app.data.local.JsExtensionStorage
+import com.pockettavern.app.data.local.VarsStorage
 import com.pockettavern.app.domain.model.MessageHeaderEntry
 import com.pockettavern.app.domain.model.QuickReplyButton
 import com.pockettavern.app.util.DebugLogger
@@ -41,7 +42,8 @@ import javax.inject.Singleton
 @Singleton
 class JsExtensionHost @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val storage: JsExtensionStorage
+    private val storage: JsExtensionStorage,
+    private val varsStorage: VarsStorage
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var webView: WebView? = null
@@ -106,9 +108,21 @@ class JsExtensionHost @Inject constructor(
         val fields: List<EditField>,
         val callbackId: String
     )
-    data class EditField(val key: String, val label: String, val value: String)
+    data class EditField(
+        val key: String,
+        val label: String,
+        val value: String,
+        val type: String = "text",
+        val options: List<String> = emptyList()
+    )
     private val _editDialogRequest = MutableStateFlow<EditDialogRequest?>(null)
     val editDialogRequest: StateFlow<EditDialogRequest?> = _editDialogRequest.asStateFlow()
+
+    // Model list request: JS calls PT.getAvailableModels() → Kotlin fetches from Forge
+    var getAvailableModelsCallback: ((String) -> Unit)? = null  // (callbackId) -> Unit
+
+    // Set model request: JS calls PT.setCurrentModel(name) → Kotlin posts to Forge
+    var setCurrentModelCallback: ((String, String) -> Unit)? = null  // (modelName, callbackId) -> Unit
 
     // Hidden generate request: JS calls PT.generateHidden() → Kotlin sends to LLM without adding to chat
     var hiddenGenerateCallback: ((String, String) -> Unit)? = null  // (prompt, callbackId) -> Unit
@@ -144,6 +158,14 @@ class JsExtensionHost @Inject constructor(
     )
     private val _panelRegistrations = MutableStateFlow<Map<String, PanelRegistration>>(emptyMap())
     val panelRegistrations: StateFlow<Map<String, PanelRegistration>> = _panelRegistrations.asStateFlow()
+
+    // ── Card extension tracking ───────────────────────────────────────────────
+
+    // Currently active card script extension ID (e.g. "Zahra's Wishes:Zahra")
+    @Volatile private var _activeCardExtId: String? = null
+    val activeCardExtId: String? get() = _activeCardExtId
+    // IDs of card scripts that have been injected but are now inactive (character switched)
+    private val _disabledCardExtIds = mutableSetOf<String>()
 
     // ── Init / reload ─────────────────────────────────────────────────────────
 
@@ -295,14 +317,17 @@ class JsExtensionHost @Inject constructor(
      */
     fun updateDisabledExtensions(disabledIds: List<String>) {
         _disabledExtensions = disabledIds.toSet()
-        if (!ready) return
-        val jsArray = disabledIds.joinToString(",") { "'${it.replace("'", "\\'")}'" }
-        scope.launch {
-            webView?.evaluateJavascript(
-                "window.__ptDisabledExtensions=[$jsArray];", null
-            )
-        }
+        pushDisabledToJs()
         DebugLogger.log("[JsExtensionHost] Disabled extensions: $disabledIds")
+    }
+
+    private fun pushDisabledToJs() {
+        if (!ready) return
+        val allDisabled = _disabledExtensions + _disabledCardExtIds
+        val jsArray = allDisabled.joinToString(",") { "'${it.replace("'", "\\'")}'" }
+        scope.launch {
+            webView?.evaluateJavascript("window.__ptDisabledExtensions=[$jsArray];", null)
+        }
     }
 
     // ── Prompt injections ─────────────────────────────────────────────────────
@@ -557,6 +582,65 @@ class JsExtensionHost @Inject constructor(
         )
     }
 
+    // ── Vars load / clear (call from IO context) ──────────────────────────────
+
+    fun varsLoad(characterName: String, chatFileName: String) {
+        varsStorage.loadForChat(characterName, chatFileName)
+    }
+
+    fun varsDeleteForChat(characterName: String, chatFileName: String) {
+        varsStorage.deleteForChat(characterName, chatFileName)
+    }
+
+    // ── Card script loader ────────────────────────────────────────────────────
+
+    /**
+     * Inject and run a card-embedded script.
+     * Disables any previously active card script so its event handlers stop firing.
+     * Safe to call repeatedly; re-injection is skipped if extId is already active.
+     */
+    fun loadCardScript(script: String, scriptName: String, characterName: String) {
+        val extId = "$scriptName:$characterName"
+        if (_activeCardExtId == extId) return   // same character re-loaded, already running
+
+        // Disable the outgoing card script
+        _activeCardExtId?.let { old ->
+            _injections.remove(old)
+            _disabledCardExtIds.add(old)
+        }
+
+        // Re-enable this card's ext ID if it was previously disabled (user switching back)
+        _disabledCardExtIds.remove(extId)
+        _activeCardExtId = extId
+
+        pushDisabledToJs()
+
+        if (!ready) return   // sandbox not ready; loadExtensionScripts will pick up _pendingCardScript
+
+        val safeId = extId.replace("\\", "\\\\").replace("'", "\\'")
+        scope.launch {
+            webView?.evaluateJavascript(
+                "window.__ptCurrentExtId='$safeId';window.PT.cardExtensionId='$safeId';", null
+            )
+            webView?.evaluateJavascript(script) { result ->
+                DebugLogger.log("[JsExtensionHost] Card script '$extId' loaded: $result")
+            }
+            webView?.evaluateJavascript("window.__ptCurrentExtId=null;", null)
+        }
+    }
+
+    /**
+     * Disable the active card script (call when character changes to one with no card script).
+     * Clears its prompt injections and stops its event handlers.
+     */
+    fun unloadCardScript() {
+        val old = _activeCardExtId ?: return
+        _injections.remove(old)
+        _disabledCardExtIds.add(old)
+        _activeCardExtId = null
+        pushDisabledToJs()
+    }
+
     // ── JavascriptInterface bridge ────────────────────────────────────────────
 
     inner class PtJsBridge {
@@ -803,10 +887,16 @@ class JsExtensionHost @Inject constructor(
                 val arr = JSONArray(fieldsJson)
                 val fields = (0 until arr.length()).map { i ->
                     val obj = arr.getJSONObject(i)
+                    val optsArr = obj.optJSONArray("options")
+                    val opts = if (optsArr != null) {
+                        (0 until optsArr.length()).map { optsArr.getString(it) }
+                    } else emptyList()
                     EditField(
-                        key   = obj.optString("key", "field$i"),
-                        label = obj.optString("label", "Field ${i + 1}"),
-                        value = obj.optString("value", "")
+                        key     = obj.optString("key", "field$i"),
+                        label   = obj.optString("label", "Field ${i + 1}"),
+                        value   = obj.optString("value", ""),
+                        type    = obj.optString("type", "text"),
+                        options = opts
                     )
                 }
                 _editDialogRequest.value = EditDialogRequest(title, fields, callbackId)
@@ -955,6 +1045,20 @@ class JsExtensionHost @Inject constructor(
             }
         }
 
+        // ── Model list / selector ─────────────────────────────────────────────
+
+        /** Called by PT.getAvailableModels(callbackId). Returns JSON array via callback. */
+        @JavascriptInterface
+        fun getAvailableModels(callbackId: String) {
+            scope.launch(Dispatchers.Main) { getAvailableModelsCallback?.invoke(callbackId) }
+        }
+
+        /** Called by PT.setCurrentModel(modelName, callbackId). */
+        @JavascriptInterface
+        fun setCurrentModel(modelName: String, callbackId: String) {
+            scope.launch(Dispatchers.Main) { setCurrentModelCallback?.invoke(modelName, callbackId) }
+        }
+
         // ── Character import ──────────────────────────────────────────────────
 
         /** Called by PT.importCharacter(url, filename). */
@@ -978,6 +1082,28 @@ class JsExtensionHost @Inject constructor(
         fun showToast(type: String, message: String) {
             scope.launch(Dispatchers.Main) { showToastCallback?.invoke(type, message) }
         }
+
+        // ── pt-variables bridge ───────────────────────────────────────────────
+
+        /** Returns JSON-encoded value for key, or "null" if missing. */
+        @JavascriptInterface
+        fun varsGet(key: String): String = varsStorage.get(key)
+
+        /** Sets key to a JSON-encoded value. */
+        @JavascriptInterface
+        fun varsSet(key: String, valueJson: String) = varsStorage.set(key, valueJson)
+
+        /** Removes a key. */
+        @JavascriptInterface
+        fun varsDelete(key: String) = varsStorage.delete(key)
+
+        /** Returns all vars as a JSON object string. */
+        @JavascriptInterface
+        fun varsGetAll(): String = varsStorage.getAll()
+
+        /** Clears all vars for the current chat. */
+        @JavascriptInterface
+        fun varsClear() = varsStorage.clear()
 
         // ── Panel registration ────────────────────────────────────────────────
 
@@ -1049,6 +1175,24 @@ class JsExtensionHost @Inject constructor(
         scope.launch {
             webView?.evaluateJavascript(
                 "if(window.__ptImageGenerateResult)__ptImageGenerateResult('$callbackId','$safe');", null
+            )
+        }
+    }
+
+    /** Called by ChatViewModel with the model list JSON (e.g. '["model1","model2"]'). */
+    fun completeGetModels(callbackId: String, modelsJson: String) {
+        scope.launch {
+            webView?.evaluateJavascript(
+                "if(window.__ptGetModelsResult)__ptGetModelsResult('$callbackId',$modelsJson);", null
+            )
+        }
+    }
+
+    /** Called by ChatViewModel after setCurrentModel completes (success=true) or fails (false). */
+    fun completeSetModel(callbackId: String, success: Boolean) {
+        scope.launch {
+            webView?.evaluateJavascript(
+                "if(window.__ptSetModelResult)__ptSetModelResult('$callbackId',$success);", null
             )
         }
     }
