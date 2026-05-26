@@ -431,6 +431,23 @@ Every extension has access to the `PT` global object:
 | `PT.getContext()` | Returns `{ character, recentMessages, personaName, apiType }`. Each `recentMessages` entry has `{ index, text, isUser }`. |
 | `PT.sendMessage(text)` | Send a message as the user through the normal generation pipeline. |
 | `PT.isEnabled(extensionId)` | Check if an extension is currently enabled (respects per-character overrides). Returns `boolean`. |
+| `PT.cardExtensionId` | The extension ID of the currently running card script (e.g. `"My Script:CharacterName"`). `null` for standalone JS extensions. |
+
+#### Per-Chat Variables (`PT.vars`)
+
+A persistent key/value store scoped to the current chat. Values survive app restarts and are isolated per character per chat file. Requires the **pt-variables** extension to be installed and enabled.
+
+| API | Description |
+|-----|-------------|
+| `PT.vars.get(key, default)` | Get a stored value. Returns `default` if the key doesn't exist. |
+| `PT.vars.set(key, value)` | Store any JSON-serializable value. |
+| `PT.vars.delete(key)` | Remove a key. |
+| `PT.vars.getAll()` | Returns all stored key/value pairs as a plain object. |
+| `PT.vars.clear()` | Remove all stored variables for this chat. |
+| `PT.vars.increment(key, by)` | Add `by` (default 1) to a numeric variable. |
+| `PT.vars.decrement(key, by)` | Subtract `by` (default 1) from a numeric variable. |
+| `PT.vars.setInjection(enabled)` | Enable/disable automatic injection of all vars into the system prompt as a `[Current World State]` block. |
+| `PT.vars.setInjectionFormat(fn)` | Provide a custom formatter `fn(vars) → string` to control exactly what gets injected. |
 
 #### UI: Message Headers
 
@@ -535,7 +552,9 @@ Add custom actions to the long-press message context menu.
 | `PT.events.GENERATION_STARTED` | null | Generation begins |
 | `PT.events.GENERATION_STOPPED` | null | Generation ends or is aborted |
 | `PT.events.CHAT_CHANGED` | file name | The active chat changes |
+| `PT.events.CHAT_STARTED` | file name | A new chat is created (greeting not yet sent) |
 | `PT.events.CHARACTER_CHANGED` | character name | The active character changes |
+| `PT.events.CHARACTER_LOADED` | — | A character with an embedded card script finishes loading |
 | `PT.events.BUTTON_CLICKED` | `{ action, label }` | A quick reply button with `action` is tapped |
 | `PT.events.HEADER_LONG_PRESSED` | `{ messageIndex, extensionId }` | User long-presses a message header |
 | `PT.events.MESSAGE_LONG_PRESSED` | `{ messageIndex }` | User long-presses a chat message (opens context menu) |
@@ -599,6 +618,102 @@ my-extension/
 ```
 
 Host both files anywhere accessible by URL (GitHub raw, a web server, etc.). The install URL can point directly to `index.js` or to the folder -- PocketTavern appends `/index.js` automatically.
+
+---
+
+### Built-in Character Card Extensions
+
+Scripts can be embedded directly inside a character card's PNG file. When the card is imported, the script travels with it — no separate installation step, no URL to share. Anyone who has the card gets the full interactive experience.
+
+#### How it works
+
+PocketTavern reads the `pockettavern` key from the card's `extensions` block. If a script is present and enabled, it loads automatically when the character is selected and unloads when switching away. Enable/disable per-card from **Settings → Extensions → Card Extensions**.
+
+#### Card JSON structure
+
+```json
+{
+  "spec": "chara_card_v2",
+  "data": {
+    "name": "My Character",
+    "extensions": {
+      "pockettavern": {
+        "script_name": "My Script",
+        "script_version": "1.0",
+        "script_description": "What this script does.",
+        "script": "(function() { /* your code here */ })()"
+      }
+    }
+  }
+}
+```
+
+#### What card scripts can do
+
+Card scripts have access to the full PT API — `PT.vars`, `PT.setExtensionPrompt`, `PT.registerMessageActions`, `PT.showEditDialog`, `PT.generateHidden`, and all events. The extension ID is available as `PT.cardExtensionId`.
+
+Two events fire specifically for card scripts:
+
+| Event | Fires when... |
+|-------|--------------|
+| `PT.events.CHARACTER_LOADED` | The card script finishes loading (use this instead of `CHAT_CHANGED` for init) |
+| `PT.events.CHAT_STARTED` | A new chat is created with this character |
+
+#### Example — mood tracker
+
+A minimal card script that tracks the number of messages exchanged and shifts the character's tone:
+
+```javascript
+(function () {
+    'use strict';
+
+    var EXT_ID = PT.cardExtensionId || 'mood-tracker:MyChar';
+
+    function init() {
+        if (!PT.vars.get('messages_seen')) PT.vars.set('messages_seen', 0);
+        updatePrompt();
+    }
+
+    function updatePrompt() {
+        var n = PT.vars.get('messages_seen', 0);
+        var tone = n < 5  ? 'reserved and formal' :
+                   n < 20 ? 'warm and familiar' :
+                             'deeply affectionate and open';
+        PT.setExtensionPrompt(
+            EXT_ID,
+            '[Current tone: ' + tone + ' — ' + n + ' messages exchanged]',
+            PT.INJECTION_POSITION.BEFORE_CHAR_DEFS
+        );
+    }
+
+    PT.eventSource.on(PT.events.CHARACTER_LOADED, init);
+    PT.eventSource.on(PT.events.CHAT_STARTED,    init);
+
+    PT.eventSource.on(PT.events.MESSAGE_RECEIVED, function () {
+        PT.vars.increment('messages_seen');
+        updatePrompt();
+    });
+
+    PT.registerMessageActions(EXT_ID, [
+        { label: 'Check bond level', action: 'check_bond' }
+    ]);
+
+    PT.eventSource.on(PT.events.BUTTON_CLICKED, function (data) {
+        if (data.action !== 'check_bond') return;
+        var n = PT.vars.get('messages_seen', 0);
+        PT.showEditDialog('Bond Tracker', [
+            { key: 'messages_seen', label: 'Messages exchanged', value: String(n) }
+        ]).then(function (result) {
+            if (result) {
+                PT.vars.set('messages_seen', parseInt(result.messages_seen, 10) || 0);
+                updatePrompt();
+            }
+        });
+    });
+})();
+```
+
+This script ships inside the card PNG. Import the card — the tracker is live immediately.
 
 </details>
 
