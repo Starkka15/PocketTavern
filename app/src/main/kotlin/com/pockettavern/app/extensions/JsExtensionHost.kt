@@ -624,6 +624,7 @@ class JsExtensionHost @Inject constructor(
             )
             webView?.evaluateJavascript(script) { result ->
                 DebugLogger.log("[JsExtensionHost] Card script '$extId' loaded: $result")
+                dispatchEvent(ExtensionEvent.CHARACTER_LOADED)
             }
             webView?.evaluateJavascript("window.__ptCurrentExtId=null;", null)
         }

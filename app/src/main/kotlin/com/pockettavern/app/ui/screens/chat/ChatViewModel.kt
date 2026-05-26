@@ -608,6 +608,7 @@ class ChatViewModel @Inject constructor(
             }
             pushExtensionContext()
             extensionManager.emit(ExtensionEvent.CHAT_CHANGED, fileName)
+            extensionManager.emit(ExtensionEvent.CHAT_STARTED, fileName)
             if (messages.isNotEmpty()) {
                 saveCurrentChat()
                 refreshChatsList()
@@ -1704,6 +1705,22 @@ No preamble, no explanation. Just the numbered list."""
                 is Result.Error -> {
                     _uiState.update { it.copy(error = "Failed to delete character") }
                 }
+            }
+        }
+    }
+
+    fun exportCurrentChat(uri: android.net.Uri) {
+        val charName = _uiState.value.character?.name ?: return
+        val chatFileName = _uiState.value.currentChatFileName ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val sanitized = charName.replace(Regex("[^a-zA-Z0-9_\\-. ]"), "_").trim().take(64)
+                val chatFile = java.io.File(context.filesDir, "chats/$sanitized/$chatFileName")
+                context.contentResolver.openOutputStream(uri)?.use { out ->
+                    chatFile.inputStream().use { it.copyTo(out) }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Export failed: ${e.message}") }
             }
         }
     }

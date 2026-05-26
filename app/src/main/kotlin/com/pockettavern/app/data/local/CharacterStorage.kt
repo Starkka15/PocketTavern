@@ -153,7 +153,7 @@ class CharacterStorage @Inject constructor(
         val tempSpriteDir = File(context.cacheDir, "charx_sprites_${System.currentTimeMillis()}")
         val result = CharxParser.parseFile(file, tempSpriteDir)
         val name = result.cardData.data.name.ifBlank { "imported_character" }
-        val safeFileName = sanitizeFileName(name) + ".png"
+        val safeFileName = uniqueCharacterFileName(sanitizeFileName(name))
         DebugLogger.log("CharacterStorage: charx name='$name' iconPng=${result.iconPng?.size} spriteDir=${tempSpriteDir.listFiles()?.size ?: 0} files")
 
         // Move streamed sprites to final sprite storage location
@@ -177,7 +177,7 @@ class CharacterStorage @Inject constructor(
         DebugLogger.log("CharacterStorage: parsing charx (${bytes.size} bytes)")
         val result = CharxParser.parse(bytes)  // throws with real message on failure
         val name = result.cardData.data.name.ifBlank { "imported_character" }
-        val safeFileName = sanitizeFileName(name) + ".png"
+        val safeFileName = uniqueCharacterFileName(sanitizeFileName(name))
         DebugLogger.log("CharacterStorage: charx name='$name' iconPng=${result.iconPng?.size} sprites=${result.sprites.size}")
 
         val avatarPng = normalizeIconToPng(result.iconPng)
@@ -197,7 +197,7 @@ class CharacterStorage @Inject constructor(
         val card = PngCharacterCard.extractCharacterData(bytes)
             ?: return null
         val name = card.data.name.ifBlank { "imported_character" }
-        val safeFileName = sanitizeFileName(name) + ".png"
+        val safeFileName = uniqueCharacterFileName(sanitizeFileName(name))
         File(charactersDir, safeFileName).writeBytes(bytes)
         characterDao.upsert(cardDataToEntity(safeFileName, card.data))
         DebugLogger.log("CharacterStorage: imported PNG $safeFileName")
@@ -221,6 +221,10 @@ class CharacterStorage @Inject constructor(
 
     /** Delete a character card and remove from Room index. */
     suspend fun deleteCharacter(fileName: String) = withContext(Dispatchers.IO) {
+        // Clean up per-chat vars sidecars for this character
+        val charName = fileName.removeSuffix(".png")
+        val charChatsDir = File(context.filesDir, "chats/${sanitizeFileName(charName)}")
+        charChatsDir.walkBottomUp().filter { it.name.endsWith(".vars.json") }.forEach { it.delete() }
         File(charactersDir, fileName).delete()
         characterDao.deleteByFileName(fileName)
     }
@@ -416,4 +420,13 @@ class CharacterStorage @Inject constructor(
 
     private fun sanitizeFileName(name: String): String =
         name.replace(Regex("[^a-zA-Z0-9_\\-. ]"), "_").trim().take(64)
+
+    /** Returns a filename that doesn't already exist in charactersDir, appending _2, _3, etc. */
+    private fun uniqueCharacterFileName(base: String): String {
+        val candidate = File(charactersDir, "$base.png")
+        if (!candidate.exists()) return "$base.png"
+        var n = 2
+        while (File(charactersDir, "${base}_$n.png").exists()) n++
+        return "${base}_$n.png"
+    }
 }

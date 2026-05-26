@@ -101,6 +101,12 @@ fun ChatScreen(
         uri?.let { viewModel.uploadBackgroundFromUri(it) }
     }
 
+    val exportChatLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/jsonl")
+    ) { uri ->
+        uri?.let { viewModel.exportCurrentChat(it) }
+    }
+
     // STT launcher
     val sttLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -246,6 +252,16 @@ fun ChatScreen(
                                     viewModel.createNewChat()
                                 },
                                 leadingIcon = { Icon(Icons.Default.Add, null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Export Chat") },
+                                onClick = {
+                                    showSettingsMenu = false
+                                    val charName = uiState.character?.name ?: "chat"
+                                    val chatFile = uiState.currentChatFileName ?: "chat.jsonl"
+                                    exportChatLauncher.launch("$charName - $chatFile")
+                                },
+                                leadingIcon = { Icon(Icons.Default.Save, null) }
                             )
                             HorizontalDivider()
                             DropdownMenuItem(
