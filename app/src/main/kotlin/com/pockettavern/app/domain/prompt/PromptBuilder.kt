@@ -26,7 +26,8 @@ class PromptBuilder(
     private val userName: String = "User",
     private val mainPromptOverride: String = "",  // OAI preset's main_prompt, takes priority over sysprompt preset
     private val extensionInjections: List<String> = emptyList(),
-    private val memoryBlock: String = ""
+    private val memoryBlock: String = "",
+    private val worldBook: String = ""
 ) {
     private val instructTemplate = chatContext.instructTemplate
     // Combine global system prompt with character's custom system prompt.
@@ -75,6 +76,13 @@ class PromptBuilder(
         }
 
         DebugLogger.logKeyValue("Combined system prompt length", systemPrompt.length)
+    }
+
+    /** Apply full macro substitution to a user message before storing/displaying it. */
+    fun applyUserMacros(text: String, history: List<ChatMessage>): String {
+        _buildHistory = history
+        _buildNewMessage = text
+        return substituteMacros(text)
     }
 
     /**
@@ -193,6 +201,10 @@ class PromptBuilder(
             if (item.id == "char_description" && memoryBlock.isNotBlank()) {
                 messages.add(PromptMessage("system", "[Memory]\n$memoryBlock"))
                 DebugLogger.log("  [memory] injecting ${memoryBlock.length} chars before char_description")
+            }
+            if (item.id == "char_description" && worldBook.isNotBlank()) {
+                messages.add(PromptMessage("system", "[Shared World Book]\n$worldBook"))
+                DebugLogger.log("  [worldbook] injecting ${worldBook.length} chars before char_description")
             }
 
             if (item.id == "chat_examples") {
@@ -515,6 +527,9 @@ class PromptBuilder(
         // Memory block injected before character content (T13)
         if (memoryBlock.isNotBlank()) {
             parts.add("[Memory]\n$memoryBlock")
+        }
+        if (worldBook.isNotBlank()) {
+            parts.add("[Shared World Book]\n$worldBook")
         }
 
         // Character description

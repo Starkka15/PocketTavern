@@ -30,5 +30,7 @@ data class Character(
     // Image generation: use avatar as img2img source
     val useAvatarForImageGen: Boolean = true,
     // Personal notes about this character (stored in Room, not embedded in PNG)
-    val notes: String = ""
+    val notes: String = "",
+    // PocketTavern-only: hints for /scanlore extraction (stored in card extensions)
+    val loreHints: String = ""
 )

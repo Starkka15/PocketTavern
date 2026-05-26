@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
@@ -38,6 +39,7 @@ import com.pockettavern.app.domain.model.ActivationStrategy
 import com.pockettavern.app.domain.model.ChatInfo
 import com.pockettavern.app.domain.model.ChatStyle
 import com.pockettavern.app.domain.model.GroupChatMessage
+import com.pockettavern.app.ui.components.ScanloreConfirmDialog
 import com.pockettavern.app.ui.theme.*
 import com.pockettavern.app.ui.theme.LocalPocketTavernColors
 import java.text.SimpleDateFormat
@@ -150,6 +152,14 @@ fun GroupChatScreen(
                                 onClick = {
                                     showMenu = false
                                     viewModel.showPromptEditor()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("World Book") },
+                                leadingIcon = { Icon(Icons.Default.MenuBook, contentDescription = null) },
+                                onClick = {
+                                    showMenu = false
+                                    viewModel.showWorldBookEditor()
                                 }
                             )
                             DropdownMenuItem(
@@ -377,6 +387,27 @@ fun GroupChatScreen(
             onTextChange = { viewModel.updatePromptEditorText(it) },
             onSave = { viewModel.saveGroupPrompt() },
             onDismiss = { viewModel.dismissPromptEditor() }
+        )
+    }
+
+    // World book editor
+    if (uiState.showWorldBookEditor) {
+        WorldBookEditorDialog(
+            text = uiState.worldBookEditorText,
+            onTextChange = { viewModel.updateWorldBookEditorText(it) },
+            onSave = { viewModel.saveWorldBook() },
+            onDismiss = { viewModel.dismissWorldBookEditor() }
+        )
+    }
+
+    // Scanlore dialog
+    if (uiState.showScanloreDialog) {
+        ScanloreConfirmDialog(
+            entries = uiState.scanloreEntries,
+            isLoading = uiState.scanloreLoading,
+            error = uiState.scanloreError,
+            onConfirm = { viewModel.confirmScanlore(it) },
+            onDismiss = { viewModel.dismissScanlore() }
         )
     }
 
@@ -883,6 +914,54 @@ private fun GroupPromptEditorDialog(
                         )
                     },
                     minLines = 6,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onSave) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun WorldBookEditorDialog(
+    text: String,
+    onTextChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("World Book") },
+        text = {
+            Column {
+                Text(
+                    text = "Shared lore injected into every generation — group and solo chats. Use /addlore to append entries from any chat.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = onTextChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 200.dp, max = 400.dp),
+                    placeholder = {
+                        Text(
+                            "e.g. [2026-05-25] Gulara processed the Vashenko brothers. +30 lbs.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    },
+                    minLines = 8,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)

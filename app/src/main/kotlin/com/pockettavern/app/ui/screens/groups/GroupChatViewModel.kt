@@ -15,6 +15,7 @@ import com.pockettavern.app.domain.model.Character
 import com.pockettavern.app.domain.model.ChatInfo
 import com.pockettavern.app.domain.model.Group
 import com.pockettavern.app.domain.model.GroupChatMessage
+import com.pockettavern.app.domain.model.PromptMessage
 import com.pockettavern.app.domain.model.Result
 import com.pockettavern.app.domain.model.StreamEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -46,7 +47,13 @@ data class GroupChatUiState(
     val availableChats: List<ChatInfo> = emptyList(),
     val showChatSelector: Boolean = false,
     val showPromptEditor: Boolean = false,
-    val promptEditorText: String = ""
+    val promptEditorText: String = "",
+    val showWorldBookEditor: Boolean = false,
+    val worldBookEditorText: String = "",
+    val showScanloreDialog: Boolean = false,
+    val scanloreEntries: List<String> = emptyList(),
+    val scanloreLoading: Boolean = false,
+    val scanloreError: String? = null,
 )
 
 @HiltViewModel
@@ -195,6 +202,45 @@ class GroupChatViewModel @Inject constructor(
         val text = _uiState.value.inputText.trim()
         if (text.isBlank() || _uiState.value.isGenerating) return
 
+        // /addlore <text> — append to group world book
+        if (text.startsWith("/addlore ")) {
+            val entry = text.removePrefix("/addlore ").trim()
+            _uiState.update { it.copy(inputText = "") }
+            if (entry.isNotBlank()) {
+                viewModelScope.launch {
+                    groupStorage.appendWorldBookEntry(group.id, entry)
+                    val updated = groupStorage.loadGroups().firstOrNull { it.id == group.id }
+                    if (updated != null) _uiState.update { it.copy(group = updated) }
+                    val narratorMsg = GroupChatMessage(
+                        content = "* [World Book] Added: $entry *",
+                        isUser = false,
+                        isSystem = true,
+                        senderName = "Narrator"
+                    )
+                    val msgs = _uiState.value.messages + narratorMsg
+                    _uiState.update { it.copy(messages = msgs) }
+                    groupStorage.appendMessage(group.id, chatFileName, narratorMsg)
+                }
+            }
+            return
+        }
+
+        // /sysauto [hint] — generate a narrator scene description, optionally guided
+        if (text.startsWith("/sysauto")) {
+            val hint = text.removePrefix("/sysauto").trim()
+            _uiState.update { it.copy(inputText = "") }
+            viewModelScope.launch { generateNarratorMessage(group, hint.ifBlank { null }) }
+            return
+        }
+
+        // /scanlore [N] — scan last N messages and extract lore entries
+        if (text.startsWith("/scanlore")) {
+            val countArg = text.removePrefix("/scanlore").trim().toIntOrNull() ?: 30
+            _uiState.update { it.copy(inputText = "", showScanloreDialog = true, scanloreLoading = true, scanloreEntries = emptyList(), scanloreError = null) }
+            viewModelScope.launch { runScanlore(group, countArg) }
+            return
+        }
+
         viewModelScope.launch {
             val userMsg = GroupChatMessage(content = text, isUser = true)
             val messages = _uiState.value.messages + userMsg
@@ -324,12 +370,15 @@ class GroupChatViewModel @Inject constructor(
             )
         }
 
+        val oaiPreset = if (config.usesChatCompletions) localRepository.getCurrentOaiPreset() else null
         val history = _uiState.value.messages
         val prompt = buildGroupPrompt(character, personaName, group, history)
         val stopSequences = buildStopSequences(character.name, personaName, group)
+        val oaiMessages = if (config.usesChatCompletions)
+            buildGroupOaiMessages(character, fileName, personaName, group, history) else null
 
         generationJob = viewModelScope.launch {
-            llmRepository.generate(prompt, config, preset, stopSequences).collect { event ->
+            llmRepository.generate(prompt, config, preset, stopSequences, oaiMessages, oaiPreset).collect { event ->
                 when (event) {
                     is StreamEvent.Token -> {
                         _uiState.update { it.copy(streamingContent = event.accumulated) }
@@ -383,13 +432,16 @@ class GroupChatViewModel @Inject constructor(
         append("$personaName is the human user — NEVER write their dialogue, thoughts, feelings, or reactions. ")
         append("Stop writing the moment ${character.name}'s turn ends. ###\n\n")
         append("[character(\"${character.name}\")\n")
-        if (character.description.isNotBlank()) append("description: ${character.description.take(600)}\n")
-        if (character.personality.isNotBlank()) append("personality: ${character.personality.take(300)}\n")
-        if (character.scenario.isNotBlank()) append("scenario: ${character.scenario.take(300)}\n")
+        if (character.description.isNotBlank()) append("description: ${character.description.take(3000)}\n")
+        if (character.personality.isNotBlank()) append("personality: ${character.personality.take(1200)}\n")
+        if (character.scenario.isNotBlank()) append("scenario: ${character.scenario.take(800)}\n")
         append("]\n\n")
 
         if (group.systemPrompt.isNotBlank()) {
             append("[scenario]\n${group.systemPrompt}\n\n")
+        }
+        if (group.worldBook.isNotBlank()) {
+            append("[Shared World Book]\n${group.worldBook}\n\n")
         }
 
         val others = group.enabledMembers.filter { it != character.avatar }
@@ -465,7 +517,7 @@ class GroupChatViewModel @Inject constructor(
         }
     }
 
-    private suspend fun generateNarratorMessage(group: Group) {
+    private suspend fun generateNarratorMessage(group: Group, hint: String? = null) {
         val chatFileName = _uiState.value.currentChatFileName ?: return
         val config = when (val r = localRepository.getApiConfiguration()) {
             is Result.Success -> r.data
@@ -484,10 +536,13 @@ class GroupChatViewModel @Inject constructor(
         }
 
         val personaName = settingsDataStore.getUserPersonaName().ifBlank { "User" }
-        val prompt = buildNarratorPrompt(group.name, personaName, chars)
+        val oaiPreset = if (config.usesChatCompletions) localRepository.getCurrentOaiPreset() else null
+        val prompt = buildNarratorPrompt(group.name, personaName, chars, hint)
+        val oaiMessages = if (config.usesChatCompletions)
+            buildNarratorOaiMessages(group.name, personaName, chars, hint) else null
 
         generationJob = viewModelScope.launch {
-            llmRepository.generate(prompt, config, preset).collect { event ->
+            llmRepository.generate(prompt, config, preset, emptyList(), oaiMessages, oaiPreset).collect { event ->
                 when (event) {
                     is StreamEvent.Token -> {
                         _uiState.update { it.copy(streamingContent = event.accumulated) }
@@ -533,9 +588,10 @@ class GroupChatViewModel @Inject constructor(
     private fun buildNarratorPrompt(
         groupName: String,
         personaName: String,
-        characters: List<Character>
+        characters: List<Character>,
+        hint: String? = null
     ): String = buildString {
-        append("You are a neutral narrator introducing a scene.\n\n")
+        append("You are a neutral narrator describing a scene.\n\n")
         append("Characters present:\n")
         for (char in characters) {
             append("- ${char.name}")
@@ -544,10 +600,15 @@ class GroupChatViewModel @Inject constructor(
             append("\n")
         }
         append("\n")
-        append("Write a vivid scene-setting narration (3-5 sentences) that:\n")
-        append("- Describes a specific, random location\n")
-        append("- Describes each character's demeanor and what they are doing\n")
-        append("- Naturally establishes $personaName's presence in the scene in whatever way fits the narrative — they might already be there, just arrived, or about to be noticed\n")
+        if (hint != null) {
+            append("Scene direction from the writer: $hint\n\n")
+            append("Write a vivid narration (3-5 sentences) based on the above direction. ")
+        } else {
+            append("Write a vivid scene-setting narration (3-5 sentences) that:\n")
+            append("- Describes a specific, random location\n")
+            append("- Describes each character's demeanor and what they are doing\n")
+            append("- Naturally establishes $personaName's presence in the scene\n")
+        }
         append("Do NOT describe $personaName's appearance or personality. Write in third person. Be immersive and creative.\n\n")
         append("Narration:")
     }
@@ -576,11 +637,14 @@ class GroupChatViewModel @Inject constructor(
             )
         }
 
+        val oaiPreset = if (config.usesChatCompletions) localRepository.getCurrentOaiPreset() else null
         val prompt = buildFirstMessagePrompt(character, group.name, group.chatStyle, group.systemPrompt, personaName, others, _uiState.value.messages)
         val stopSequences = buildStopSequences(character.name, personaName, group)
+        val oaiMessages = if (config.usesChatCompletions)
+            buildFirstMessageOaiMessages(character, fileName, group.name, group.chatStyle, group.systemPrompt, personaName, others, _uiState.value.messages) else null
 
         generationJob = viewModelScope.launch {
-            llmRepository.generate(prompt, config, preset, stopSequences).collect { event ->
+            llmRepository.generate(prompt, config, preset, stopSequences, oaiMessages, oaiPreset).collect { event ->
                 when (event) {
                     is StreamEvent.Token -> {
                         _uiState.update { it.copy(streamingContent = event.accumulated) }
@@ -634,9 +698,9 @@ class GroupChatViewModel @Inject constructor(
         priorMessages: List<GroupChatMessage>
     ): String = buildString {
         append("[character(\"${character.name}\")\n")
-        if (character.description.isNotBlank()) append("description: ${character.description.take(600)}\n")
-        if (character.personality.isNotBlank()) append("personality: ${character.personality.take(300)}\n")
-        if (character.scenario.isNotBlank()) append("scenario: ${character.scenario.take(300)}\n")
+        if (character.description.isNotBlank()) append("description: ${character.description.take(3000)}\n")
+        if (character.personality.isNotBlank()) append("personality: ${character.personality.take(1200)}\n")
+        if (character.scenario.isNotBlank()) append("scenario: ${character.scenario.take(800)}\n")
         append("]\n\n")
 
         if (groupSystemPrompt.isNotBlank()) {
@@ -751,6 +815,270 @@ class GroupChatViewModel @Inject constructor(
         val updated = group.copy(systemPrompt = _uiState.value.promptEditorText.trim())
         _uiState.update { it.copy(group = updated, showPromptEditor = false) }
         viewModelScope.launch { groupStorage.saveGroup(updated) }
+    }
+
+    fun showWorldBookEditor() {
+        val wb = _uiState.value.group?.worldBook ?: ""
+        _uiState.update { it.copy(showWorldBookEditor = true, worldBookEditorText = wb) }
+    }
+
+    fun dismissWorldBookEditor() {
+        _uiState.update { it.copy(showWorldBookEditor = false) }
+    }
+
+    fun updateWorldBookEditorText(text: String) {
+        _uiState.update { it.copy(worldBookEditorText = text) }
+    }
+
+    fun saveWorldBook() {
+        val group = _uiState.value.group ?: return
+        val updated = group.copy(worldBook = _uiState.value.worldBookEditorText.trim())
+        _uiState.update { it.copy(group = updated, showWorldBookEditor = false) }
+        viewModelScope.launch { groupStorage.saveWorldBook(group.id, updated.worldBook) }
+    }
+
+    fun dismissScanlore() {
+        _uiState.update { it.copy(showScanloreDialog = false, scanloreEntries = emptyList(), scanloreError = null, scanloreLoading = false) }
+    }
+
+    fun confirmScanlore(entries: List<String>) {
+        val group = _uiState.value.group ?: return
+        val chatFileName = _uiState.value.currentChatFileName ?: return
+        viewModelScope.launch {
+            entries.forEach { groupStorage.appendWorldBookEntry(group.id, it) }
+            val updated = groupStorage.loadGroups().firstOrNull { it.id == group.id }
+            if (updated != null) _uiState.update { it.copy(group = updated) }
+            _uiState.update { it.copy(showScanloreDialog = false, scanloreEntries = emptyList()) }
+            val summary = if (entries.size == 1) entries[0] else "${entries.size} entries"
+            val narratorMsg = GroupChatMessage(
+                content = "* [World Book] Added: $summary *",
+                isUser = false, isSystem = true, senderName = "Narrator"
+            )
+            val msgs = _uiState.value.messages + narratorMsg
+            _uiState.update { it.copy(messages = msgs) }
+            groupStorage.appendMessage(group.id, chatFileName, narratorMsg)
+        }
+    }
+
+    private suspend fun runScanlore(group: Group, messageCount: Int) {
+        val characters = group.enabledMembers.mapNotNull { loadedCharacters[it] }
+        val loreHints = characters
+            .filter { it.loreHints.isNotBlank() }
+            .joinToString("\n\n") { "${it.name}:\n${it.loreHints}" }
+
+        if (loreHints.isBlank()) {
+            _uiState.update { it.copy(scanloreLoading = false, scanloreError = "No lore tracking hints set on any character in this group. Edit a character and fill in the Lore Tracking field.") }
+            return
+        }
+
+        val messages = _uiState.value.messages.takeLast(messageCount)
+        val personaName = settingsDataStore.getUserPersonaName().ifBlank { "User" }
+        val transcript = messages.joinToString("\n") { msg ->
+            val role = when {
+                msg.isUser -> personaName
+                msg.senderName != null -> msg.senderName
+                else -> "Character"
+            }
+            "$role: ${msg.content.take(500)}"
+        }
+
+        val extractionPrompt = """You are a lore extraction assistant. Read the following conversation excerpt and extract notable events worth recording in a shared world log.
+
+TRACKING CRITERIA:
+$loreHints
+
+CONVERSATION:
+$transcript
+
+OUTPUT FORMAT:
+Return ONLY a numbered list of concise lore entries, one per line, in past tense.
+Only include events that actually occurred in this conversation.
+If nothing notable happened, return exactly: Nothing notable to record.
+No preamble, no explanation. Just the numbered list."""
+
+        try {
+            val config = when (val r = localRepository.getApiConfiguration()) {
+                is Result.Success -> r.data
+                is Result.Error -> { _uiState.update { it.copy(scanloreLoading = false, scanloreError = "No API configured.") }; return }
+            }
+            var fullResponse = ""
+            val oaiMessages = if (config.usesChatCompletions)
+                listOf(PromptMessage("user", extractionPrompt)) else null
+            llmRepository.generate(extractionPrompt, config, null, emptyList(), oaiMessages, null).collect { event ->
+                when (event) {
+                    is StreamEvent.Token -> fullResponse = event.accumulated
+                    is StreamEvent.Complete -> fullResponse = event.fullText
+                    else -> {}
+                }
+            }
+            val entries = parseScanloreResponse(fullResponse)
+            if (entries.isEmpty()) {
+                _uiState.update { it.copy(scanloreLoading = false, scanloreEntries = emptyList(), scanloreError = "Nothing notable found in the last $messageCount messages.") }
+            } else {
+                _uiState.update { it.copy(scanloreLoading = false, scanloreEntries = entries, scanloreError = null) }
+            }
+        } catch (e: Exception) {
+            _uiState.update { it.copy(scanloreLoading = false, scanloreError = "Scan failed: ${e.message}") }
+        }
+    }
+
+    private fun parseScanloreResponse(raw: String): List<String> {
+        if (raw.contains("nothing notable", ignoreCase = true)) return emptyList()
+        return raw.lines()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .map { line ->
+                line.replace(Regex("^[\\d]+\\.\\s*"), "")
+                    .replace(Regex("^[-*•]\\s*"), "")
+                    .trim()
+            }
+            .filter { it.isNotBlank() }
+    }
+
+    // ── OAI message builders (chat completions mode) ───────────────────────────
+
+    private fun buildGroupOaiMessages(
+        character: Character,
+        fileName: String,
+        personaName: String,
+        group: Group,
+        history: List<GroupChatMessage>
+    ): List<PromptMessage> {
+        val otherNames = group.enabledMembers.mapNotNull { loadedCharacters[it] }
+            .filter { it.name != character.name }.map { it.name }.joinToString("/").ifBlank { "other characters" }
+
+        val systemContent = buildString {
+            append("You are ${character.name}. You ONLY write ${character.name}'s words and actions. ")
+            append("$personaName is the human user — NEVER write their dialogue, thoughts, feelings, or reactions. ")
+            append("Stop writing the moment ${character.name}'s turn ends.\n\n")
+
+            append("[Character: ${character.name}]\n")
+            if (character.description.isNotBlank()) append("description: ${character.description.take(3000)}\n")
+            if (character.personality.isNotBlank()) append("personality: ${character.personality.take(1200)}\n")
+            if (character.scenario.isNotBlank()) append("scenario: ${character.scenario.take(800)}\n")
+            append("\n")
+
+            if (group.systemPrompt.isNotBlank()) append("[Group Scenario]\n${group.systemPrompt}\n\n")
+            if (group.worldBook.isNotBlank()) append("[Shared World Book]\n${group.worldBook}\n\n")
+
+            val others = group.enabledMembers.filter { it != fileName }.mapNotNull { loadedCharacters[it] }
+            if (others.isNotEmpty()) {
+                append("[Other characters present]\n")
+                for (other in others) {
+                    val snippet = other.personality.take(120).ifBlank { other.description.take(120) }
+                    append("${other.name}${if (snippet.isNotBlank()) ": $snippet" else ""}\n")
+                }
+                append("\n")
+            }
+
+            if (group.chatStyle == ChatStyle.RP) {
+                append("Write in FIRST PERSON using *asterisks* for actions and \"double quotes\" for spoken words. ")
+                append("Do NOT refer to yourself in third person. Do NOT control what $otherNames does. Keep it to 1-3 short paragraphs.\n")
+            } else {
+                append("Write spoken dialogue in \"double quotes\". No action descriptions. Keep it concise.\n")
+            }
+            append("Be responsive to $personaName — follow their lead. ")
+            append("Write ONLY ${character.name}'s response. Do NOT prefix with your name. Do NOT write for $personaName or any other character.")
+        }
+
+        val userContent = buildString {
+            val narratorMsg = history.firstOrNull { it.isSystem && it.senderName == "Narrator" }
+            if (narratorMsg != null) append("[Scene: ${narratorMsg.content}]\n\n")
+
+            val recent = history.filter { !it.isSystem }.let { msgs ->
+                if (msgs.size > 24) msgs.takeLast(24) else msgs
+            }
+            for (msg in recent) {
+                val role = when {
+                    msg.isUser -> personaName
+                    msg.senderName != null -> msg.senderName
+                    else -> "Unknown"
+                }
+                append("$role: ${msg.content}\n")
+            }
+            append("\nRespond now as ${character.name}.")
+        }
+
+        return listOf(PromptMessage("system", systemContent), PromptMessage("user", userContent))
+    }
+
+    private fun buildNarratorOaiMessages(
+        groupName: String,
+        personaName: String,
+        characters: List<Character>,
+        hint: String? = null
+    ): List<PromptMessage> {
+        val content = buildString {
+            append("You are a neutral narrator describing a scene.\n\nCharacters present:\n")
+            for (char in characters) {
+                val snippet = char.personality.take(200).ifBlank { char.description.take(200) }
+                append("- ${char.name}${if (snippet.isNotBlank()) ": $snippet" else ""}\n")
+            }
+            if (hint != null) {
+                append("\nScene direction from the writer: $hint\n\nWrite a vivid narration (3-5 sentences) based on the above direction. ")
+            } else {
+                append("\nWrite a vivid scene-setting narration (3-5 sentences) that:\n")
+                append("- Describes a specific, random location\n")
+                append("- Describes each character's demeanor and what they are doing\n")
+                append("- Naturally establishes $personaName's presence in the scene\n")
+            }
+            append("Do NOT describe $personaName's appearance or personality. Write in third person. Be immersive and creative.")
+        }
+        return listOf(PromptMessage("user", content))
+    }
+
+    private fun buildFirstMessageOaiMessages(
+        character: Character,
+        fileName: String,
+        groupName: String,
+        chatStyle: Int,
+        groupSystemPrompt: String,
+        personaName: String,
+        others: List<Character>,
+        priorMessages: List<GroupChatMessage>
+    ): List<PromptMessage> {
+        val systemContent = buildString {
+            append("You are ${character.name}. Write ONLY ${character.name}'s opening response. Do NOT prefix with your name. Do NOT write for anyone else.\n\n")
+            append("[Character: ${character.name}]\n")
+            if (character.description.isNotBlank()) append("description: ${character.description.take(3000)}\n")
+            if (character.personality.isNotBlank()) append("personality: ${character.personality.take(1200)}\n")
+            if (character.scenario.isNotBlank()) append("scenario: ${character.scenario.take(800)}\n")
+            append("\n")
+            if (groupSystemPrompt.isNotBlank()) append("[Group Scenario]\n$groupSystemPrompt\n\n")
+            if (others.isNotEmpty()) {
+                append("[Other characters present]\n")
+                for (other in others) {
+                    val snippet = other.personality.take(100).ifBlank { other.description.take(100) }
+                    append("${other.name}${if (snippet.isNotBlank()) ": $snippet" else ""}\n")
+                }
+                append("\n")
+            }
+            if (chatStyle == ChatStyle.RP) {
+                append("Write in FIRST PERSON using *asterisks* for actions and \"double quotes\" for spoken words. Keep it to 1-3 short paragraphs.")
+            } else {
+                append("Write spoken dialogue in \"double quotes\". Keep it concise.")
+            }
+        }
+
+        val userContent = buildString {
+            val narratorMsg = priorMessages.firstOrNull { it.isSystem && it.senderName == "Narrator" }
+            if (narratorMsg != null) append("[Scene: ${narratorMsg.content}]\n\n")
+
+            val nonNarrator = priorMessages.filter { !it.isSystem }
+            if (nonNarrator.isEmpty()) {
+                append("You MUST speak directly to $personaName — address them, react to their presence. Be creative and concise.\n")
+            } else {
+                append("The scene is underway. Join naturally, in character.\n\n")
+                val recent = if (nonNarrator.size > 10) nonNarrator.takeLast(10) else nonNarrator
+                for (msg in recent) {
+                    val role = msg.senderName ?: "Unknown"
+                    append("$role: ${msg.content}\n")
+                }
+            }
+            append("\nRespond now as ${character.name}. Speak directly to $personaName.")
+        }
+
+        return listOf(PromptMessage("system", systemContent), PromptMessage("user", userContent))
     }
 
     fun setChatStyle(style: Int) {

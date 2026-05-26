@@ -393,8 +393,22 @@ fun StreamingChatBubble(
     }
 }
 
-// Matches <img src=(name)>, < img src=(name)>, and bare img src=(name) (model often omits brackets)
-private val SPRITE_REGEX = Regex("""<\s*img\s+src=\(([^)]+)\)\s*>|\bimg\s+src=\(([^)]+)\)""")
+// Matches sprite/expression commands in all formats:
+//   Group 1: <img cmd="name">       double quotes
+//   Group 2: <img cmd=''name''>     double single quotes
+//   Group 3: <img cmd=<<name>>>     angle brackets
+//   Group 4: <img cmd=(name)>       parentheses
+//   Group 5: <img src=(name)>       SillyTavern classic
+//   Group 6: bare img src=(name)    model often omits brackets
+private val SPRITE_REGEX = Regex(
+    """<\s*img\s+cmd="([^"]+)"[^>]*>""" +
+    """|<\s*img\s+cmd=''([^']+)''[^>]*>""" +
+    """|<\s*img\s+cmd=<<([^>]+)>>[^>]*>""" +
+    """|<\s*img\s+cmd=\(([^)]+)\)[^>]*>""" +
+    """|<\s*img\s+src=\(([^)]+)\)\s*>""" +
+    """|\bimg\s+src=\(([^)]+)\)""",
+    RegexOption.IGNORE_CASE
+)
 
 // Matches markdown images: ![alt text](url)
 private val MD_IMAGE_REGEX = Regex("""!\[([^\]]*)\]\(([^)]+)\)""")
@@ -419,7 +433,8 @@ private fun splitIntoChunks(text: String): List<MessageChunk> {
     data class RawMatch(val start: Int, val end: Int, val chunk: MessageChunk)
     val matches = mutableListOf<RawMatch>()
     for (m in SPRITE_REGEX.findAll(text)) {
-        val name = (m.groupValues[1].ifEmpty { m.groupValues[2] }).trim()
+        val name = (m.groupValues[1].ifEmpty { m.groupValues[2] }.ifEmpty { m.groupValues[3] }
+            .ifEmpty { m.groupValues[4] }.ifEmpty { m.groupValues[5] }.ifEmpty { m.groupValues[6] }).trim()
         if (name.isNotEmpty()) {
             // If the "sprite name" is actually a URL, treat it as a remote image
             val chunk = if (name.startsWith("http://") || name.startsWith("https://"))

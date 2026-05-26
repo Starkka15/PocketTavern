@@ -24,5 +24,6 @@ data class CharacterEntity(
     val isFavorite: Boolean = false,
     val lastChatDate: Long = 0,
     val useAvatarForImageGen: Boolean = true,
-    val notes: String = ""
+    val notes: String = "",
+    val loreHints: String = ""
 )

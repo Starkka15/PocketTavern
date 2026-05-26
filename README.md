@@ -84,11 +84,23 @@ PocketTavern's chat screen is built around a natural, responsive conversation fl
 
 Type these directly in the chat input field:
 
+#### Solo Chat
+
 | Command | What it does |
 |---------|-------------|
 | `/sys <text>` | Insert a narrator message into the chat without sending anything to the AI. Rendered as full-width centered italic text. |
 | `/ooc <text>` | Send an out-of-character note to the AI without showing a user bubble. Useful for giving instructions mid-scene ("stop using the word 'suddenly'") or asking meta questions without breaking immersion. |
 | `/persona <name>` | Temporarily change your persona name for the current session. Inserts a narrator note confirming the change. Resets to your configured persona the next time you open the chat. |
+| `/addlore <text>` | Append a timestamped entry to the shared World Book of the group this character belongs to. Only works if the character is a member of at least one group. |
+| `/scanlore [N]` | Ask the AI to scan the last N messages (default: 30) and extract notable events worth recording as lore. Results appear in a review dialog — check, edit, or uncheck entries before adding them to the World Book. Requires the character to have a **Lore Tracking** field set and to belong to a group. |
+
+#### Group Chat
+
+| Command | What it does |
+|---------|-------------|
+| `/addlore <text>` | Append a timestamped entry to this group's shared World Book. |
+| `/scanlore [N]` | Scan the last N messages (default: 30) and extract lore events across all characters. Results appear in a review dialog before being added to the World Book. Lore hints are gathered from every member that has them set. |
+| `/sysauto [hint]` | Generate a narrator scene description mid-conversation. Without a hint, the AI invents something based on the characters and group name. With a hint (e.g. `/sysauto the chase ends at the docks`), the AI writes that scene. |
 
 ### Group Chat
 
@@ -99,6 +111,7 @@ Chat with multiple AI characters simultaneously:
 - Generation modes: Swap (characters take turns) or Append (characters build on each other)
 - Enable/disable individual members per conversation
 - Each character maintains its own persona, description, and world info
+- **Shared World Book** *(beta)* — a persistent lore log attached to the group. Injected into every generation — both group chat turns and solo chats with any member. Grow it with `/addlore` and `/scanlore`, or edit it directly from the group overflow menu → **World Book**.
 
 </details>
 
@@ -207,7 +220,9 @@ Characters are stored as PNG files with embedded metadata (V2 spec) — the same
   - **Personality** — Description, Personality, Scenario
   - **Messages** — First Message, Alternate Greetings (unlimited), Example Dialogue
   - **Advanced** — Character-specific System Prompt (supports `{{original}}`), Post-History Instructions, embedded Character Lorebook
-  - **Meta** — Creator name, Tags, Creator Notes
+  - **Meta** — Creator name, Tags, Creator Notes, **Lore Tracking** *(PocketTavern-only)*
+
+> **Lore Tracking** is a PocketTavern-exclusive field (stored in the card's `extensions` map, invisible to SillyTavern and other tools). Write what `/scanlore` should watch for — weight changes, relationship milestones, named events, anything the AI should log automatically. Each character's hints are passed to the LLM as extraction criteria when you run `/scanlore`.
 - Edit any character's details at any time
 - Favorite characters (pinned to top of list)
 - Per-character background images

@@ -165,7 +165,16 @@ fun ChatScreen(
                                 size = 36.dp
                             )
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text(char.name)
+                            Column {
+                                Text(char.name, style = MaterialTheme.typography.titleMedium)
+                                uiState.linkedGroupName?.let { groupName ->
+                                    Text(
+                                        text = "Group: $groupName",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
                         } ?: Text("Loading...")
                     }
                 },
@@ -642,6 +651,16 @@ fun ChatScreen(
             greetings = uiState.availableGreetings,
             onSelectGreeting = { viewModel.selectGreeting(it) },
             onDismiss = { viewModel.dismissGreetingPicker() }
+        )
+    }
+
+    if (uiState.showScanloreDialog) {
+        com.pockettavern.app.ui.components.ScanloreConfirmDialog(
+            entries = uiState.scanloreEntries,
+            isLoading = uiState.scanloreLoading,
+            error = uiState.scanloreError,
+            onConfirm = { viewModel.confirmScanlore(it) },
+            onDismiss = { viewModel.dismissScanlore() }
         )
     }
 

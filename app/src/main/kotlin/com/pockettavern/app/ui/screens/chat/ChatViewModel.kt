@@ -21,8 +21,10 @@ import com.pockettavern.app.extensions.JsExtensionHost
 import com.pockettavern.app.domain.model.ApiConfiguration
 import com.pockettavern.app.domain.model.Chat
 import com.pockettavern.app.domain.model.Character
+import com.pockettavern.app.domain.model.ChatContext
 import com.pockettavern.app.domain.model.ChatInfo
 import com.pockettavern.app.domain.model.ChatMessage
+import com.pockettavern.app.domain.model.UserPersona
 import com.pockettavern.app.domain.model.ChatMessageMetadata
 import com.pockettavern.app.domain.model.MessageHeaderEntry
 import com.pockettavern.app.domain.model.ForgeGenerationParams
@@ -30,6 +32,7 @@ import com.pockettavern.app.domain.model.GenerationState
 import com.pockettavern.app.domain.model.QuickReplyButton
 import com.pockettavern.app.domain.model.Result
 import com.pockettavern.app.domain.model.StreamEvent
+import com.pockettavern.app.data.local.GroupStorage
 import com.pockettavern.app.data.local.SettingsDataStore
 import com.pockettavern.app.domain.prompt.PromptBuilder
 import com.pockettavern.app.domain.usecase.SummarizeHistoryUseCase
@@ -112,6 +115,14 @@ data class ChatUiState(
     val currentSearchResultIndex: Int = 0,
     // Context window usage (estimated tokens)
     val contextUsedTokens: Int = 0,
+    // Shared world book (from linked group)
+    val linkedGroupName: String? = null,
+    val hasWorldBook: Boolean = false,
+    // Scanlore dialog
+    val showScanloreDialog: Boolean = false,
+    val scanloreEntries: List<String> = emptyList(),
+    val scanloreLoading: Boolean = false,
+    val scanloreError: String? = null,
 )
 
 data class GalleryImage(
@@ -137,7 +148,8 @@ class ChatViewModel @Inject constructor(
     private val settingsDataStore: SettingsDataStore,
     private val characterDao: com.pockettavern.app.data.local.db.dao.CharacterDao,
     private val spriteStorage: com.pockettavern.app.data.local.SpriteStorage,
-    private val summarizeHistoryUseCase: SummarizeHistoryUseCase
+    private val summarizeHistoryUseCase: SummarizeHistoryUseCase,
+    private val groupStorage: GroupStorage
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -289,8 +301,12 @@ class ChatViewModel @Inject constructor(
 
     // Last known API config — updated when generation starts, used for abort
     @Volatile private var _currentConfig: ApiConfiguration = ApiConfiguration.DEFAULT
-    // Last known persona name — updated when generation starts, used for multi-turn trimming
+    // Last known persona name/description — updated when generation starts
     @Volatile private var _currentUserName: String = "User"
+    @Volatile private var _currentPersonaDescription: String = ""
+    // Shared world book from linked group (empty if character not in any group)
+    @Volatile private var _currentGroupId: String? = null
+    @Volatile private var _currentWorldBook: String = ""
 
     /**
      * Rebuild the context JSON that JS extensions see via PT.getContext().
@@ -370,6 +386,15 @@ class ChatViewModel @Inject constructor(
                     }
                     // Update per-character extension filter
                     extensionManager.updateCharacterFilter(avatarUrl)
+                    // Load linked group world book
+                    val charFileName = character.avatar ?: "$avatarUrl"
+                    val linkedGroup = groupStorage.getGroupsForCharacter(charFileName).firstOrNull()
+                    _currentGroupId = linkedGroup?.id
+                    _currentWorldBook = linkedGroup?.worldBook ?: ""
+                    _uiState.update { it.copy(
+                        linkedGroupName = linkedGroup?.name,
+                        hasWorldBook = linkedGroup?.worldBook?.isNotBlank() == true
+                    )}
                     loadChats(character, avatarUrl)
                 }
                 is Result.Error -> {
@@ -572,6 +597,99 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch { saveCurrentChat() }
     }
 
+    fun dismissScanlore() {
+        _uiState.update { it.copy(showScanloreDialog = false, scanloreEntries = emptyList(), scanloreError = null, scanloreLoading = false) }
+    }
+
+    fun confirmScanlore(entries: List<String>) {
+        val groupId = _currentGroupId ?: return
+        viewModelScope.launch {
+            entries.forEach { groupStorage.appendWorldBookEntry(groupId, it) }
+            val updatedGroup = groupStorage.getGroupsForCharacter(
+                _uiState.value.character?.avatar ?: ""
+            ).firstOrNull { it.id == groupId }
+            _currentWorldBook = updatedGroup?.worldBook ?: _currentWorldBook
+            _uiState.update { it.copy(showScanloreDialog = false, scanloreEntries = emptyList(), hasWorldBook = _currentWorldBook.isNotBlank()) }
+            val summary = if (entries.size == 1) entries[0] else "${entries.size} entries"
+            insertNarratorMessage("* [World Book] Added: $summary *")
+        }
+    }
+
+    private suspend fun runScanlore(messageCount: Int) {
+        val character = _uiState.value.character
+        val groupId = _currentGroupId
+        if (groupId == null) {
+            _uiState.update { it.copy(scanloreLoading = false, scanloreError = "No group linked — /scanlore requires a group world book.") }
+            return
+        }
+        val loreHints = character?.loreHints ?: ""
+        if (loreHints.isBlank()) {
+            _uiState.update { it.copy(scanloreLoading = false, scanloreError = "No lore tracking hints set on this character. Edit the character and fill in the Lore Tracking field.") }
+            return
+        }
+
+        val messages = _uiState.value.messages.takeLast(messageCount)
+        val transcript = messages.joinToString("\n") { msg ->
+            val role = when {
+                msg.isNarrator -> "Narrator"
+                msg.isUser -> _currentUserName
+                else -> character?.name ?: "Character"
+            }
+            "$role: ${msg.content.take(500)}"
+        }
+
+        val extractionPrompt = """You are a lore extraction assistant. Read the following conversation excerpt and extract notable events worth recording in a shared world log.
+
+TRACKING CRITERIA:
+$loreHints
+
+CONVERSATION:
+$transcript
+
+OUTPUT FORMAT:
+Return ONLY a numbered list of concise lore entries, one per line, in past tense.
+Only include events that actually occurred in this conversation.
+If nothing notable happened, return exactly: Nothing notable to record.
+No preamble, no explanation. Just the numbered list."""
+
+        try {
+            val config = _currentConfig
+            var fullResponse = ""
+            val oaiMessages = if (config.usesChatCompletions)
+                listOf(com.pockettavern.app.domain.model.PromptMessage("user", extractionPrompt))
+            else null
+            llmRepository.generate(extractionPrompt, config, null, emptyList(), oaiMessages, null).collect { event ->
+                when (event) {
+                    is com.pockettavern.app.domain.model.StreamEvent.Token -> fullResponse = event.accumulated
+                    is com.pockettavern.app.domain.model.StreamEvent.Complete -> fullResponse = event.fullText
+                    else -> {}
+                }
+            }
+            val entries = parseScanloreResponse(fullResponse)
+            if (entries.isEmpty()) {
+                _uiState.update { it.copy(scanloreLoading = false, scanloreEntries = emptyList(), scanloreError = "Nothing notable found in the last $messageCount messages.") }
+            } else {
+                _uiState.update { it.copy(scanloreLoading = false, scanloreEntries = entries, scanloreError = null) }
+            }
+        } catch (e: Exception) {
+            _uiState.update { it.copy(scanloreLoading = false, scanloreError = "Scan failed: ${e.message}") }
+        }
+    }
+
+    private fun parseScanloreResponse(raw: String): List<String> {
+        if (raw.contains("nothing notable", ignoreCase = true)) return emptyList()
+        return raw.lines()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .map { line ->
+                // Strip leading "1. " "- " "* " etc.
+                line.replace(Regex("^[\\d]+\\.\\s*"), "")
+                    .replace(Regex("^[-*•]\\s*"), "")
+                    .trim()
+            }
+            .filter { it.isNotBlank() }
+    }
+
     private fun sendMessageText(rawText: String) {
         val character = _uiState.value.character ?: return
 
@@ -593,6 +711,37 @@ class ChatViewModel @Inject constructor(
             return
         }
 
+        // /addlore <text> — append entry to linked group's shared world book
+        if (rawText.startsWith("/addlore ")) {
+            val entry = rawText.removePrefix("/addlore ").trim()
+            _uiState.update { it.copy(inputText = "") }
+            if (entry.isNotBlank()) {
+                val groupId = _currentGroupId
+                if (groupId != null) {
+                    viewModelScope.launch {
+                        groupStorage.appendWorldBookEntry(groupId, entry)
+                        val updatedGroup = groupStorage.getGroupsForCharacter(
+                            _uiState.value.character?.avatar ?: ""
+                        ).firstOrNull { it.id == groupId }
+                        _currentWorldBook = updatedGroup?.worldBook ?: _currentWorldBook
+                        _uiState.update { it.copy(hasWorldBook = _currentWorldBook.isNotBlank()) }
+                        insertNarratorMessage("* [World Book] Added: $entry *")
+                    }
+                } else {
+                    insertNarratorMessage("* [World Book] No group linked to this character *")
+                }
+            }
+            return
+        }
+
+        // /scanlore [N] — scan last N messages and extract lore entries
+        if (rawText.startsWith("/scanlore")) {
+            val countArg = rawText.removePrefix("/scanlore").trim().toIntOrNull() ?: 30
+            _uiState.update { it.copy(inputText = "", showScanloreDialog = true, scanloreLoading = true, scanloreEntries = emptyList(), scanloreError = null) }
+            viewModelScope.launch { runScanlore(countArg) }
+            return
+        }
+
         // /persona <name> — temporarily override persona name for the session
         if (rawText.startsWith("/persona ")) {
             val personaName = rawText.removePrefix("/persona ").trim()
@@ -606,10 +755,11 @@ class ChatViewModel @Inject constructor(
 
         autoContinueCount = 0
 
-        // Apply input regex rules
-        val message = extensionManager.processInput(rawText)
-            .replace("{{char}}", character.name, ignoreCase = true)
-            .replace("{{user}}", _currentUserName, ignoreCase = true)
+        // Apply input regex rules, then full macro substitution
+        val processed = extensionManager.processInput(rawText)
+        val macroContext = ChatContext(userPersona = UserPersona(name = _currentUserName, description = _currentPersonaDescription))
+        val macroBuilder = PromptBuilder(character, macroContext, _currentUserName)
+        val message = macroBuilder.applyUserMacros(processed, _uiState.value.messages)
         val userMessage = ChatMessage(content = message, isUser = true)
         _uiState.update {
             it.copy(
@@ -743,11 +893,12 @@ class ChatViewModel @Inject constructor(
         val oaiPreset = if (config.usesChatCompletions) localRepository.getCurrentOaiPreset() else null
         val userName = chatContext.userPersona.name.ifBlank { "User" }
         _currentUserName = userName
+        _currentPersonaDescription = chatContext.userPersona.description
         val mainPromptItem = oaiPreset?.promptOrder?.find { it.id == "main_prompt" }
         val mainPromptOverride = if (config.usesChatCompletions && mainPromptItem?.enabled == true)
             mainPromptItem.content ?: "" else ""
         val extensionInjections = extensionManager.getPromptInjections()
-        val builder = PromptBuilder(character, chatContext, userName, mainPromptOverride, extensionInjections, _currentMemoryBlock)
+        val builder = PromptBuilder(character, chatContext, userName, mainPromptOverride, extensionInjections, _currentMemoryBlock, _currentWorldBook)
         val prompt = builder.buildPrompt(history, userMessage)
 
         // For chat completion APIs, also build structured messages for proper role formatting.

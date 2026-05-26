@@ -17,6 +17,7 @@ data class Group(
     val generationMode: Int = GenerationMode.SWAP,
     val chatStyle: Int = ChatStyle.DIALOGUE,
     val systemPrompt: String = "",
+    val worldBook: String = "",
     val disabledMembers: List<String> = emptyList(),
     val allowSelfResponses: Boolean = false,
     val chats: List<String> = emptyList()

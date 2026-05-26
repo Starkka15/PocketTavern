@@ -11,6 +11,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.text.SimpleDateFormat
+import java.time.LocalDate
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
@@ -60,6 +61,34 @@ class GroupStorage @Inject constructor(
     suspend fun deleteGroup(groupId: String) = withContext(Dispatchers.IO) {
         saveGroups(loadGroups().filter { it.id != groupId })
         File(groupsDir, groupId).deleteRecursively()
+    }
+
+    /** Find all groups that contain this character fileName as a member. */
+    suspend fun getGroupsForCharacter(characterFileName: String): List<Group> =
+        withContext(Dispatchers.IO) {
+            loadGroups().filter { characterFileName in it.members }
+        }
+
+    /** Append a timestamped lore entry to a group's world book and persist. */
+    suspend fun appendWorldBookEntry(groupId: String, entry: String) = withContext(Dispatchers.IO) {
+        val groups = loadGroups().toMutableList()
+        val idx = groups.indexOfFirst { it.id == groupId }
+        if (idx < 0) return@withContext
+        val date = LocalDate.now().toString()
+        val line = "[$date] $entry"
+        val current = groups[idx].worldBook
+        val updated = if (current.isBlank()) line else "$current\n$line"
+        groups[idx] = groups[idx].copy(worldBook = updated)
+        saveGroups(groups)
+    }
+
+    /** Overwrite the world book entirely (for editor UI). */
+    suspend fun saveWorldBook(groupId: String, content: String) = withContext(Dispatchers.IO) {
+        val groups = loadGroups().toMutableList()
+        val idx = groups.indexOfFirst { it.id == groupId }
+        if (idx < 0) return@withContext
+        groups[idx] = groups[idx].copy(worldBook = content)
+        saveGroups(groups)
     }
 
     // ── Chat list ─────────────────────────────────────────────────────────────

@@ -12,6 +12,8 @@ import com.pockettavern.app.util.PngCharacterCard
 import com.pockettavern.app.util.CharacterCardData
 import com.pockettavern.app.util.CharacterCardV2
 import com.pockettavern.app.util.DebugLogger
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -73,6 +75,10 @@ class CharacterStorage @Inject constructor(
             else -> defaultAvatarPng()
         }
 
+        val extensions = buildMap<String, kotlinx.serialization.json.JsonElement> {
+            if (character.loreHints.isNotBlank())
+                put("pockettavern_lore_hints", JsonPrimitive(character.loreHints))
+        }
         val cardData = CharacterCardV2(
             data = CharacterCardData(
                 name = character.name,
@@ -85,7 +91,8 @@ class CharacterStorage @Inject constructor(
                 systemPrompt = character.systemPrompt,
                 postHistoryInstructions = character.postHistoryInstructions,
                 alternateGreetings = character.alternateGreetings,
-                tags = character.tags
+                tags = character.tags,
+                extensions = extensions
             )
         )
 
@@ -255,6 +262,9 @@ class CharacterStorage @Inject constructor(
         val greetingsJson = if (data?.alternateGreetings.isNullOrEmpty()) "[]" else {
             JSONArray(data!!.alternateGreetings).toString()
         }
+        val loreHints = try {
+            data?.extensions?.get("pockettavern_lore_hints")?.jsonPrimitive?.content ?: ""
+        } catch (_: Exception) { "" }
         return CharacterEntity(
             fileName = fileName,
             avatar = fileName,
@@ -270,7 +280,8 @@ class CharacterStorage @Inject constructor(
             alternateGreetings = greetingsJson,
             tags = data?.tags?.joinToString(",") ?: "",
             hasCharacterBook = data?.characterBook != null,
-            characterBookEntryCount = data?.characterBook?.entries?.size ?: 0
+            characterBookEntryCount = data?.characterBook?.entries?.size ?: 0,
+            loreHints = loreHints
         )
     }
 
@@ -296,7 +307,8 @@ class CharacterStorage @Inject constructor(
             characterBookEntryCount = character.characterBookEntryCount,
             isFavorite = character.isFavorite,
             useAvatarForImageGen = character.useAvatarForImageGen,
-            notes = character.notes
+            notes = character.notes,
+            loreHints = character.loreHints
         )
     }
 
@@ -322,7 +334,8 @@ class CharacterStorage @Inject constructor(
             characterBookEntryCount = entity.characterBookEntryCount,
             isFavorite = entity.isFavorite,
             useAvatarForImageGen = entity.useAvatarForImageGen,
-            notes = entity.notes
+            notes = entity.notes,
+            loreHints = entity.loreHints
         )
     }
 
@@ -347,7 +360,10 @@ class CharacterStorage @Inject constructor(
                 alternateGreetings = data?.alternateGreetings ?: emptyList(),
                 tags = data?.tags ?: emptyList(),
                 hasCharacterBook = data?.characterBook != null,
-                characterBookEntryCount = data?.characterBook?.entries?.size ?: 0
+                characterBookEntryCount = data?.characterBook?.entries?.size ?: 0,
+                loreHints = try {
+                    extensions?.get("pockettavern_lore_hints")?.jsonPrimitive?.content ?: ""
+                } catch (_: Exception) { "" }
             )
         } catch (e: Exception) {
             DebugLogger.logError("CharacterStorage", "Failed to read ${file.name}", e)

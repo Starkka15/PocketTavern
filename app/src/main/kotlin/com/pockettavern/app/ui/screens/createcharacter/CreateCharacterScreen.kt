@@ -575,6 +575,14 @@ private fun MetaTab(uiState: CreateCharacterUiState, viewModel: CreateCharacterV
         minLines = 3,
         maxLines = 6
     )
+    CharacterTextField(
+        value = uiState.loreHints,
+        onValueChange = { viewModel.updateLoreHints(it) },
+        label = "Lore Tracking (PocketTavern)",
+        placeholder = "What /scanlore should watch for — e.g. Track: weight changes after digestion, villain captures (name + outcome), solo missions without partner...",
+        minLines = 3,
+        maxLines = 8
+    )
 }
 
 @Composable

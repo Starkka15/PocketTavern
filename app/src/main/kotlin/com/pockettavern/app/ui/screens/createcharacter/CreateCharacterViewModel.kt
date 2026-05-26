@@ -45,6 +45,7 @@ data class CreateCharacterUiState(
     val systemPrompt: String = "",
     val postHistoryInstructions: String = "",
     val creatorNotes: String = "",
+    val loreHints: String = "",
     val alternateGreetings: List<String> = emptyList(),
     val tags: List<String> = emptyList(),
     val creator: String = "",
@@ -121,6 +122,10 @@ class CreateCharacterViewModel @Inject constructor(
         _uiState.update { it.copy(creatorNotes = value) }
     }
 
+    fun updateLoreHints(value: String) {
+        _uiState.update { it.copy(loreHints = value) }
+    }
+
     fun updateCreator(value: String) {
         _uiState.update { it.copy(creator = value) }
     }
@@ -180,6 +185,7 @@ class CreateCharacterViewModel @Inject constructor(
                             systemPrompt = character.systemPrompt,
                             postHistoryInstructions = character.postHistoryInstructions,
                             creatorNotes = character.creatorNotes,
+                            loreHints = character.loreHints,
                             alternateGreetings = character.alternateGreetings,
                             tags = character.tags,
                             isLoadingCharacter = false
@@ -314,6 +320,7 @@ class CreateCharacterViewModel @Inject constructor(
                         systemPrompt = state.systemPrompt.trim(),
                         postHistoryInstructions = state.postHistoryInstructions.trim(),
                         creatorNotes = state.creatorNotes.trim(),
+                        loreHints = state.loreHints.trim(),
                         alternateGreetings = state.alternateGreetings,
                         tags = state.tags
                     )
@@ -342,6 +349,7 @@ class CreateCharacterViewModel @Inject constructor(
                         systemPrompt = state.systemPrompt.trim(),
                         postHistoryInstructions = state.postHistoryInstructions.trim(),
                         creatorNotes = state.creatorNotes.trim(),
+                        loreHints = state.loreHints.trim(),
                         alternateGreetings = state.alternateGreetings,
                         tags = state.tags
                     )
