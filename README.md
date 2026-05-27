@@ -2,8 +2,8 @@
 
 **⚠️ NOT FOR COMMERCIAL USE — See [LICENSE](LICENSE) for details**
 
-> **PocketTavern is a fully standalone Android app for chatting with AI characters — no server required.**
-> Connect directly to your LLM backend of choice, manage characters and chats locally, and take your AI companions anywhere.
+> **The goal: the best open-source AI chat app on Android.**
+> Simple enough to pick up in minutes. Deep enough for power users who want full control over every token.
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-ff247f?style=for-the-badge&logoColor=white)](https://stt.gg/49Bfn8bA)
 [![Release](https://img.shields.io/github/v/release/Starkka15/PocketTavern?style=for-the-badge&color=7c3aed)](https://github.com/Starkka15/PocketTavern/releases/latest)
@@ -11,15 +11,17 @@
 
 ---
 
-## Why We Went Standalone
+## Why PocketTavern Exists
 
-PocketTavern started as a companion app for SillyTavern — you needed a running SillyTavern server on your home PC, and the app just connected to it.
+Every AI chat app wants a subscription. Monthly fees, token limits, paywalled features, data you don't control. The landscape keeps moving in one direction — and it's not toward the user.
 
-**We wanted more than that.**
+**We decided to do something different.**
 
-Going standalone gave us three things: **one app** instead of a phone client tethered to a desktop server, **full control** over the experience without fighting a web UI that wasn't designed for mobile, and the freedom to **build features** that would be difficult or impossible to bolt onto SillyTavern's frontend.
+PocketTavern is free, open-source, and always will be. It connects directly to whatever LLM backend you choose — your own hardware, a cloud API you already pay for, or a free endpoint. No middleman. No account required. No one reading your chats.
 
-PocketTavern now talks directly to LLM APIs — KoboldCPP, Ollama, OpenAI-compatible endpoints, Anthropic, and more — with no middleman. Characters, chats, and settings all live on your device in a fully SillyTavern-compatible format, so nothing is locked in.
+The design philosophy is simple: **easy to get started, powerful when you need it.** New users can install, connect an API, and be chatting in under two minutes. Power users get full control over prompt templates, sampler parameters, world info injection, per-character overrides, and a JavaScript extension API for building custom behavior into character cards. The depth is there when you want it — and out of the way when you don't.
+
+Characters, chats, and settings all live on your device in fully SillyTavern-compatible formats. Nothing is locked in. If you leave, you take everything with you.
 
 ---
 
@@ -790,7 +792,7 @@ Settings are organized into five groups:
 - **Generation** — Text Generation Parameters, Chat Completion Presets, Formatting
 - **World & Characters** — World Info / Lorebooks, Context Settings (Author's Note, Auto-Continue, Long-Term Memory), Personas
 - **Appearance & Audio** — Themes, Text-to-Speech
-- **Utilities** — Extensions, Import from SillyTavern, Help
+- **Utilities** — Extensions, Import from SillyTavern, Character Storage, Backup & Restore, Help
 
 </details>
 
