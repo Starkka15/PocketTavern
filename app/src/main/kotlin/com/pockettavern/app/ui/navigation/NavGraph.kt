@@ -43,6 +43,7 @@ import com.pockettavern.app.ui.screens.settings.TtsSettingsScreen
 import com.pockettavern.app.ui.screens.backup.BackupScreen
 import com.pockettavern.app.ui.screens.risuRealm.RisuRealmBrowserScreen
 import com.pockettavern.app.ui.screens.botBooru.BotBooruBrowserScreen
+import com.pockettavern.app.ui.screens.settings.StorageBrowserScreen
 import com.pockettavern.app.ui.audio.ThemeAudioManager
 
 @Composable
@@ -158,8 +159,13 @@ fun SillyTavernNavGraph(
                 onNavigateToTheme = { navController.navigate(Route.ThemeSettings) },
                 onNavigateToTtsSettings = { navController.navigate(Route.TtsSettings) },
                 onNavigateToImageGen = { navController.navigate(Route.ImageGenSettings) },
-                onNavigateToBackup = { navController.navigate(Route.Backup) }
+                onNavigateToBackup = { navController.navigate(Route.Backup) },
+                onNavigateToStorageBrowser = { navController.navigate(Route.StorageBrowser) }
             )
+        }
+
+        composable<Route.StorageBrowser> {
+            StorageBrowserScreen(onBack = { navController.popBackStack() })
         }
 
         composable<Route.Backup> {

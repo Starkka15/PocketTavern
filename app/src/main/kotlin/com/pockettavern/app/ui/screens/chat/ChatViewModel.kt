@@ -176,6 +176,9 @@ class ChatViewModel @Inject constructor(
     // TTS auto-play state
     private var ttsAutoPlay = false
 
+    // Track which card file is currently open so we can disable it on back-out
+    private var currentCardFileName: String? = null
+
     init {
         extensionManager.load()
         // Wire JS sendMessage callback so PT.sendMessage() routes through the normal pipeline
@@ -430,20 +433,20 @@ class ChatViewModel @Inject constructor(
                 val bytes = (bytesResult as? Result.Success)?.data ?: return@withContext
                 val card = PngCharacterCard.extractCharacterData(bytes) ?: return@withContext
                 val ptExtJson = card.data.extensions["pockettavern"] ?: run {
+                    cardExtensionSettings.disable(fileName)
                     extensionManager.unloadCardScript()
                     return@withContext
                 }
                 val ptExt = org.json.JSONObject(ptExtJson.toString())
                 val script = ptExt.optString("script", "")
                 if (script.isBlank()) {
+                    cardExtensionSettings.disable(fileName)
                     extensionManager.unloadCardScript()
                     return@withContext
                 }
-                if (!cardExtensionSettings.isEnabled(fileName)) {
-                    extensionManager.unloadCardScript()
-                    com.pockettavern.app.util.DebugLogger.log("[ChatViewModel] Card script disabled for $fileName")
-                    return@withContext
-                }
+                // Card has a script — auto-enable and load
+                cardExtensionSettings.setEnabled(fileName, true)
+                currentCardFileName = fileName
                 val scriptName = ptExt.optString("script_name", character.name)
                 com.pockettavern.app.util.DebugLogger.log("[ChatViewModel] Card script found: '$scriptName' (${script.length} chars)")
                 extensionManager.loadCardScript(script, scriptName, character.name)
@@ -451,6 +454,12 @@ class ChatViewModel @Inject constructor(
                 com.pockettavern.app.util.DebugLogger.log("[ChatViewModel] Card script load error: ${e.message}")
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        currentCardFileName?.let { cardExtensionSettings.disable(it) }
+        currentCardFileName = null
     }
 
     private suspend fun loadChats(character: Character, avatarUrl: String) {

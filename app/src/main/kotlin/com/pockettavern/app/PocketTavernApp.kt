@@ -3,6 +3,7 @@ package com.pockettavern.app
 import android.app.Application
 import coil.ImageLoader
 import coil.ImageLoaderFactory
+import com.pockettavern.app.data.local.CardExtensionSettings
 import com.pockettavern.app.util.DebugLogger
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -13,11 +14,16 @@ class PocketTavernApp : Application(), ImageLoaderFactory {
     @Inject
     lateinit var imageLoader: ImageLoader
 
+    @Inject
+    lateinit var cardExtensionSettings: CardExtensionSettings
+
     override fun onCreate() {
         super.onCreate()
         // Initialize debug logger
         DebugLogger.init(this)
         DebugLogger.log("PocketTavern App started")
+        // Disable all card extensions on startup — they auto-enable when their card is opened
+        cardExtensionSettings.disableAll()
 
         // Set up global uncaught exception handler
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()

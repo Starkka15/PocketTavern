@@ -219,14 +219,37 @@ class CharacterStorage @Inject constructor(
         return defaultAvatarPng()
     }
 
-    /** Delete a character card and remove from Room index. */
+    /** Delete a character card and remove from Room index. Chat cleanup is handled by LocalRepository. */
     suspend fun deleteCharacter(fileName: String) = withContext(Dispatchers.IO) {
-        // Clean up per-chat vars sidecars for this character
-        val charName = fileName.removeSuffix(".png")
-        val charChatsDir = File(context.filesDir, "chats/${sanitizeFileName(charName)}")
-        charChatsDir.walkBottomUp().filter { it.name.endsWith(".vars.json") }.forEach { it.delete() }
         File(charactersDir, fileName).delete()
         characterDao.deleteByFileName(fileName)
+    }
+
+    data class CharacterFileInfo(
+        val fileName: String,
+        val displayName: String,
+        val sizeBytes: Long,
+        val existsOnDisk: Boolean,
+        val inDatabase: Boolean
+    )
+
+    /** List all character entries from DB, cross-referenced with disk. */
+    suspend fun listCharacterFileInfo(): List<CharacterFileInfo> = withContext(Dispatchers.IO) {
+        val dbEntries = characterDao.getAll().associateBy { it.fileName }
+        val diskFiles = (charactersDir.listFiles { f -> f.extension == "png" } ?: emptyArray())
+            .associateBy { it.name }
+        val allKeys = (dbEntries.keys + diskFiles.keys).toSet()
+        allKeys.map { key ->
+            val entity = dbEntries[key]
+            val file = diskFiles[key]
+            CharacterFileInfo(
+                fileName = key,
+                displayName = entity?.name ?: key.removeSuffix(".png"),
+                sizeBytes = file?.length() ?: 0L,
+                existsOnDisk = file != null,
+                inDatabase = entity != null
+            )
+        }.sortedBy { it.displayName.lowercase() }
     }
 
     /** Get the raw PNG bytes for a character (for export/sharing). */

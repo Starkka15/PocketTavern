@@ -1,9 +1,11 @@
 package com.pockettavern.app.ui.screens.groups
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,12 +17,17 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,18 +37,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.pockettavern.app.domain.model.ActivationStrategy
+import com.pockettavern.app.domain.model.Character
 import com.pockettavern.app.domain.model.ChatInfo
 import com.pockettavern.app.domain.model.ChatStyle
 import com.pockettavern.app.domain.model.GroupChatMessage
 import com.pockettavern.app.ui.components.ScanloreConfirmDialog
 import com.pockettavern.app.ui.theme.*
 import com.pockettavern.app.ui.theme.LocalPocketTavernColors
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -64,9 +74,35 @@ fun GroupChatScreen(
     val hasStreamingItem = uiState.isGenerating && uiState.streamingCharacterName.isNotBlank()
     val totalItems = uiState.messages.size + if (hasStreamingItem) 1 else 0
 
-    // While streaming: keep the bottom of the growing bubble visible (no animation — keep up with tokens)
+    // Track whether the user has intentionally scrolled away from the bottom.
+    // Upward scroll during streaming disables auto-follow; scrolling back to the
+    // bottom (or a new generation starting) re-enables it.
+    var userScrolledAway by remember { mutableStateOf(false) }
+    LaunchedEffect(listState) {
+        var prevIndex = listState.firstVisibleItemIndex
+        var prevOffset = listState.firstVisibleItemScrollOffset
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                val scrolledUp = index < prevIndex || (index == prevIndex && offset < prevOffset)
+                if (scrolledUp && listState.isScrollInProgress) userScrolledAway = true
+                val info = listState.layoutInfo
+                val lastItem = info.visibleItemsInfo.lastOrNull()
+                if (lastItem != null &&
+                    lastItem.index >= info.totalItemsCount - 1 &&
+                    lastItem.offset + lastItem.size <= info.viewportEndOffset + 4) {
+                    userScrolledAway = false
+                }
+                prevIndex = index
+                prevOffset = offset
+            }
+    }
+    // Reset when a new generation starts
+    LaunchedEffect(uiState.isGenerating) {
+        if (uiState.isGenerating) userScrolledAway = false
+    }
+    // Auto-follow during streaming unless the user has scrolled away
     LaunchedEffect(uiState.streamingContent) {
-        if (hasStreamingItem && totalItems > 0) {
+        if (hasStreamingItem && totalItems > 0 && !userScrolledAway) {
             listState.scrollToItem(totalItems - 1, scrollOffset = Int.MAX_VALUE)
         }
     }
@@ -146,6 +182,28 @@ fun GroupChatScreen(
                             expanded = showMenu,
                             onDismissRequest = { showMenu = false }
                         ) {
+                            DropdownMenuItem(
+                                text = { Text("Edit Group") },
+                                leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = null) },
+                                onClick = {
+                                    showMenu = false
+                                    viewModel.showEditGroup()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Generate Scene Image") },
+                                leadingIcon = {
+                                    if (uiState.isGeneratingImage)
+                                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                    else
+                                        Icon(Icons.Default.Image, contentDescription = null)
+                                },
+                                onClick = {
+                                    showMenu = false
+                                    viewModel.generateGroupSceneImage()
+                                },
+                                enabled = !uiState.isGeneratingImage && !uiState.isGenerating
+                            )
                             DropdownMenuItem(
                                 text = { Text("Edit Prompt") },
                                 leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
@@ -346,13 +404,15 @@ fun GroupChatScreen(
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(uiState.messages) { message ->
-                            if (message.isSystem) {
+                        items(uiState.messages, key = { it.id }) { message ->
+                            val index = uiState.messages.indexOf(message)
+                            if (message.isSystem && message.imagePath == null) {
                                 NarratorBubble(content = message.content)
                             } else {
                                 GroupMessageBubble(
                                     message = message,
-                                    avatarUrl = uiState.memberAvatarUrls[message.senderAvatar]
+                                    avatarUrl = uiState.memberAvatarUrls[message.senderAvatar],
+                                    onLongPress = { viewModel.showMessageActions(index) }
                                 )
                             }
                         }
@@ -408,6 +468,50 @@ fun GroupChatScreen(
             error = uiState.scanloreError,
             onConfirm = { viewModel.confirmScanlore(it) },
             onDismiss = { viewModel.dismissScanlore() }
+        )
+    }
+
+    // Message actions dialog
+    uiState.selectedMessageIndex?.let { msgIdx ->
+        if (uiState.showMessageActions) {
+            val msg = uiState.messages.getOrNull(msgIdx)
+            val isLastAi = msgIdx == uiState.messages.indexOfLast { !it.isUser && !it.isSystem }
+            GroupMessageActionsDialog(
+                isUserMessage = msg?.isUser == true,
+                isLastAiMessage = isLastAi && msg?.isUser == false && msg.isSystem == false,
+                onEdit = { viewModel.startEditingMessage(msgIdx) },
+                onDelete = { viewModel.deleteMessage(msgIdx) },
+                onDeleteFromHere = { viewModel.deleteMessagesFromIndex(msgIdx) },
+                onRegenerate = {
+                    viewModel.dismissMessageActions()
+                    viewModel.regenerateLastResponse()
+                },
+                onDismiss = { viewModel.dismissMessageActions() }
+            )
+        }
+    }
+
+    // Edit message dialog
+    uiState.editingMessageIndex?.let {
+        GroupEditMessageDialog(
+            text = uiState.editingMessageText,
+            onTextChange = { viewModel.updateEditingText(it) },
+            onSave = { viewModel.saveEditedMessage() },
+            onDismiss = { viewModel.cancelEditing() }
+        )
+    }
+
+    // Edit group dialog
+    if (uiState.showEditGroup) {
+        EditGroupDialog(
+            groupName = uiState.editGroupName,
+            selectedMembers = uiState.editGroupMembers,
+            availableCharacters = uiState.availableCharacters,
+            characterAvatarUrls = uiState.characterAvatarUrls,
+            onGroupNameChange = { viewModel.updateEditGroupName(it) },
+            onToggleMember = { viewModel.toggleEditGroupMember(it) },
+            onConfirm = { viewModel.saveEditGroup() },
+            onDismiss = { viewModel.dismissEditGroup() }
         )
     }
 
@@ -580,20 +684,22 @@ private fun TypingIndicator(modifier: Modifier = Modifier) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun GroupMessageBubble(
     message: GroupChatMessage,
-    avatarUrl: String?
+    avatarUrl: String?,
+    onLongPress: () -> Unit
 ) {
     val avatarShape = LocalPocketTavernColors.current.avatarShape.toShape()
     val isUser = message.isUser
+    val context = LocalContext.current
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
         if (!isUser) {
-            // Character avatar
             AsyncImage(
                 model = avatarUrl,
                 contentDescription = message.senderName,
@@ -610,7 +716,6 @@ private fun GroupMessageBubble(
             modifier = Modifier.widthIn(max = 280.dp),
             horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
         ) {
-            // Sender name for AI messages
             if (!isUser && message.senderName != null) {
                 Text(
                     text = message.senderName,
@@ -620,47 +725,54 @@ private fun GroupMessageBubble(
                 )
             }
 
-            Surface(
-                shape = RoundedCornerShape(
-                    topStart = 16.dp,
-                    topEnd = 16.dp,
-                    bottomStart = if (isUser) 16.dp else 4.dp,
-                    bottomEnd = if (isUser) 4.dp else 16.dp
-                ),
-                color = if (isUser) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainerLow
-                },
-                modifier = Modifier.border(
-                    width = 1.dp,
-                    brush = Brush.linearGradient(
-                        colors = if (isUser) {
-                            listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-                        } else {
-                            listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-                        }
-                    ),
-                    shape = RoundedCornerShape(
-                        topStart = 16.dp,
-                        topEnd = 16.dp,
-                        bottomStart = if (isUser) 16.dp else 4.dp,
-                        bottomEnd = if (isUser) 4.dp else 16.dp
+            val bubbleShape = RoundedCornerShape(
+                topStart = 16.dp, topEnd = 16.dp,
+                bottomStart = if (isUser) 16.dp else 4.dp,
+                bottomEnd = if (isUser) 4.dp else 16.dp
+            )
+
+            if (message.imagePath != null) {
+                // Image message
+                val imageFile = File(context.filesDir, message.imagePath)
+                AsyncImage(
+                    model = imageFile,
+                    contentDescription = "Scene image",
+                    modifier = Modifier
+                        .widthIn(max = 260.dp)
+                        .clip(bubbleShape)
+                        .combinedClickable(onClick = {}, onLongClick = onLongPress),
+                    contentScale = ContentScale.FillWidth
+                )
+            } else {
+                Surface(
+                    shape = bubbleShape,
+                    color = if (isUser) MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                            else MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier
+                        .border(
+                            width = 1.dp,
+                            brush = Brush.linearGradient(
+                                colors = if (isUser)
+                                    listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                                else
+                                    listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                            ),
+                            shape = bubbleShape
+                        )
+                        .combinedClickable(onClick = {}, onLongClick = onLongPress)
+                ) {
+                    Text(
+                        text = message.content,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(12.dp)
                     )
-                )
-            ) {
-                Text(
-                    text = message.content,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(12.dp)
-                )
+                }
             }
         }
 
         if (isUser) {
             Spacer(modifier = Modifier.width(8.dp))
-            // User avatar placeholder
             Box(
                 modifier = Modifier
                     .size(36.dp)
@@ -668,11 +780,7 @@ private fun GroupMessageBubble(
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    "You",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Text("You", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
         }
     }
@@ -975,6 +1083,161 @@ private fun WorldBookEditorDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
+    )
+}
+
+@Composable
+private fun GroupMessageActionsDialog(
+    isUserMessage: Boolean,
+    isLastAiMessage: Boolean,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onDeleteFromHere: () -> Unit,
+    onRegenerate: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Message Actions") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = { onEdit(); onDismiss() }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text("Edit Message")
+                    Spacer(Modifier.weight(1f))
+                }
+                TextButton(onClick = { onDelete(); onDismiss() }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text("Delete Message", color = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.weight(1f))
+                }
+                TextButton(onClick = { onDeleteFromHere(); onDismiss() }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text("Delete From Here", color = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.weight(1f))
+                }
+                if (!isUserMessage && isLastAiMessage) {
+                    TextButton(onClick = onRegenerate, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text("Regenerate", color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        containerColor = MaterialTheme.colorScheme.background,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface
+    )
+}
+
+@Composable
+private fun GroupEditMessageDialog(
+    text: String,
+    onTextChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Message") },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = onTextChange,
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 4,
+                maxLines = 12,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    cursorColor = MaterialTheme.colorScheme.primary
+                )
+            )
+        },
+        confirmButton = { TextButton(onClick = onSave) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        containerColor = MaterialTheme.colorScheme.background,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditGroupDialog(
+    groupName: String,
+    selectedMembers: Set<String>,
+    availableCharacters: List<Character>,
+    characterAvatarUrls: Map<String, String?>,
+    onGroupNameChange: (String) -> Unit,
+    onToggleMember: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val avatarShape = LocalPocketTavernColors.current.avatarShape.toShape()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Group") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = groupName,
+                    onValueChange = onGroupNameChange,
+                    label = { Text("Group Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        cursorColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+                Spacer(Modifier.height(16.dp))
+                Text("Members (at least 2)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
+                LazyColumn(modifier = Modifier.heightIn(max = 300.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(availableCharacters) { character ->
+                        val avatarKey = character.avatar ?: "${character.name}.png"
+                        val isSelected = avatarKey in selectedMembers
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { onToggleMember(avatarKey) },
+                            color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceContainerLow,
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                AsyncImage(
+                                    model = characterAvatarUrls[avatarKey],
+                                    contentDescription = null,
+                                    modifier = Modifier.size(40.dp).clip(avatarShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Text(text = character.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                                if (isSelected) Icon(Icons.Default.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
+                if (selectedMembers.size < 2) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("Select at least ${2 - selectedMembers.size} more", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = groupName.isNotBlank() && selectedMembers.size >= 2) {
+                Text("Save", color = MaterialTheme.colorScheme.primary)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } },
+        containerColor = MaterialTheme.colorScheme.background,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface
     )
 }
 

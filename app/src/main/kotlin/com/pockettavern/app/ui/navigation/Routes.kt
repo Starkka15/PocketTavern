@@ -111,4 +111,7 @@ sealed class Route {
 
     @Serializable
     data object BotBooru : Route()
+
+    @Serializable
+    data object StorageBrowser : Route()
 }

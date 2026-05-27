@@ -166,6 +166,8 @@ class JsExtensionHost @Inject constructor(
     val activeCardExtId: String? get() = _activeCardExtId
     // IDs of card scripts that have been injected but are now inactive (character switched)
     private val _disabledCardExtIds = mutableSetOf<String>()
+    // IDs of user-installed and bundled extensions — injections with these keys are preserved on card switch
+    @Volatile private var _userExtensionIds: Set<String> = emptySet()
 
     // ── Init / reload ─────────────────────────────────────────────────────────
 
@@ -573,6 +575,9 @@ class JsExtensionHost @Inject constructor(
             }
         }
 
+        // Record all known user/bundled extension IDs so card-injection cleanup can distinguish them.
+        _userExtensionIds = bundledIds + extensions.map { it.id }.toSet()
+
         // Fire ST lifecycle events so extensions waiting for APP_READY (e.g. BotBrowser) initialise.
         // Queued after all extension evals, so all handlers are already registered when this runs.
         wv.evaluateJavascript(
@@ -604,11 +609,11 @@ class JsExtensionHost @Inject constructor(
         if (_activeCardExtId == extId) return   // same character re-loaded, already running
 
         // Disable the outgoing card script and clear its UI registrations.
-        // _messageActions uses the JS-side EXT_ID as key (e.g. "zahra_wishes"), not the
-        // composite Kotlin extId, so we can't remove by key — clear the whole map instead.
-        // registerMessageActions is a PT-only API; no ST extensions use it.
+        // _injections uses the JS-side EXT_ID as key (e.g. "zahra_wishes"), not the
+        // composite Kotlin extId — remove any injection key that isn't a known user extension.
+        // _messageActions / _jsButtonSets use JS EXT_IDs too, so clear the whole map.
         _activeCardExtId?.let { old ->
-            _injections.remove(old)
+            _injections.keys.filter { it !in _userExtensionIds }.forEach { _injections.remove(it) }
             _disabledCardExtIds.add(old)
             _messageActions.value = emptyMap()
             _jsButtonSets.value = emptyMap()
@@ -643,7 +648,7 @@ class JsExtensionHost @Inject constructor(
      */
     fun unloadCardScript() {
         val old = _activeCardExtId ?: return
-        _injections.remove(old)
+        _injections.keys.filter { it !in _userExtensionIds }.forEach { _injections.remove(it) }
         _disabledCardExtIds.add(old)
         _messageActions.value = emptyMap()
         _jsButtonSets.value = emptyMap()
