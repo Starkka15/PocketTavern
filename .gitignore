@@ -76,3 +76,4 @@ lint/tmp/
 
 # Secrets
 secrets.properties
+*SPEC*.md
