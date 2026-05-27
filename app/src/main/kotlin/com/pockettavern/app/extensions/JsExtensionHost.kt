@@ -603,10 +603,17 @@ class JsExtensionHost @Inject constructor(
         val extId = "$scriptName:$characterName"
         if (_activeCardExtId == extId) return   // same character re-loaded, already running
 
-        // Disable the outgoing card script
+        // Disable the outgoing card script and clear its UI registrations.
+        // _messageActions uses the JS-side EXT_ID as key (e.g. "zahra_wishes"), not the
+        // composite Kotlin extId, so we can't remove by key — clear the whole map instead.
+        // registerMessageActions is a PT-only API; no ST extensions use it.
         _activeCardExtId?.let { old ->
             _injections.remove(old)
             _disabledCardExtIds.add(old)
+            _messageActions.value = emptyMap()
+            _jsButtonSets.value = emptyMap()
+            _headerButtons.value = _headerButtons.value - old
+            _headerMenus.value = _headerMenus.value - old
         }
 
         // Re-enable this card's ext ID if it was previously disabled (user switching back)
@@ -638,6 +645,10 @@ class JsExtensionHost @Inject constructor(
         val old = _activeCardExtId ?: return
         _injections.remove(old)
         _disabledCardExtIds.add(old)
+        _messageActions.value = emptyMap()
+        _jsButtonSets.value = emptyMap()
+        _headerButtons.value = _headerButtons.value - old
+        _headerMenus.value = _headerMenus.value - old
         _activeCardExtId = null
         pushDisabledToJs()
     }
