@@ -49,5 +49,6 @@ data class GroupChatMessage(
     val isSystem: Boolean = false,
     val senderName: String? = null,
     val senderAvatar: String? = null,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val imagePath: String? = null
 )

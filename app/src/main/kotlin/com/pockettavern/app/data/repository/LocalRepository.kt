@@ -60,7 +60,11 @@ class LocalRepository @Inject constructor(
     }
 
     suspend fun deleteCharacter(fileName: String): Result<Unit> = withResult {
+        // Resolve display name before deleting the entity so we can clean up chats
+        val displayName = characterStorage.getCharacter(fileName)?.name
+            ?: fileName.removeSuffix(".png")
         characterStorage.deleteCharacter(fileName)
+        chatStorage.deleteAllForCharacter(displayName)
     }
 
     /** Import a character card (PNG or .charx) from a content URI. */
@@ -91,6 +95,11 @@ class LocalRepository @Inject constructor(
 
     /** Rebuild Room index from disk (call on first launch). */
     suspend fun rebuildCharacterIndex() = characterStorage.rebuildIndex()
+
+    /** List all character entries cross-referenced with disk files. */
+    suspend fun listCharacterFileInfo(): Result<List<CharacterStorage.CharacterFileInfo>> = withResult {
+        characterStorage.listCharacterFileInfo()
+    }
 
     // ── Chats ────────────────────────────────────────────────────────────────
 

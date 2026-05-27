@@ -56,6 +56,7 @@ fun SettingsHubScreen(
     onNavigateToTtsSettings: () -> Unit = {},
     onNavigateToImageGen: () -> Unit = {},
     onNavigateToBackup: () -> Unit = {},
+    onNavigateToStorageBrowser: () -> Unit = {},
     viewModel: SettingsHubViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -169,7 +170,7 @@ fun SettingsHubScreen(
     }
 
     // ── Utilities ──────────────────────────────────────────────────
-    val utilityItems = remember(onNavigateToExtensions, onNavigateToStImport, onNavigateToSetupGuide, onNavigateToBackup) {
+    val utilityItems = remember(onNavigateToExtensions, onNavigateToStImport, onNavigateToSetupGuide, onNavigateToBackup, onNavigateToStorageBrowser) {
         listOf(
             SettingsItem(
                 title = "Extensions",
@@ -183,6 +184,13 @@ fun SettingsHubScreen(
                 subtitle = "Migrate characters, chats, and lorebooks",
                 icon = Icons.Default.Download,
                 onClick = onNavigateToStImport,
+                requiresConnection = false
+            ),
+            SettingsItem(
+                title = "Character Storage",
+                subtitle = "Browse, delete, and rescan character files",
+                icon = Icons.Default.Storage,
+                onClick = onNavigateToStorageBrowser,
                 requiresConnection = false
             ),
             SettingsItem(

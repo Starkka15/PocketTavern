@@ -177,6 +177,14 @@ class ChatStorage @Inject constructor(
         chatDao.deleteByFileName(fileName)
     }
 
+    /** Delete all chats for a character — used when deleting a character card. */
+    suspend fun deleteAllForCharacter(characterName: String) = withContext(Dispatchers.IO) {
+        val dir = File(chatsDir, sanitizeFileName(characterName))
+        if (dir.exists()) dir.deleteRecursively()
+        chatDao.deleteAllForCharacter(characterName)
+        DebugLogger.log("ChatStorage: deleted all chats for $characterName")
+    }
+
     /** Append a single message to an existing chat (efficient for real-time saving). */
     suspend fun appendMessage(
         characterName: String,

@@ -1,11 +1,14 @@
 package com.pockettavern.app.ui.screens.groups
 
 import android.content.Context
+import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pockettavern.app.data.local.CharacterStorage
 import com.pockettavern.app.data.local.GroupStorage
+import com.pockettavern.app.data.local.LoreBookStorage
 import com.pockettavern.app.data.local.SettingsDataStore
+import com.pockettavern.app.data.repository.ImageGenRepository
 import com.pockettavern.app.data.repository.LlmRepository
 import com.pockettavern.app.data.repository.LocalRepository
 import com.pockettavern.app.domain.model.ActivationStrategy
@@ -13,6 +16,10 @@ import com.pockettavern.app.domain.model.ApiConfiguration
 import com.pockettavern.app.domain.model.ChatStyle
 import com.pockettavern.app.domain.model.Character
 import com.pockettavern.app.domain.model.ChatInfo
+import com.pockettavern.app.domain.model.ForgeGenerationParams
+import com.pockettavern.app.domain.model.WorldInfoEntry
+import com.pockettavern.app.util.PngCharacterCard
+import com.pockettavern.app.domain.model.GenerationState
 import com.pockettavern.app.domain.model.Group
 import com.pockettavern.app.domain.model.GroupChatMessage
 import com.pockettavern.app.domain.model.PromptMessage
@@ -20,12 +27,15 @@ import com.pockettavern.app.domain.model.Result
 import com.pockettavern.app.domain.model.StreamEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import javax.inject.Inject
 import kotlin.random.Random
 
@@ -54,6 +64,19 @@ data class GroupChatUiState(
     val scanloreEntries: List<String> = emptyList(),
     val scanloreLoading: Boolean = false,
     val scanloreError: String? = null,
+    // Message actions
+    val showMessageActions: Boolean = false,
+    val selectedMessageIndex: Int? = null,
+    val editingMessageIndex: Int? = null,
+    val editingMessageText: String = "",
+    // Edit group
+    val showEditGroup: Boolean = false,
+    val editGroupName: String = "",
+    val editGroupMembers: Set<String> = emptySet(),
+    val availableCharacters: List<Character> = emptyList(),
+    val characterAvatarUrls: Map<String, String?> = emptyMap(),
+    // Group scene image gen
+    val isGeneratingImage: Boolean = false,
 )
 
 @HiltViewModel
@@ -61,9 +84,11 @@ class GroupChatViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val groupStorage: GroupStorage,
     private val characterStorage: CharacterStorage,
+    private val loreBookStorage: LoreBookStorage,
     private val llmRepository: LlmRepository,
     private val localRepository: LocalRepository,
-    private val settingsDataStore: SettingsDataStore
+    private val settingsDataStore: SettingsDataStore,
+    private val imageGenRepository: ImageGenRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(GroupChatUiState())
@@ -267,9 +292,11 @@ class GroupChatViewModel @Inject constructor(
             else -> {
                 val pool = enabled.filter { it != lastSpeakerFileName }.ifEmpty { enabled }
                 val lastUserText = history.lastOrNull { it.isUser }?.content ?: ""
-                val mentioned = detectMentionedCharacter(lastUserText, pool)
+                // Search all enabled members for a name mention (not just pool, so last speaker can be re-triggered)
+                val mentioned = detectMentionedCharacter(lastUserText, enabled)
                 val first = when {
-                    mentioned != null -> mentioned
+                    mentioned != null && mentioned in pool -> mentioned
+                    mentioned != null -> pool.firstOrNull() ?: return // mentioned is last speaker; pick anyone else first
                     group.activationStrategy == ActivationStrategy.POOLED -> pool.random()
                     else -> pickByTalkativeness(pool)
                 }
@@ -277,16 +304,25 @@ class GroupChatViewModel @Inject constructor(
                 generateForCharacter(group, firstChar, first)
                 lastSpeakerFileName = first
 
+                // If someone was explicitly mentioned but didn't speak first, guarantee them as followUp 0
+                val pendingMentioned = if (mentioned != null && mentioned != first) mentioned else null
+
                 var followUps = 0
                 while (followUps < maxFollowUps) {
                     val others = enabled.filter { it != lastSpeakerFileName }
                     if (others.isEmpty()) break
-                    val guaranteed = followUps == 0
-                    val next = pickFollowUp(others, guaranteed) ?: break
+                    val next: String?
+                    if (pendingMentioned != null && pendingMentioned in others && followUps == 0) {
+                        next = pendingMentioned
+                    } else {
+                        val guaranteed = followUps == 0 && pendingMentioned == null
+                        next = pickFollowUp(others, guaranteed)
+                    }
+                    followUps++
+                    if (next == null) continue
                     val nextChar = loadedCharacters[next] ?: break
                     generateForCharacter(group, nextChar, next)
                     lastSpeakerFileName = next
-                    followUps++
                 }
             }
         }
@@ -316,12 +352,18 @@ class GroupChatViewModel @Inject constructor(
         add("\n{\"")
     }
 
-    /** Returns the first candidate whose character name appears as a word in [text], or null. */
+    /** Returns the first candidate whose name (full or first word) appears as a word in [text], or null. */
     private fun detectMentionedCharacter(text: String, candidates: List<String>): String? {
         for (fileName in candidates) {
             val name = loadedCharacters[fileName]?.name ?: continue
-            val regex = Regex("\\b${Regex.escape(name)}\\b", RegexOption.IGNORE_CASE)
-            if (regex.containsMatchIn(text)) return fileName
+            val fullRegex = Regex("\\b${Regex.escape(name)}\\b", RegexOption.IGNORE_CASE)
+            if (fullRegex.containsMatchIn(text)) return fileName
+            // Also match by first name alone when the name is multi-word
+            val firstName = name.substringBefore(" ")
+            if (firstName.length >= 3 && firstName != name) {
+                val firstNameRegex = Regex("\\b${Regex.escape(firstName)}\\b", RegexOption.IGNORE_CASE)
+                if (firstNameRegex.containsMatchIn(text)) return fileName
+            }
         }
         return null
     }
@@ -372,10 +414,12 @@ class GroupChatViewModel @Inject constructor(
 
         val oaiPreset = if (config.usesChatCompletions) localRepository.getCurrentOaiPreset() else null
         val history = _uiState.value.messages
-        val prompt = buildGroupPrompt(character, personaName, group, history)
+        val allLoreEntries = loadGroupLoreEntries(group)
+        val loreEntries = filterLoreEntries(allLoreEntries, history)
+        val prompt = buildGroupPrompt(character, personaName, group, history, loreEntries)
         val stopSequences = buildStopSequences(character.name, personaName, group)
         val oaiMessages = if (config.usesChatCompletions)
-            buildGroupOaiMessages(character, fileName, personaName, group, history) else null
+            buildGroupOaiMessages(character, fileName, personaName, group, history, loreEntries) else null
 
         generationJob = viewModelScope.launch {
             llmRepository.generate(prompt, config, preset, stopSequences, oaiMessages, oaiPreset).collect { event ->
@@ -426,7 +470,8 @@ class GroupChatViewModel @Inject constructor(
         character: Character,
         personaName: String,
         group: Group,
-        history: List<GroupChatMessage>
+        history: List<GroupChatMessage>,
+        loreEntries: List<WorldInfoEntry> = emptyList()
     ): String = buildString {
         append("### RULE: You are ${character.name}. You ONLY write ${character.name}'s words and actions. ")
         append("$personaName is the human user — NEVER write their dialogue, thoughts, feelings, or reactions. ")
@@ -442,6 +487,11 @@ class GroupChatViewModel @Inject constructor(
         }
         if (group.worldBook.isNotBlank()) {
             append("[Shared World Book]\n${group.worldBook}\n\n")
+        }
+        val beforeCharEntries = loreEntries.filter { it.position == 0 }
+        if (beforeCharEntries.isNotEmpty()) {
+            append("[World Info]\n")
+            beforeCharEntries.forEach { append(it.content).append("\n\n") }
         }
 
         val others = group.enabledMembers.filter { it != character.avatar }
@@ -942,7 +992,8 @@ No preamble, no explanation. Just the numbered list."""
         fileName: String,
         personaName: String,
         group: Group,
-        history: List<GroupChatMessage>
+        history: List<GroupChatMessage>,
+        loreEntries: List<WorldInfoEntry> = emptyList()
     ): List<PromptMessage> {
         val otherNames = group.enabledMembers.mapNotNull { loadedCharacters[it] }
             .filter { it.name != character.name }.map { it.name }.joinToString("/").ifBlank { "other characters" }
@@ -960,6 +1011,10 @@ No preamble, no explanation. Just the numbered list."""
 
             if (group.systemPrompt.isNotBlank()) append("[Group Scenario]\n${group.systemPrompt}\n\n")
             if (group.worldBook.isNotBlank()) append("[Shared World Book]\n${group.worldBook}\n\n")
+            if (loreEntries.isNotEmpty()) {
+                append("[World Info]\n")
+                loreEntries.forEach { append(it.content).append("\n\n") }
+            }
 
             val others = group.enabledMembers.filter { it != fileName }.mapNotNull { loadedCharacters[it] }
             if (others.isNotEmpty()) {
@@ -1081,11 +1136,299 @@ No preamble, no explanation. Just the numbered list."""
         return listOf(PromptMessage("system", systemContent), PromptMessage("user", userContent))
     }
 
+    // ── Lorebook support ──────────────────────────────────────────────────────
+
+    /** Load and deduplicate all lore entries across every enabled group member. */
+    private suspend fun loadGroupLoreEntries(group: Group): List<WorldInfoEntry> {
+        val seen = mutableSetOf<String>()
+        val result = mutableListOf<WorldInfoEntry>()
+
+        for (fileName in group.enabledMembers) {
+            val character = loadedCharacters[fileName] ?: continue
+
+            // 1. Attached external lorebook
+            character.attachedWorldInfo?.let { lbName ->
+                loreBookStorage.loadLorebook(lbName).forEach { entry ->
+                    val key = entry.uid.ifBlank { entry.content.take(80) }
+                    if (seen.add(key)) result.add(entry)
+                }
+            }
+
+            // 2. Embedded character book from the PNG
+            if (character.hasCharacterBook) {
+                val bytes = withContext(Dispatchers.IO) { characterStorage.getCharacterBytes(fileName) }
+                val card = bytes?.let { PngCharacterCard.extractCharacterData(it) }
+                card?.data?.characterBook?.entries?.forEach { entry ->
+                    val key = (entry.id?.toString() ?: entry.content.take(80))
+                    if (seen.add(key)) {
+                        result.add(WorldInfoEntry(
+                            uid = entry.id?.toString() ?: "",
+                            key = entry.keys,
+                            keysecondary = entry.secondaryKeys,
+                            content = entry.content,
+                            comment = entry.comment.ifBlank { entry.name },
+                            constant = entry.constant,
+                            selective = entry.selective,
+                            order = entry.insertionOrder,
+                            position = if (entry.position == "after_char") 1 else 0,
+                            depth = 4,
+                            probability = 100,
+                            enabled = entry.enabled
+                        ))
+                    }
+                }
+            }
+        }
+        return result
+    }
+
+    /** Filter lore entries by keyword match against recent messages + character descriptions. */
+    private fun filterLoreEntries(
+        entries: List<WorldInfoEntry>,
+        history: List<GroupChatMessage>,
+        scanDepth: Int = 50
+    ): List<WorldInfoEntry> {
+        val scanText = buildString {
+            history.takeLast(scanDepth).forEach { append(it.content).append(" ") }
+            loadedCharacters.values.forEach { append(it.description).append(" ").append(it.scenario).append(" ") }
+        }
+        val scanLower = scanText.lowercase()
+
+        return entries.filter { entry ->
+            if (!entry.enabled) return@filter false
+            if (entry.constant) return@filter true
+            if (entry.key.isEmpty()) return@filter false
+
+            val primaryHit = entry.key.any { k ->
+                val kl = k.lowercase().trim()
+                kl.isNotBlank() && (scanLower.contains("\\b${Regex.escape(kl)}\\b".toRegex()) || scanLower.contains(kl))
+            }
+            if (!primaryHit) return@filter false
+
+            if (entry.selective && entry.keysecondary.isNotEmpty()) {
+                entry.keysecondary.any { k ->
+                    val kl = k.lowercase().trim()
+                    kl.isNotBlank() && scanLower.contains(kl)
+                }
+            } else {
+                true
+            }
+        }.sortedBy { it.order }
+    }
+
     fun setChatStyle(style: Int) {
         val group = _uiState.value.group ?: return
         val updated = group.copy(chatStyle = style)
         _uiState.update { it.copy(group = updated) }
         viewModelScope.launch { groupStorage.saveGroup(updated) }
+    }
+
+    // ── Message actions ───────────────────────────────────────────────────────
+
+    fun showMessageActions(index: Int) {
+        _uiState.update { it.copy(showMessageActions = true, selectedMessageIndex = index) }
+    }
+
+    fun dismissMessageActions() {
+        _uiState.update { it.copy(showMessageActions = false, selectedMessageIndex = null) }
+    }
+
+    fun deleteMessage(index: Int) {
+        val group = _uiState.value.group ?: return
+        val chatFileName = _uiState.value.currentChatFileName ?: return
+        val messages = _uiState.value.messages.toMutableList()
+        if (index !in messages.indices) return
+        messages.removeAt(index)
+        _uiState.update { it.copy(messages = messages, showMessageActions = false, selectedMessageIndex = null) }
+        viewModelScope.launch { groupStorage.saveMessages(group.id, chatFileName, messages) }
+    }
+
+    fun deleteMessagesFromIndex(index: Int) {
+        val group = _uiState.value.group ?: return
+        val chatFileName = _uiState.value.currentChatFileName ?: return
+        val messages = _uiState.value.messages.toMutableList()
+        if (index !in messages.indices) return
+        while (messages.size > index) messages.removeAt(messages.size - 1)
+        _uiState.update { it.copy(messages = messages, showMessageActions = false, selectedMessageIndex = null) }
+        viewModelScope.launch { groupStorage.saveMessages(group.id, chatFileName, messages) }
+    }
+
+    fun startEditingMessage(index: Int) {
+        val message = _uiState.value.messages.getOrNull(index) ?: return
+        _uiState.update { it.copy(editingMessageIndex = index, editingMessageText = message.content, showMessageActions = false) }
+    }
+
+    fun updateEditingText(text: String) {
+        _uiState.update { it.copy(editingMessageText = text) }
+    }
+
+    fun saveEditedMessage() {
+        val index = _uiState.value.editingMessageIndex ?: return
+        val group = _uiState.value.group ?: return
+        val chatFileName = _uiState.value.currentChatFileName ?: return
+        val messages = _uiState.value.messages.toMutableList()
+        if (index !in messages.indices) return
+        messages[index] = messages[index].copy(content = _uiState.value.editingMessageText)
+        _uiState.update { it.copy(messages = messages, editingMessageIndex = null, editingMessageText = "") }
+        viewModelScope.launch { groupStorage.saveMessages(group.id, chatFileName, messages) }
+    }
+
+    fun cancelEditing() {
+        _uiState.update { it.copy(editingMessageIndex = null, editingMessageText = "") }
+    }
+
+    fun regenerateLastResponse() {
+        val group = _uiState.value.group ?: return
+        val chatFileName = _uiState.value.currentChatFileName ?: return
+        val messages = _uiState.value.messages
+        val lastAiIndex = messages.indexOfLast { !it.isUser && !it.isSystem }
+        if (lastAiIndex == -1) return
+        val lastAiMsg = messages[lastAiIndex]
+        val avatarKey = lastAiMsg.senderAvatar ?: return
+        val character = loadedCharacters[avatarKey] ?: return
+
+        val trimmedMessages = messages.subList(0, lastAiIndex)
+        _uiState.update { it.copy(messages = trimmedMessages, showMessageActions = false, selectedMessageIndex = null) }
+        viewModelScope.launch {
+            groupStorage.saveMessages(group.id, chatFileName, trimmedMessages)
+            generateForCharacter(group, character, avatarKey)
+        }
+    }
+
+    // ── Edit group ────────────────────────────────────────────────────────────
+
+    fun showEditGroup() {
+        val group = _uiState.value.group ?: return
+        viewModelScope.launch {
+            val characters = characterStorage.listCharacters()
+            val urls = characters.associate { char ->
+                (char.avatar ?: "${char.name}.png") to
+                    characterStorage.getAvatarUri(char.avatar ?: "${char.name}.png").toString()
+            }
+            _uiState.update {
+                it.copy(
+                    showEditGroup = true,
+                    editGroupName = group.name,
+                    editGroupMembers = group.members.toSet(),
+                    availableCharacters = characters,
+                    characterAvatarUrls = urls
+                )
+            }
+        }
+    }
+
+    fun dismissEditGroup() {
+        _uiState.update { it.copy(showEditGroup = false) }
+    }
+
+    fun updateEditGroupName(name: String) {
+        _uiState.update { it.copy(editGroupName = name) }
+    }
+
+    fun toggleEditGroupMember(avatarKey: String) {
+        _uiState.update { state ->
+            val current = state.editGroupMembers
+            state.copy(editGroupMembers = if (avatarKey in current) current - avatarKey else current + avatarKey)
+        }
+    }
+
+    fun saveEditGroup() {
+        val group = _uiState.value.group ?: return
+        val name = _uiState.value.editGroupName.trim()
+        val members = _uiState.value.editGroupMembers.toList()
+        if (name.isBlank() || members.size < 2) return
+        val updated = group.copy(name = name, members = members)
+        viewModelScope.launch {
+            groupStorage.saveGroup(updated)
+            val chars = members.mapNotNull { fileName ->
+                characterStorage.getCharacter(fileName)?.let { fileName to it }
+            }.toMap()
+            loadedCharacters = chars
+            val avatarUrls = members.associate { fileName ->
+                fileName to characterStorage.getAvatarUri(fileName).toString()
+            }
+            _uiState.update {
+                it.copy(
+                    group = updated,
+                    memberAvatarUrls = avatarUrls,
+                    showEditGroup = false
+                )
+            }
+        }
+    }
+
+    // ── Group scene image ─────────────────────────────────────────────────────
+
+    fun generateGroupSceneImage() {
+        val group = _uiState.value.group ?: return
+        val chatFileName = _uiState.value.currentChatFileName ?: return
+        if (_uiState.value.isGeneratingImage || _uiState.value.isGenerating) return
+
+        _uiState.update { it.copy(isGeneratingImage = true) }
+
+        viewModelScope.launch {
+            try {
+                val imageGenConfig = settingsDataStore.getImageGenConfig()
+                val members = group.enabledMembers
+                val characters = members.mapNotNull { loadedCharacters[it] }
+
+                // Build SD prompt from character descriptions
+                val charParts = characters.joinToString(", ") { char ->
+                    val desc = char.description
+                        .replace("\n", " ")
+                        .trim()
+                        .take(200)
+                    if (desc.isNotBlank()) desc else char.name
+                }
+                val sdPrompt = "${characters.size} people, $charParts, detailed, high quality"
+
+                val params = ForgeGenerationParams(
+                    prompt = sdPrompt,
+                    negativePrompt = imageGenConfig.negativePrompt,
+                    width = imageGenConfig.width,
+                    height = imageGenConfig.height,
+                    steps = imageGenConfig.steps,
+                    cfgScale = imageGenConfig.cfgScale,
+                    sampler = imageGenConfig.sampler,
+                    seed = imageGenConfig.seed
+                )
+
+                var resultBase64 = ""
+                imageGenRepository.generateImageWithProgress(params).collect { state ->
+                    if (state is GenerationState.Complete) resultBase64 = state.imageBase64
+                }
+
+                if (resultBase64.isNotBlank()) {
+                    val imagePath = withContext(Dispatchers.IO) {
+                        try {
+                            val imageBytes = Base64.decode(resultBase64, Base64.DEFAULT)
+                            val dir = File(context.filesDir, "group_images/${group.id}").also { it.mkdirs() }
+                            val file = File(dir, "${System.currentTimeMillis()}.png")
+                            file.writeBytes(imageBytes)
+                            "group_images/${group.id}/${file.name}"
+                        } catch (_: Exception) { null }
+                    }
+                    if (imagePath != null) {
+                        val imageMsg = GroupChatMessage(
+                            content = "",
+                            isUser = false,
+                            isSystem = true,
+                            senderName = "Scene",
+                            imagePath = imagePath
+                        )
+                        val msgs = _uiState.value.messages + imageMsg
+                        _uiState.update { it.copy(messages = msgs) }
+                        groupStorage.appendMessage(group.id, chatFileName, imageMsg)
+                    }
+                } else {
+                    _uiState.update { it.copy(error = "Image generation failed or no backend configured") }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Image generation error: ${e.message}") }
+            } finally {
+                _uiState.update { it.copy(isGeneratingImage = false) }
+            }
+        }
     }
 
     fun stopGeneration() {
