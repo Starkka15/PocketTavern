@@ -464,8 +464,8 @@ fun ChatScreen(
                             Text("Stop")
                         }
                     }
-                } else if (uiState.messages.isNotEmpty() && uiState.messages.last().isUser.not()) {
-                    // Show regenerate and continue buttons after AI response
+                } else if (uiState.messages.isNotEmpty() && uiState.messages.last().isUser.not() && !uiState.messages.last().isNarrator) {
+                    // Show regenerate and continue buttons after AI response (not after narrator inserts)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -984,7 +984,7 @@ private fun MessageWithActions(
 
         // Show swipe indicator on the last assistant message (always) and on any
         // assistant message that already has multiple alternatives stored
-        val showIndicator = !message.isUser &&
+        val showIndicator = !message.isUser && !message.isNarrator &&
                 (isLastAssistantMessage || (swipeInfo != null && swipeInfo.second > 1))
         if (showIndicator) {
             Row(

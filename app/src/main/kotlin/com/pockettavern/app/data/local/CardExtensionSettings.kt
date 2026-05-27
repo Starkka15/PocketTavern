@@ -13,9 +13,17 @@ class CardExtensionSettings @Inject constructor(
     private val prefs = context.getSharedPreferences("card_ext_settings", Context.MODE_PRIVATE)
 
     fun isEnabled(characterFile: String): Boolean =
-        prefs.getBoolean("enabled_$characterFile", true)
+        prefs.getBoolean("enabled_$characterFile", false)
 
     fun setEnabled(characterFile: String, enabled: Boolean) {
         prefs.edit().putBoolean("enabled_$characterFile", enabled).apply()
+    }
+
+    fun disable(characterFile: String) =
+        prefs.edit().remove("enabled_$characterFile").apply()
+
+    /** Call on app start — ensures no card extension is enabled unless a card is actively open. */
+    fun disableAll() {
+        prefs.edit().clear().apply()
     }
 }
