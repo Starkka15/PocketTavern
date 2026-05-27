@@ -530,7 +530,10 @@ Insert non-LLM messages into the chat (narrator text or images).
 
 | API | Description |
 |-----|-------------|
-| `PT.insertMessage(content, options)` | Insert a message into the chat. Options: `{ type }` where type is `"narrator"` (default) or `"image"`. For image type, pass `{ type: "image", imageBase64: "..." }`. Images are saved to disk and rendered inline in chat. |
+| `PT.insertMessage(content)` | Insert a narrator message into the chat. |
+| `PT.insertMessage(content, { type: 'image', imageBase64: '...' })` | Insert an image message. The base64 PNG is saved to disk and rendered inline. |
+
+**Note:** The first argument is always `content` (the text or caption). There is no `role` parameter — all inserted messages are narrator-style. Do not pass a role string as the first argument; it will be inserted as the literal message content. |
 
 #### Message Context Menu
 
