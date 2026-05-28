@@ -2,7 +2,7 @@
 
 **⚠️ NOT FOR COMMERCIAL USE — See [LICENSE](LICENSE) for details**
 
-> **The goal: the best open-source AI chat app on Android.**
+> **The goal: the best source-available AI chat app on Android.**
 > Simple enough to pick up in minutes. Deep enough for power users who want full control over every token.
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-ff247f?style=for-the-badge&logoColor=white)](https://stt.gg/49Bfn8bA)
@@ -17,7 +17,7 @@ Every AI chat app wants a subscription. Monthly fees, token limits, paywalled fe
 
 **We decided to do something different.**
 
-PocketTavern is free, open-source, and always will be. It connects directly to whatever LLM backend you choose — your own hardware, a cloud API you already pay for, or a free endpoint. No middleman. No account required. No one reading your chats.
+PocketTavern is free, source-available, and always will be. It connects directly to whatever LLM backend you choose — your own hardware, a cloud API you already pay for, or a free endpoint. No middleman. No account required. No one reading your chats.
 
 The design philosophy is simple: **easy to get started, powerful when you need it.** New users can install, connect an API, and be chatting in under two minutes. Power users get full control over prompt templates, sampler parameters, world info injection, per-character overrides, and a JavaScript extension API for building custom behavior into character cards. The depth is there when you want it — and out of the way when you don't.
 
@@ -1145,6 +1145,18 @@ You can also import individual `.png` character cards at any time via the charac
 > **Content Disclaimer:** PocketTavern does not host, store, or provide any character content. All characters come from your own device or optional third-party services (CharaVault, Forge) that you configure. We have no visibility into what characters or content you use.
 
 > **Personal Use:** This app is designed strictly for personal use. The app ID and package name (`com.pockettavern.app`) are independent of SillyTavern. PocketTavern is not affiliated with, endorsed by, or derived from any commercial product.
+
+---
+
+## License
+
+PocketTavern is licensed under **MIT + Commons Clause**.
+
+The source code is freely available to use, modify, fork, and redistribute. The Commons Clause addendum adds one restriction: **you may not sell PocketTavern or any product substantially derived from it** — including rebrands, paywalled forks, or SaaS wrappers.
+
+> **Note:** Due to the Commons Clause addendum, PocketTavern does not meet the [Open Source Definition](https://opensource.org/osd) as defined by the Open Source Initiative (OSI) and is not OSI-certified. It is correctly described as **source-available**.
+
+See [LICENSE](LICENSE) for full terms.
 
 ---
 
