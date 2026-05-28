@@ -1,26 +1,33 @@
-MIT License + Commons Clause
+MIT License + No Commercial Use Restriction
 
-"Commons Clause" License Condition v1.0
+Copyright (c) 2026 starkka15
 
-The Software is provided to you by the Licensor under the License, as defined
-below, subject to the following condition.
+The rights granted under this License do not include, and this License does not
+grant, the right to Sell the Software or any Derivative Work, in whole or in part.
 
-Without limiting other conditions in the License, the grant of rights under the
-License will not include, and the License does not grant to you, the right to
-Sell the Software.
+For purposes of this restriction, "Sell" means any of the following where a fee,
+subscription charge, or other consideration is received:
 
-For purposes of the foregoing, "Sell" means practicing any or all of the rights
-granted to you under the License to provide to third parties, for a fee or other
-consideration (including without limitation fees for hosting or consulting/
-support services related to the Software), a product or service whose value
-derives, entirely or substantially, from the functionality of the Software. Any
-license notice or attribution required by the License must also include this
-Commons Clause License Condition notice.
+  (a) distributing the Software or any Derivative Work as a paid product, including
+      via app stores, direct download, or physical media;
+
+  (b) providing access to the Software or any Derivative Work as a hosted service,
+      SaaS product, or subscription-based application;
+
+  (c) incorporating any portion of the Software's source code into a commercial
+      product or service for which a fee is charged;
+
+  (d) providing consulting, support, or integration services whose primary
+      deliverable is the Software or any Derivative Work.
+
+This restriction applies to any portion of the code, however small. There is no
+minimum threshold. Any commercial use of any part of this Software requires
+explicit written permission from the Licensor (starkka15).
+
+Any license notice or attribution required by the License must also include this
+restriction notice.
 
 Software: PocketTavern
-
-License: MIT License
-
 Licensor: starkka15
 
 ---

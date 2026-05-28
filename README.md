@@ -1150,11 +1150,13 @@ You can also import individual `.png` character cards at any time via the charac
 
 ## License
 
-PocketTavern is licensed under **MIT + Commons Clause**.
+PocketTavern is licensed under **MIT + No Commercial Use Restriction**.
 
-The source code is freely available to use, modify, fork, and redistribute. The Commons Clause addendum adds one restriction: **you may not sell PocketTavern or any product substantially derived from it** — including rebrands, paywalled forks, or SaaS wrappers.
+The source code is freely available to use, modify, fork, and redistribute. One restriction applies: **you may not sell PocketTavern or any portion of its code** — this includes rebrands, paywalled forks, SaaS wrappers, app store clones, or any product or service for which a fee is charged. Any portion of the code, however small, is covered. No minimum threshold applies.
 
-> **Note:** Due to the Commons Clause addendum, PocketTavern does not meet the [Open Source Definition](https://opensource.org/osd) as defined by the Open Source Initiative (OSI) and is not OSI-certified. It is correctly described as **source-available**.
+Commercial use of any part of this software requires explicit written permission from the author.
+
+> **Note:** This license is not OSI-certified and does not meet the [Open Source Definition](https://opensource.org/osd). It is correctly described as **source-available**.
 
 See [LICENSE](LICENSE) for full terms.
 
