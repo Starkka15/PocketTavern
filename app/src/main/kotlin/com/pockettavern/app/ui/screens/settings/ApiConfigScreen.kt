@@ -160,6 +160,37 @@ fun ApiConfigScreen(
 
                 HorizontalDivider()
 
+                // Show Thoughts (reasoning models: DeepSeek R1, QwQ, etc.)
+                if (uiState.config.usesChatCompletions) {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Show Reasoning Tokens",
+                                    style = MaterialTheme.typography.titleSmall
+                                )
+                                Text(
+                                    text = "Display thinking from reasoning models (DeepSeek R1, QwQ). Supports reasoning_content field and <think> tags.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = uiState.config.showThoughts,
+                                onCheckedChange = { viewModel.setShowThoughts(it) }
+                            )
+                        }
+                    }
+
+                    HorizontalDivider()
+                }
+
                 // API Key
                 ApiKeySection(
                     apiKey = uiState.apiKey,

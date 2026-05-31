@@ -51,7 +51,8 @@ class LlmRepository @Inject constructor(
         preset: TextGenPreset?,
         stopSequences: List<String> = emptyList(),
         messages: List<PromptMessage>? = null,
-        oaiPreset: OaiPreset? = null
+        oaiPreset: OaiPreset? = null,
+        showThoughts: Boolean = false
     ): Flow<StreamEvent> = flow {
         val endpoint = config.effectiveBaseUrl
         DebugLogger.log("LlmRepository: generating with ${config.displayName} ($endpoint)")
@@ -68,7 +69,8 @@ class LlmRepository @Inject constructor(
                     preset = preset,
                     oaiPreset = oaiPreset,
                     stopSequences = stopSequences,
-                    apiKey = apiKey
+                    apiKey = apiKey,
+                    showThoughts = showThoughts
                 ).collect { emit(it) }
 
                 config.textGenType == "koboldcpp" || config.mainApi == "kobold" ->
@@ -378,7 +380,8 @@ class LlmRepository @Inject constructor(
         preset: TextGenPreset?,
         oaiPreset: OaiPreset?,
         stopSequences: List<String>,
-        apiKey: String
+        apiKey: String,
+        showThoughts: Boolean = false
     ): Flow<StreamEvent> = flow {
         val baseUrl = config.effectiveBaseUrl.trimEnd('/').removeSuffix("/v1")
 
@@ -432,6 +435,9 @@ class LlmRepository @Inject constructor(
             .build()
 
         val accumulated = StringBuilder()
+        val accumulatedThinking = StringBuilder()
+        var inThinkBlock = false
+
         okHttpClient.newCall(httpReq).execute().use { response ->
             if (!response.isSuccessful) {
                 val errorBody = response.body?.string() ?: ""
@@ -456,12 +462,30 @@ class LlmRepository @Inject constructor(
                     if (data == "[DONE]") break
                     try {
                         val chunk = json.decodeFromString<OaiStreamChunk>(data)
-                        val token = chunk.choices.firstOrNull()?.delta?.content ?: continue
-                        if (token.isNotEmpty()) {
-                            accumulated.append(token)
-                            emit(StreamEvent.Token(token, accumulated.toString()))
+                        val delta = chunk.choices.firstOrNull()?.delta ?: continue
+
+                        // reasoning_content (OpenRouter/official) or reasoning (nano-gpt, some proxies)
+                        val reasoningToken = delta.reasoningContent ?: delta.reasoning
+                        if (reasoningToken != null && reasoningToken.isNotEmpty()) {
+                            if (showThoughts) {
+                                accumulatedThinking.append(reasoningToken)
+                                emit(StreamEvent.ThinkingToken(reasoningToken, accumulatedThinking.toString()))
+                            }
+                            continue
                         }
-                    } catch (e: Exception) { /* skip */ }
+
+                        val rawToken = delta.content ?: continue
+                        if (rawToken.isEmpty()) continue
+
+                        // <think>...</think> tag handling (local endpoints that embed thinking in content)
+                        emitTokenWithThinkHandling(
+                            rawToken, showThoughts,
+                            accumulated, accumulatedThinking,
+                            inThinkBlockRef = { inThinkBlock },
+                            setInThinkBlock = { inThinkBlock = it }
+                        ) { event -> emit(event) }
+
+                    } catch (e: Exception) { /* skip malformed */ }
                 }
             }
         }
@@ -469,7 +493,7 @@ class LlmRepository @Inject constructor(
         DebugLogger.logSection("Chat Completion Response")
         result.lines().take(20).forEach { DebugLogger.log("  $it") }
         if (result.lines().size > 20) DebugLogger.log("  ... (${result.lines().size - 20} more lines)")
-        emit(StreamEvent.Complete(result))
+        emit(StreamEvent.Complete(result, accumulatedThinking.toString()))
     }
 
     // OpenAI text completions fallback (TextGenWebUI, Ooba, etc.)
@@ -576,6 +600,55 @@ class LlmRepository @Inject constructor(
                 else emptyList()
             }
         } catch (e: Exception) { emptyList() }
+    }
+}
+
+/**
+ * Splits a raw content token around <think>...</think> tags, emitting ThinkingToken or Token
+ * events accordingly. Handles tags that span multiple tokens via the inThinkBlock flag.
+ */
+private suspend fun emitTokenWithThinkHandling(
+    rawToken: String,
+    showThoughts: Boolean,
+    accumulated: StringBuilder,
+    accumulatedThinking: StringBuilder,
+    inThinkBlockRef: () -> Boolean,
+    setInThinkBlock: (Boolean) -> Unit,
+    emit: suspend (StreamEvent) -> Unit
+) {
+    var remaining = rawToken
+    while (remaining.isNotEmpty()) {
+        if (!inThinkBlockRef()) {
+            val startIdx = remaining.indexOf("<think>")
+            if (startIdx < 0) {
+                accumulated.append(remaining)
+                emit(StreamEvent.Token(remaining, accumulated.toString()))
+                break
+            }
+            val before = remaining.substring(0, startIdx)
+            if (before.isNotEmpty()) {
+                accumulated.append(before)
+                emit(StreamEvent.Token(before, accumulated.toString()))
+            }
+            remaining = remaining.substring(startIdx + "<think>".length)
+            setInThinkBlock(true)
+        } else {
+            val endIdx = remaining.indexOf("</think>")
+            if (endIdx < 0) {
+                if (showThoughts) {
+                    accumulatedThinking.append(remaining)
+                    emit(StreamEvent.ThinkingToken(remaining, accumulatedThinking.toString()))
+                }
+                break
+            }
+            val thinkChunk = remaining.substring(0, endIdx)
+            if (showThoughts && thinkChunk.isNotEmpty()) {
+                accumulatedThinking.append(thinkChunk)
+                emit(StreamEvent.ThinkingToken(thinkChunk, accumulatedThinking.toString()))
+            }
+            remaining = remaining.substring(endIdx + "</think>".length)
+            setInThinkBlock(false)
+        }
     }
 }
 

@@ -116,6 +116,9 @@ class SettingsDataStore @Inject constructor(
         // Long-Term Memory
         val MEMORY_ENABLED = booleanPreferencesKey("memory_enabled")
 
+        // Show reasoning/thinking tokens (R1, QwQ, etc.)
+        val SHOW_THOUGHTS = booleanPreferencesKey("show_thoughts")
+
         // Sentinel incremented when an encrypted-prefs value changes, to trigger flow re-emit
         val SECURE_REFRESH = intPreferencesKey("secure_refresh")
     }
@@ -131,7 +134,8 @@ class SettingsDataStore @Inject constructor(
             customUrl = prefs[Keys.LLM_CUSTOM_URL],
             apiKey = encryptedPrefs.getString(SECURE_LLM_API_KEY, null)
                 ?: prefs[Keys.LLM_API_KEY] ?: "",
-            currentModel = prefs[Keys.LLM_CURRENT_MODEL] ?: ""
+            currentModel = prefs[Keys.LLM_CURRENT_MODEL] ?: "",
+            showThoughts = prefs[Keys.SHOW_THOUGHTS] ?: false
         )
     }
 
@@ -148,6 +152,7 @@ class SettingsDataStore @Inject constructor(
             else prefs.remove(Keys.LLM_CUSTOM_URL)
             prefs.remove(Keys.LLM_API_KEY)
             prefs[Keys.LLM_CURRENT_MODEL] = config.currentModel
+            prefs[Keys.SHOW_THOUGHTS] = config.showThoughts
             prefs[Keys.SECURE_REFRESH] = (prefs[Keys.SECURE_REFRESH] ?: 0) + 1
         }
     }

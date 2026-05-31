@@ -316,6 +316,16 @@ fun ChatScreen(
                                 leadingIcon = { Icon(Icons.Default.Collections, null) }
                             )
                             HorizontalDivider()
+                            if (uiState.apiShowThoughtsEnabled) {
+                                DropdownMenuItem(
+                                    text = { Text(if (uiState.showReasoningBubbles) "Hide Reasoning" else "Show Reasoning") },
+                                    onClick = {
+                                        showSettingsMenu = false
+                                        viewModel.toggleReasoningBubbles()
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.AutoAwesome, null) }
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text("Debug Log") },
                                 onClick = {
@@ -606,35 +616,41 @@ fun ChatScreen(
                                         viewModel.swipeRight(index)
                                     }
                                 },
-                                getSpriteFile = { viewModel.getSpriteFile(it) }
+                                getSpriteFile = { viewModel.getSpriteFile(it) },
+                                showReasoning = uiState.showReasoningBubbles
                             )
                         }
 
                         // Show streaming content or typing indicator when generating
                         if (uiState.isGenerating) {
                             item {
-                                if (uiState.streamingContent.isNotEmpty()) {
-                                    // Show streaming response as it comes in
-                                    StreamingChatBubble(
-                                        content = uiState.streamingContent,
-                                        characterName = uiState.character?.name ?: "Assistant"
-                                    )
-                                } else {
-                                    // Initial typing indicator before first token
-                                    Row(
-                                        modifier = Modifier.padding(start = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(16.dp),
-                                            strokeWidth = 2.dp
+                                Column {
+                                    // Streaming thinking block (R1 reasoning)
+                                    if (uiState.streamingThinking.isNotEmpty() && uiState.showReasoningBubbles) {
+                                        StreamingThinkingBubble(content = uiState.streamingThinking)
+                                    }
+                                    if (uiState.streamingContent.isNotEmpty()) {
+                                        StreamingChatBubble(
+                                            content = uiState.streamingContent,
+                                            characterName = uiState.character?.name ?: "Assistant"
                                         )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "${uiState.character?.name ?: "Assistant"} is typing...",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                    } else if (uiState.streamingThinking.isEmpty()) {
+                                        // Initial typing indicator before first token
+                                        Row(
+                                            modifier = Modifier.padding(start = 12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(16.dp),
+                                                strokeWidth = 2.dp
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "${uiState.character?.name ?: "Assistant"} is typing...",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -922,7 +938,8 @@ private fun MessageWithActions(
     onHeaderActionClick: ((String, String) -> Unit)? = null,
     onSwipeLeft: () -> Unit,
     onSwipeRight: () -> Unit,
-    getSpriteFile: ((String) -> File?)? = null
+    getSpriteFile: ((String) -> File?)? = null,
+    showReasoning: Boolean = true
 ) {
     Column {
         Box(
@@ -978,7 +995,8 @@ private fun MessageWithActions(
                 onHeaderActionClick = onHeaderActionClick,
                 onBubbleLongPress = onLongPress,
                 onImageAction = if (message.imagePath != null) onLongPress else null,
-                getSpriteFile = getSpriteFile
+                getSpriteFile = getSpriteFile,
+                showReasoning = showReasoning
             )
         }
 

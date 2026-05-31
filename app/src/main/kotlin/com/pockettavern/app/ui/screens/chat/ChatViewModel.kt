@@ -63,6 +63,9 @@ data class ChatUiState(
     val isLoading: Boolean = true,
     val isGenerating: Boolean = false,
     val streamingContent: String = "",
+    val streamingThinking: String = "",
+    val showReasoningBubbles: Boolean = true,
+    val apiShowThoughtsEnabled: Boolean = false,
     val currentChatFileName: String? = null,
     val availableChats: List<ChatInfo> = emptyList(),
     val showChatSelector: Boolean = false,
@@ -296,7 +299,8 @@ class ChatViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         currentApiName = config.displayName,
-                        currentModelName = config.currentModel
+                        currentModelName = config.currentModel,
+                        apiShowThoughtsEnabled = config.showThoughts
                     )
                 }
             }
@@ -855,16 +859,21 @@ No preamble, no explanation. Just the numbered list."""
                     is StreamEvent.Token -> {
                         _uiState.update { it.copy(streamingContent = event.accumulated) }
                     }
+                    is StreamEvent.ThinkingToken -> {
+                        _uiState.update { it.copy(streamingThinking = event.accumulatedThinking) }
+                    }
                     is StreamEvent.Complete -> {
                         // Step 1: apply regex rules + multi-turn trim (keeps extension tags intact)
                         val processed = trimMultiTurn(extensionManager.processOutput(event.fullText))
+                        val reasoning = event.thinkingText.ifBlank { null }
                         // Step 2: add message with raw text so we can emit MESSAGE_RECEIVED first
-                        val rawMessage = ChatMessage(content = processed, isUser = false)
+                        val rawMessage = ChatMessage(content = processed, isUser = false, reasoning = reasoning)
                         _uiState.update {
                             it.copy(
                                 messages = it.messages + rawMessage,
                                 isGenerating = false,
-                                streamingContent = ""
+                                streamingContent = "",
+                                streamingThinking = ""
                             )
                         }
                         // Step 3: update extension context, then emit MESSAGE_RECEIVED
@@ -913,7 +922,7 @@ No preamble, no explanation. Just the numbered list."""
                     }
                     is StreamEvent.Error -> {
                         _uiState.update {
-                            it.copy(isGenerating = false, streamingContent = "", error = event.message)
+                            it.copy(isGenerating = false, streamingContent = "", streamingThinking = "", error = event.message)
                         }
                         extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
                         generationJob = null
@@ -990,7 +999,7 @@ No preamble, no explanation. Just the numbered list."""
             }
         }
 
-        llmRepository.generate(prompt, config, preset, stopSequences, messages, oaiPreset).collect { emit(it) }
+        llmRepository.generate(prompt, config, preset, stopSequences, messages, oaiPreset, config.showThoughts).collect { emit(it) }
     }.flowOn(Dispatchers.IO)
 
     fun stopGeneration() {
@@ -1512,7 +1521,8 @@ No preamble, no explanation. Just the numbered list."""
                 when (event) {
                     is StreamEvent.Complete -> resultText = event.fullText
                     is StreamEvent.Error -> resultText = ""
-                    is StreamEvent.Token -> { /* ignore streaming tokens */ }
+                    is StreamEvent.Token -> { /* ignore */ }
+                    is StreamEvent.ThinkingToken -> { /* ignore */ }
                 }
             }
             extensionManager.jsHost.completeHiddenGenerate(callbackId, resultText)
@@ -1738,6 +1748,10 @@ No preamble, no explanation. Just the numbered list."""
         _uiState.update { it.copy(error = null) }
     }
 
+    fun toggleReasoningBubbles() {
+        _uiState.update { it.copy(showReasoningBubbles = !it.showReasoningBubbles) }
+    }
+
     // ========== Message Search ==========
 
     fun toggleSearch() {
@@ -1870,9 +1884,12 @@ No preamble, no explanation. Just the numbered list."""
                             continueGeneration()
                         }
                     }
+                    is StreamEvent.ThinkingToken -> {
+                        _uiState.update { it.copy(streamingThinking = event.accumulatedThinking) }
+                    }
                     is StreamEvent.Error -> {
                         _uiState.update {
-                            it.copy(isGenerating = false, streamingContent = "", error = event.message)
+                            it.copy(isGenerating = false, streamingContent = "", streamingThinking = "", error = event.message)
                         }
                         extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
                         generationJob = null
@@ -1920,9 +1937,10 @@ No preamble, no explanation. Just the numbered list."""
                         generationJob = null
                         saveCurrentChat()
                     }
+                    is StreamEvent.ThinkingToken -> {}
                     is StreamEvent.Error -> {
                         _uiState.update {
-                            it.copy(isGenerating = false, streamingContent = "", error = event.message)
+                            it.copy(isGenerating = false, streamingContent = "", streamingThinking = "", error = event.message)
                         }
                         extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
                         generationJob = null
@@ -2014,6 +2032,7 @@ No preamble, no explanation. Just the numbered list."""
                         generationJob = null
                         saveCurrentChat()
                     }
+                    is StreamEvent.ThinkingToken -> {}
                     is StreamEvent.Error -> {
                         _uiState.update {
                             it.copy(

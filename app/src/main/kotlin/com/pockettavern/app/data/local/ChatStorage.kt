@@ -246,7 +246,8 @@ class ChatStorage @Inject constructor(
                         senderName = if (!chatLine.isUser && !chatLine.isSystem) chatLine.name else null,
                         rawContent = extra["raw_content"]?.jsonPrimitive?.contentOrNull,
                         extensionHeaders = parseExtensionHeaders(extra),
-                        imagePath = extra["image_path"]?.jsonPrimitive?.contentOrNull
+                        imagePath = extra["image_path"]?.jsonPrimitive?.contentOrNull,
+                        reasoning = extra["reasoning"]?.jsonPrimitive?.contentOrNull
                     )
                 } catch (e: Exception) { null }
             }
@@ -274,6 +275,9 @@ class ChatStorage @Inject constructor(
         }
         if (message.imagePath != null) {
             map["image_path"] = JsonPrimitive(message.imagePath)
+        }
+        if (message.reasoning != null) {
+            map["reasoning"] = JsonPrimitive(message.reasoning)
         }
         if (message.extensionHeaders.isNotEmpty()) {
             val headersArray = message.extensionHeaders.map { entry ->

@@ -2,7 +2,8 @@ package com.pockettavern.app.domain.model
 
 sealed class StreamEvent {
     data class Token(val token: String, val accumulated: String) : StreamEvent()
-    data class Complete(val fullText: String) : StreamEvent()
+    data class ThinkingToken(val token: String, val accumulatedThinking: String) : StreamEvent()
+    data class Complete(val fullText: String, val thinkingText: String = "") : StreamEvent()
     data class Error(val message: String) : StreamEvent()
 }
 

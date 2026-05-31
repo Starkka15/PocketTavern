@@ -50,7 +50,8 @@ fun ChatBubble(
     onHeaderActionClick: ((String, String) -> Unit)? = null,
     onBubbleLongPress: (() -> Unit)? = null,
     onImageAction: (() -> Unit)? = null,
-    getSpriteFile: ((String) -> File?)? = null
+    getSpriteFile: ((String) -> File?)? = null,
+    showReasoning: Boolean = true
 ) {
     // Narrator/system messages render as full-width centered italic text
     if (message.isNarrator) {
@@ -280,6 +281,50 @@ fun ChatBubble(
                 }
             }
         }
+        // Collapsible reasoning block (DeepSeek R1 / thinking models)
+        if (!message.isUser && message.reasoning != null && showReasoning) {
+            var reasoningExpanded by remember { mutableStateOf(false) }
+            Surface(
+                modifier = Modifier
+                    .widthIn(max = 320.dp)
+                    .padding(bottom = 4.dp)
+                    .combinedClickable(
+                        onClick = { reasoningExpanded = !reasoningExpanded },
+                        onLongClick = {}
+                    ),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = if (reasoningExpanded) "▾" else "▸",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Reasoning",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    AnimatedVisibility(visible = reasoningExpanded) {
+                        Column {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = message.reasoning,
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Default),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         Surface(
             modifier = Modifier
                 .widthIn(max = 320.dp)
@@ -389,6 +434,44 @@ fun StreamingChatBubble(
                     color = ptColors.assistantBubbleText
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun StreamingThinkingBubble(
+    content: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .widthIn(max = 320.dp)
+            .padding(bottom = 4.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(10.dp),
+                    strokeWidth = 1.5.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Reasoning...",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = content + "▌",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
