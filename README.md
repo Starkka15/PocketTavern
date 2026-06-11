@@ -5,7 +5,7 @@
 > **The goal: the best source-available AI chat app on Android.**
 > Simple enough to pick up in minutes. Deep enough for power users who want full control over every token.
 
-[![Forum]([https://charavault.net/forum#c/pt-help])
+[![Forum](https://charavault.net/forum#c/pt-help)
 [![Release](https://img.shields.io/github/v/release/Starkka15/PocketTavern?style=for-the-badge&color=7c3aed)](https://github.com/Starkka15/PocketTavern/releases/latest)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3ddc84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Starkka15/PocketTavern/releases/latest)
 
