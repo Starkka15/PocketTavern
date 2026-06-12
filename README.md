@@ -1157,6 +1157,10 @@ Commercial use of any part of this software requires explicit written permission
 
 > **Note:** This license is not OSI-certified and does not meet the [Open Source Definition](https://opensource.org/osd). It is correctly described as **source-available**.
 
+### Our philosophy
+
+We treat PocketTavern as open source in spirit — fork it, modify it, build your own app from it, learn from it, share it. That's all welcome. The only line we draw is **profit as a barrier**. Donations to cover hosting or running costs are fine. What we don't want is money standing between someone and the app — no subscriptions, no paywalled features, no paid downloads. PocketTavern exists to cost nothing, and we want any fork or derivative to follow the same principle.
+
 See [LICENSE](LICENSE) for full terms.
 
 ---
