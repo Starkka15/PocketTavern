@@ -131,6 +131,11 @@ data class ChatUiState(
     val showModelPicker: Boolean = false,
     val availableModels: List<String> = emptyList(),
     val modelPickerLoading: Boolean = false,
+    // Generate first message dialog
+    val showGenerateGreetingPrompt: Boolean = false,
+    val generatingFirstMessage: Boolean = false,
+    val generatedFirstMessage: String = "",
+    val generateFirstMessageError: String? = null,
 )
 
 data class GalleryImage(
@@ -566,16 +571,27 @@ class ChatViewModel @Inject constructor(
                 if (character.firstMessage.isNotBlank()) add(character.firstMessage)
                 addAll(character.alternateGreetings.filter { it.isNotBlank() })
             }
-            if (allGreetings.size > 1) {
-                _uiState.update {
-                    it.copy(
-                        showGreetingPicker = true,
-                        availableGreetings = allGreetings,
-                        isLoading = false
-                    )
+            when {
+                allGreetings.size > 1 -> {
+                    _uiState.update {
+                        it.copy(
+                            showGreetingPicker = true,
+                            availableGreetings = allGreetings,
+                            isLoading = false
+                        )
+                    }
                 }
-            } else {
-                startNewChatWithGreeting(allGreetings.firstOrNull())
+                allGreetings.isEmpty() -> {
+                    _uiState.update {
+                        it.copy(
+                            showGenerateGreetingPrompt = true,
+                            generatedFirstMessage = "",
+                            generateFirstMessageError = null,
+                            isLoading = false
+                        )
+                    }
+                }
+                else -> startNewChatWithGreeting(allGreetings.firstOrNull())
             }
         }
     }
@@ -587,6 +603,97 @@ class ChatViewModel @Inject constructor(
     fun selectGreeting(greeting: String?) {
         _uiState.update { it.copy(showGreetingPicker = false, availableGreetings = emptyList()) }
         startNewChatWithGreeting(greeting)
+    }
+
+    fun dismissGenerateGreetingPrompt() {
+        _uiState.update {
+            it.copy(
+                showGenerateGreetingPrompt = false,
+                generatingFirstMessage = false,
+                generatedFirstMessage = "",
+                generateFirstMessageError = null
+            )
+        }
+        startNewChatWithGreeting(null)
+    }
+
+    fun confirmGeneratedGreeting() {
+        val text = _uiState.value.generatedFirstMessage
+        _uiState.update {
+            it.copy(
+                showGenerateGreetingPrompt = false,
+                generatingFirstMessage = false,
+                generatedFirstMessage = "",
+                generateFirstMessageError = null
+            )
+        }
+        startNewChatWithGreeting(text.ifBlank { null })
+    }
+
+    fun generateFirstMessage() {
+        val character = _uiState.value.character ?: return
+        val config = _currentConfig
+        _uiState.update {
+            it.copy(
+                generatingFirstMessage = true,
+                generatedFirstMessage = "",
+                generateFirstMessageError = null
+            )
+        }
+        viewModelScope.launch {
+            try {
+                val cardInfo = buildString {
+                    appendLine("Name: ${character.name}")
+                    if (character.description.isNotBlank()) appendLine("Description: ${character.description}")
+                    if (character.personality.isNotBlank()) appendLine("Personality: ${character.personality}")
+                    if (character.scenario.isNotBlank()) appendLine("Scenario: ${character.scenario}")
+                    if (character.creatorNotes.isNotBlank()) appendLine("Creator notes: ${character.creatorNotes}")
+                    if (character.systemPrompt.isNotBlank()) appendLine("System prompt: ${character.systemPrompt}")
+                    if (character.messageExample.isNotBlank()) appendLine("Example dialogue:\n${character.messageExample}")
+                }
+                val userName = settingsDataStore.getUserPersonaName().ifBlank { "User" }
+                val prompt = """You are writing the opening message for a roleplay character.
+Write a first message as ${character.name} that establishes their personality, voice, and the scenario.
+The user's name is $userName. Use {{user}} for the user and {{char}} for the character name.
+Write only the character's opening message — no preamble, no meta-commentary, no instructions.
+
+CHARACTER CARD:
+$cardInfo""".trimIndent()
+
+                val oaiMessages = if (config.usesChatCompletions)
+                    listOf(com.pockettavern.app.domain.model.PromptMessage("user", prompt))
+                else null
+
+                llmRepository.generate(prompt, config, null, emptyList(), oaiMessages, null).collect { event ->
+                    when (event) {
+                        is com.pockettavern.app.domain.model.StreamEvent.Token ->
+                            _uiState.update { it.copy(generatedFirstMessage = event.accumulated) }
+                        is com.pockettavern.app.domain.model.StreamEvent.Complete ->
+                            _uiState.update {
+                                it.copy(
+                                    generatedFirstMessage = event.fullText,
+                                    generatingFirstMessage = false
+                                )
+                            }
+                        is com.pockettavern.app.domain.model.StreamEvent.Error ->
+                            _uiState.update {
+                                it.copy(
+                                    generatingFirstMessage = false,
+                                    generateFirstMessageError = event.message
+                                )
+                            }
+                        else -> {}
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        generatingFirstMessage = false,
+                        generateFirstMessageError = e.message ?: "Generation failed"
+                    )
+                }
+            }
+        }
     }
 
     private fun startNewChatWithGreeting(greeting: String?) {

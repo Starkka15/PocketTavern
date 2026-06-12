@@ -737,6 +737,19 @@ fun ChatScreen(
         )
     }
 
+    // Generate first message for cards with no greeting
+    if (uiState.showGenerateGreetingPrompt) {
+        GenerateFirstMessageDialog(
+            characterName = uiState.character?.name ?: "",
+            isGenerating = uiState.generatingFirstMessage,
+            generatedText = uiState.generatedFirstMessage,
+            error = uiState.generateFirstMessageError,
+            onGenerate = { viewModel.generateFirstMessage() },
+            onConfirm = { viewModel.confirmGeneratedGreeting() },
+            onSkip = { viewModel.dismissGenerateGreetingPrompt() }
+        )
+    }
+
     if (uiState.showScanloreDialog) {
         com.pockettavern.app.ui.components.ScanloreConfirmDialog(
             entries = uiState.scanloreEntries,
@@ -1344,6 +1357,79 @@ private fun GreetingPickerDialog(
             TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
+        }
+    )
+}
+
+@Composable
+private fun GenerateFirstMessageDialog(
+    characterName: String,
+    isGenerating: Boolean,
+    generatedText: String,
+    error: String?,
+    onGenerate: () -> Unit,
+    onConfirm: () -> Unit,
+    onSkip: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onSkip,
+        title = { Text("No Opening Message") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "$characterName has no opening message. Generate one using the card info?",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                when {
+                    error != null -> Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    isGenerating || generatedText.isNotBlank() -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 80.dp, max = 240.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = MaterialTheme.shapes.small
+                                )
+                                .padding(10.dp)
+                        ) {
+                            Text(
+                                text = generatedText.ifBlank { "…" },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (isGenerating) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .align(Alignment.BottomEnd),
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            when {
+                generatedText.isNotBlank() && !isGenerating -> {
+                    TextButton(onClick = onConfirm) { Text("Use This") }
+                }
+                !isGenerating -> {
+                    TextButton(onClick = onGenerate) { Text("Generate") }
+                }
+                else -> {
+                    TextButton(onClick = {}, enabled = false) { Text("Generating…") }
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onSkip) { Text("Skip") }
         }
     )
 }
