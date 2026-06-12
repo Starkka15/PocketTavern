@@ -1,24 +1,35 @@
 package com.pockettavern.app.ui.audio
 
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import com.pockettavern.app.util.DebugLogger
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.Locale
 import java.util.UUID
 import kotlin.coroutines.resume
 
-class SystemTtsProvider(context: Context) : TtsProvider {
+class SystemTtsProvider(context: Context, enginePackage: String? = null) : TtsProvider {
 
     private var tts: TextToSpeech? = null
     private var ready = false
     private var speaking = false
+    private val readyDeferred = CompletableDeferred<Boolean>()
 
     init {
-        tts = TextToSpeech(context) { status ->
+        val engine = enginePackage
+            ?: Settings.Secure.getString(context.contentResolver, Settings.Secure.TTS_DEFAULT_SYNTH)
+        DebugLogger.log("[SystemTTS] Using engine: $engine (explicit: ${enginePackage != null})")
+
+        tts = TextToSpeech(context, { status ->
             ready = status == TextToSpeech.SUCCESS
+            readyDeferred.complete(ready)
             if (ready) {
+                val voiceCount = tts?.voices?.size ?: 0
+                DebugLogger.log("[SystemTTS] Initialized, ${voiceCount} voices available")
                 tts?.language = Locale.getDefault()
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) { speaking = true }
@@ -27,16 +38,17 @@ class SystemTtsProvider(context: Context) : TtsProvider {
                     override fun onError(utteranceId: String?) { speaking = false }
                     override fun onError(utteranceId: String?, errorCode: Int) { speaking = false }
                 })
-                DebugLogger.log("[SystemTTS] Initialized successfully")
             } else {
                 DebugLogger.log("[SystemTTS] Initialization failed with status: $status")
             }
-        }
+        }, engine)
     }
+
+    suspend fun waitForReady(): Boolean = readyDeferred.await()
 
     override suspend fun speak(text: String, voiceId: String?, speed: Float) {
         val engine = tts ?: return
-        if (!ready) return
+        if (!ready && !readyDeferred.await()) return
 
         engine.setSpeechRate(speed)
 
