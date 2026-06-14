@@ -105,6 +105,45 @@ fun TtsSettingsScreen(
                     }
                 }
 
+                // ── System TTS Engine & Voice Selector ─────────────────
+                if (config.provider == "system") {
+                    item {
+                        SectionCard {
+                            Text(
+                                "System TTS Engine",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "Choose which installed TTS engine to use",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            EngineSelector(
+                                selectedEngine = config.systemEngine,
+                                engines = uiState.availableEngines,
+                                onEngineSelected = { viewModel.updateSystemEngine(it) }
+                            )
+
+                            if (config.systemEngine.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                VoiceSelector(
+                                    label = "Default Voice",
+                                    selectedVoice = config.systemVoice,
+                                    voices = uiState.systemVoices,
+                                    onVoiceSelected = { viewModel.updateSystemVoice(it) },
+                                    onRefresh = {
+                                        viewModel.updateSystemEngine(config.systemEngine)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // ── OpenAI Settings ─────────────────────────────────────
                 if (config.provider == "openai") {
                     item {
@@ -314,7 +353,8 @@ private fun VoiceSelector(
             modifier = Modifier.weight(1f)
         ) {
             OutlinedTextField(
-                value = voices.find { it.id == selectedVoice }?.name ?: selectedVoice,
+                value = if (selectedVoice.isEmpty()) "Default (engine default)" 
+                       else voices.find { it.id == selectedVoice }?.name ?: selectedVoice,
                 onValueChange = { },
                 readOnly = true,
                 modifier = Modifier
@@ -340,6 +380,13 @@ private fun VoiceSelector(
                         onClick = { expanded = false }
                     )
                 }
+                DropdownMenuItem(
+                    text = { Text("Default (engine default)") },
+                    onClick = {
+                        onVoiceSelected("")
+                        expanded = false
+                    }
+                )
                 voices.forEach { voice ->
                     DropdownMenuItem(
                         text = {
@@ -372,6 +419,70 @@ private fun VoiceSelector(
                 contentDescription = "Refresh voices",
                 tint = MaterialTheme.colorScheme.primary
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EngineSelector(
+    selectedEngine: String,
+    engines: List<com.pockettavern.app.ui.audio.TtsEngineInfo>,
+    onEngineSelected: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    val selectedLabel = if (selectedEngine.isEmpty()) {
+        "System default"
+    } else {
+        engines.find { it.packageName == selectedEngine }?.label ?: selectedEngine
+    }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it }
+    ) {
+        OutlinedTextField(
+            value = selectedLabel,
+            onValueChange = { },
+            readOnly = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+            label = { Text("Engine") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            singleLine = true
+        )
+
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("System default") },
+                onClick = {
+                    onEngineSelected("")
+                    expanded = false
+                }
+            )
+            engines.forEach { engine ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(engine.label)
+                            Text(
+                                engine.packageName,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    onClick = {
+                        onEngineSelected(engine.packageName)
+                        expanded = false
+                    }
+                )
+            }
         }
     }
 }

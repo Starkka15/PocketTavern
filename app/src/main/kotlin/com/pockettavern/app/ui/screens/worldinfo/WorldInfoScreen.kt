@@ -50,13 +50,22 @@ fun WorldInfoScreen(
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
         val bytes = context.contentResolver.openInputStream(uri)?.readBytes() ?: return@rememberLauncherForActivityResult
-        val name = uri.lastPathSegment
+        val nameFromUri = uri.lastPathSegment
             ?.substringAfterLast('/')
             ?.substringAfterLast('%')
             ?.removeSuffix(".json")
             ?.ifBlank { null }
-            ?: "Imported Lorebook"
-        viewModel.importJson(name, bytes)
+        // If the URI segment is just a number (document ID, not filename), fall back to the JSON name field
+        val name = if (nameFromUri != null && nameFromUri.all { it.isDigit() }) {
+            try {
+                val json = org.json.JSONObject(String(bytes))
+                json.optString("name").ifBlank { null }
+            } catch (_: Exception) { null }
+        } else nameFromUri ?: try {
+            val json = org.json.JSONObject(String(bytes))
+            json.optString("name").ifBlank { null }
+        } catch (_: Exception) { null } ?: "Imported Lorebook"
+        viewModel.importJson(name ?: "Imported Lorebook", bytes)
     }
 
     Scaffold(

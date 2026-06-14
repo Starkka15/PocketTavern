@@ -27,7 +27,10 @@ data class ApiConfiguration(
 
     // Connection status
     val isConnected: Boolean = false,
-    val connectionError: String? = null
+    val connectionError: String? = null,
+
+    // Show reasoning/thinking tokens (DeepSeek R1, QwQ, etc.)
+    val showThoughts: Boolean = false
 ) {
     /**
      * Whether this configuration uses chat completions (OpenAI-style) or text completions

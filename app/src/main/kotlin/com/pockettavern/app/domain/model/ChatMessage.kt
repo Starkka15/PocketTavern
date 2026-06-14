@@ -28,7 +28,9 @@ data class ChatMessage(
     // Headers set by extensions (multiple extensions can each set one per message)
     val extensionHeaders: List<MessageHeaderEntry> = emptyList(),
     // Path to an image file for image messages (relative to filesDir, e.g. "chat_images/xxx/yyy.png")
-    val imagePath: String? = null
+    val imagePath: String? = null,
+    // Reasoning/thinking content from models like DeepSeek R1 (shown collapsed in UI)
+    val reasoning: String? = null
 )
 
 // Per-chat metadata stored in the first message

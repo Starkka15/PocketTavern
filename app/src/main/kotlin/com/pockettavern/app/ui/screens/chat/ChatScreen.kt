@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
@@ -316,6 +317,16 @@ fun ChatScreen(
                                 leadingIcon = { Icon(Icons.Default.Collections, null) }
                             )
                             HorizontalDivider()
+                            if (uiState.apiShowThoughtsEnabled) {
+                                DropdownMenuItem(
+                                    text = { Text(if (uiState.showReasoningBubbles) "Hide Reasoning" else "Show Reasoning") },
+                                    onClick = {
+                                        showSettingsMenu = false
+                                        viewModel.toggleReasoningBubbles()
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.AutoAwesome, null) }
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text("Debug Log") },
                                 onClick = {
@@ -606,35 +617,41 @@ fun ChatScreen(
                                         viewModel.swipeRight(index)
                                     }
                                 },
-                                getSpriteFile = { viewModel.getSpriteFile(it) }
+                                getSpriteFile = { viewModel.getSpriteFile(it) },
+                                showReasoning = uiState.showReasoningBubbles
                             )
                         }
 
                         // Show streaming content or typing indicator when generating
                         if (uiState.isGenerating) {
                             item {
-                                if (uiState.streamingContent.isNotEmpty()) {
-                                    // Show streaming response as it comes in
-                                    StreamingChatBubble(
-                                        content = uiState.streamingContent,
-                                        characterName = uiState.character?.name ?: "Assistant"
-                                    )
-                                } else {
-                                    // Initial typing indicator before first token
-                                    Row(
-                                        modifier = Modifier.padding(start = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(16.dp),
-                                            strokeWidth = 2.dp
+                                Column {
+                                    // Streaming thinking block (R1 reasoning)
+                                    if (uiState.streamingThinking.isNotEmpty() && uiState.showReasoningBubbles) {
+                                        StreamingThinkingBubble(content = uiState.streamingThinking)
+                                    }
+                                    if (uiState.streamingContent.isNotEmpty()) {
+                                        StreamingChatBubble(
+                                            content = uiState.streamingContent,
+                                            characterName = uiState.character?.name ?: "Assistant"
                                         )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "${uiState.character?.name ?: "Assistant"} is typing...",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                    } else if (uiState.streamingThinking.isEmpty()) {
+                                        // Initial typing indicator before first token
+                                        Row(
+                                            modifier = Modifier.padding(start = 12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(16.dp),
+                                                strokeWidth = 2.dp
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "${uiState.character?.name ?: "Assistant"} is typing...",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -688,7 +705,18 @@ fun ChatScreen(
             currentChatFileName = uiState.currentChatFileName,
             onSelectChat = { viewModel.selectChat(it) },
             onNewChat = { viewModel.createNewChat() },
+            onRenameChat = { viewModel.showRenameChatDialog(it) },
             onDismiss = { viewModel.dismissChatSelector() }
+        )
+    }
+
+    // Chat rename dialog
+    if (uiState.showRenameChatDialog) {
+        RenameChatDialog(
+            currentInput = uiState.renameChatInput,
+            onInputChange = { viewModel.updateRenameChatInput(it) },
+            onConfirm = { viewModel.confirmRenameChat() },
+            onDismiss = { viewModel.dismissRenameChatDialog() }
         )
     }
 
@@ -718,6 +746,19 @@ fun ChatScreen(
             greetings = uiState.availableGreetings,
             onSelectGreeting = { viewModel.selectGreeting(it) },
             onDismiss = { viewModel.dismissGreetingPicker() }
+        )
+    }
+
+    // Generate first message for cards with no greeting
+    if (uiState.showGenerateGreetingPrompt) {
+        GenerateFirstMessageDialog(
+            characterName = uiState.character?.name ?: "",
+            isGenerating = uiState.generatingFirstMessage,
+            generatedText = uiState.generatedFirstMessage,
+            error = uiState.generateFirstMessageError,
+            onGenerate = { viewModel.generateFirstMessage() },
+            onConfirm = { viewModel.confirmGeneratedGreeting() },
+            onSkip = { viewModel.dismissGenerateGreetingPrompt() }
         )
     }
 
@@ -753,6 +794,9 @@ fun ChatScreen(
                 },
                 onDeleteFromHere = {
                     viewModel.deleteMessagesFromIndex(messageIndex)
+                },
+                onForkHere = {
+                    viewModel.forkChatAtMessage(messageIndex)
                 },
                 onSaveImage = {
                     viewModel.saveImageMessageToGallery(messageIndex)
@@ -799,12 +843,14 @@ fun ChatScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ChatSelectorDialog(
     chats: List<com.pockettavern.app.domain.model.ChatInfo>,
     currentChatFileName: String?,
     onSelectChat: (String) -> Unit,
     onNewChat: () -> Unit,
+    onRenameChat: (String) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -828,7 +874,10 @@ private fun ChatSelectorDialog(
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { onSelectChat(chat.fileName) },
+                                    .combinedClickable(
+                                        onClick = { onSelectChat(chat.fileName) },
+                                        onLongClick = { onRenameChat(chat.fileName) }
+                                    ),
                                 color = if (isSelected)
                                     MaterialTheme.colorScheme.primaryContainer
                                 else
@@ -902,7 +951,7 @@ private fun formatChatFileName(fileName: String): String {
         }
         "$monthName ${day.toInt()}, $year $hour12:$minute $amPm"
     } else {
-        fileName
+        fileName.removeSuffix(".jsonl")
     }
 }
 
@@ -922,7 +971,8 @@ private fun MessageWithActions(
     onHeaderActionClick: ((String, String) -> Unit)? = null,
     onSwipeLeft: () -> Unit,
     onSwipeRight: () -> Unit,
-    getSpriteFile: ((String) -> File?)? = null
+    getSpriteFile: ((String) -> File?)? = null,
+    showReasoning: Boolean = true
 ) {
     Column {
         Box(
@@ -978,7 +1028,8 @@ private fun MessageWithActions(
                 onHeaderActionClick = onHeaderActionClick,
                 onBubbleLongPress = onLongPress,
                 onImageAction = if (message.imagePath != null) onLongPress else null,
-                getSpriteFile = getSpriteFile
+                getSpriteFile = getSpriteFile,
+                showReasoning = showReasoning
             )
         }
 
@@ -1014,6 +1065,7 @@ private fun MessageActionsDialog(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onDeleteFromHere: () -> Unit,
+    onForkHere: () -> Unit = {},
     onRegenerate: () -> Unit,
     onSaveImage: () -> Unit = {},
     onSpeakTts: () -> Unit = {},
@@ -1107,6 +1159,21 @@ private fun MessageActionsDialog(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text("Delete From Here", color = MaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+
+                // Fork — branch a new chat with history up to this message
+                TextButton(
+                    onClick = onForkHere,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.CallSplit,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Fork From Here")
                     Spacer(modifier = Modifier.weight(1f))
                 }
 
@@ -1326,6 +1393,109 @@ private fun GreetingPickerDialog(
             TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
+        }
+    )
+}
+
+@Composable
+private fun GenerateFirstMessageDialog(
+    characterName: String,
+    isGenerating: Boolean,
+    generatedText: String,
+    error: String?,
+    onGenerate: () -> Unit,
+    onConfirm: () -> Unit,
+    onSkip: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onSkip,
+        title = { Text("No Opening Message") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "$characterName has no opening message. Generate one using the card info?",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                when {
+                    error != null -> Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    isGenerating || generatedText.isNotBlank() -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 80.dp, max = 240.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = MaterialTheme.shapes.small
+                                )
+                                .padding(10.dp)
+                        ) {
+                            Text(
+                                text = generatedText.ifBlank { "…" },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (isGenerating) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .align(Alignment.BottomEnd),
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            when {
+                generatedText.isNotBlank() && !isGenerating -> {
+                    TextButton(onClick = onConfirm) { Text("Use This") }
+                }
+                !isGenerating -> {
+                    TextButton(onClick = onGenerate) { Text("Generate") }
+                }
+                else -> {
+                    TextButton(onClick = {}, enabled = false) { Text("Generating…") }
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onSkip) { Text("Skip") }
+        }
+    )
+}
+
+@Composable
+private fun RenameChatDialog(
+    currentInput: String,
+    onInputChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rename Chat") },
+        text = {
+            OutlinedTextField(
+                value = currentInput,
+                onValueChange = onInputChange,
+                label = { Text("New name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = currentInput.isNotBlank()) {
+                Text("Rename")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
 }

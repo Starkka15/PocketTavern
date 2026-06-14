@@ -139,6 +139,10 @@ class ApiConfigViewModel @Inject constructor(
         }
     }
 
+    fun setShowThoughts(enabled: Boolean) {
+        _uiState.update { it.copy(config = it.config.copy(showThoughts = enabled)) }
+    }
+
     fun saveConfiguration() {
         val config = _uiState.value.config
         viewModelScope.launch {

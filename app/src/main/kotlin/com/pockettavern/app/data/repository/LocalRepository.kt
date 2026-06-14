@@ -121,6 +121,15 @@ class LocalRepository @Inject constructor(
         chatStorage.deleteChat(characterName, fileName)
     }
 
+    suspend fun renameChat(characterName: String, oldFileName: String, newDisplayName: String): Result<String> = withResult {
+        chatStorage.renameChat(characterName, oldFileName, newDisplayName)
+    }
+
+    suspend fun forkChat(characterName: String, messages: List<com.pockettavern.app.domain.model.ChatMessage>): Result<String> = withResult {
+        val userName = settingsDataStore.getUserPersonaName().ifBlank { "User" }
+        chatStorage.forkChat(characterName, messages, userName)
+    }
+
     fun generateChatFileName(characterName: String): String =
         chatStorage.generateFileName(characterName)
 

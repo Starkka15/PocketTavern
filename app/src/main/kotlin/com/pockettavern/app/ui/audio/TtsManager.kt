@@ -1,6 +1,7 @@
 package com.pockettavern.app.ui.audio
 
 import android.content.Context
+import android.content.Intent
 import com.pockettavern.app.data.local.SettingsDataStore
 import com.pockettavern.app.data.local.TtsVoiceStorage
 import com.pockettavern.app.util.DebugLogger
@@ -13,6 +14,11 @@ import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
 
+data class TtsEngineInfo(
+    val packageName: String,
+    val label: String
+)
+
 @Singleton
 class TtsManager @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -21,16 +27,34 @@ class TtsManager @Inject constructor(
     @Named("LLM") private val okHttpClient: OkHttpClient
 ) {
     private var systemProvider: SystemTtsProvider? = null
+    private var systemEngine: String? = null
     private var openAiProvider: OpenAiTtsProvider? = null
 
     private val _speakingState = MutableStateFlow(false)
     val speakingState: StateFlow<Boolean> = _speakingState.asStateFlow()
 
-    private fun getSystemProvider(): SystemTtsProvider {
-        if (systemProvider == null) {
-            systemProvider = SystemTtsProvider(context)
+    private fun getSystemProvider(engine: String?): SystemTtsProvider {
+        if (systemProvider == null || systemEngine != engine) {
+            systemProvider?.shutdown()
+            systemEngine = engine
+            systemProvider = SystemTtsProvider(context, engine)
         }
         return systemProvider!!
+    }
+
+    fun getSystemEngines(): List<TtsEngineInfo> {
+        try {
+            val intent = Intent("android.intent.action.TTS_SERVICE")
+            return context.packageManager.queryIntentServices(intent, 0).map { info ->
+                TtsEngineInfo(
+                    packageName = info.serviceInfo.packageName,
+                    label = info.loadLabel(context.packageManager).toString()
+                )
+            }
+        } catch (e: Exception) {
+            DebugLogger.log("[TtsManager] Failed to query TTS engines: ${e.message}")
+            return emptyList()
+        }
     }
 
     private fun getOpenAiProvider(): OpenAiTtsProvider {
@@ -56,7 +80,10 @@ class TtsManager @Inject constructor(
 
         // Determine voice: per-character or global default
         val voiceId = if (characterFile != null) {
-            voiceStorage.getVoiceId(characterFile)
+            voiceStorage.getVoiceId(characterFile) ?: 
+                if (config.systemVoice.isNotEmpty()) config.systemVoice else null
+        } else if (config.systemVoice.isNotEmpty()) {
+            config.systemVoice
         } else null
 
         _speakingState.value = true
@@ -71,7 +98,8 @@ class TtsManager @Inject constructor(
                     provider.speak(filteredText, voice, config.speed)
                 }
                 else -> {
-                    val provider = getSystemProvider()
+                    val engine = if (config.systemEngine.isNotEmpty()) config.systemEngine else null
+                    val provider = getSystemProvider(engine)
                     provider.speak(filteredText, voiceId, config.speed)
                 }
             }
@@ -103,8 +131,23 @@ class TtsManager @Inject constructor(
                 p.model = config.openAiModel
                 p.getVoices()
             }
-            else -> getSystemProvider().getVoices()
+            else -> {
+                val config = settingsDataStore.getTtsConfig()
+                val engine = if (config.systemEngine.isNotEmpty()) config.systemEngine else null
+                getSystemProvider(engine).getVoices()
+            }
         }
+    }
+
+    suspend fun getVoicesForSystemEngine(engine: String?): List<TtsVoice> {
+        val temp = SystemTtsProvider(context, engine)
+        if (temp.waitForReady()) {
+            val voices = temp.getVoices()
+            temp.shutdown()
+            return voices
+        }
+        temp.shutdown()
+        return emptyList()
     }
 
     fun isSpeaking(): Boolean =

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pockettavern.app.data.local.SettingsDataStore
 import com.pockettavern.app.domain.model.TtsConfig
+import com.pockettavern.app.ui.audio.TtsEngineInfo
 import com.pockettavern.app.ui.audio.TtsManager
 import com.pockettavern.app.ui.audio.TtsVoice
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,6 +18,8 @@ import javax.inject.Inject
 data class TtsSettingsUiState(
     val config: TtsConfig = TtsConfig(),
     val voices: List<TtsVoice> = emptyList(),
+    val systemVoices: List<TtsVoice> = emptyList(),
+    val availableEngines: List<TtsEngineInfo> = emptyList(),
     val isLoading: Boolean = true,
     val isTesting: Boolean = false
 )
@@ -34,9 +37,19 @@ class TtsSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             settingsDataStore.ttsConfigFlow.collect { config ->
                 _uiState.update { it.copy(config = config, isLoading = false) }
+                if (config.provider == "system" && config.systemEngine.isNotEmpty() && _uiState.value.systemVoices.isEmpty()) {
+                    val voices = ttsManager.getVoicesForSystemEngine(config.systemEngine)
+                    _uiState.update { it.copy(systemVoices = voices) }
+                }
             }
         }
         loadVoices()
+        loadEngines()
+    }
+
+    private fun loadEngines() {
+        val engines = ttsManager.getSystemEngines()
+        _uiState.update { it.copy(availableEngines = engines) }
     }
 
     private fun loadVoices() {
@@ -91,6 +104,25 @@ class TtsSettingsViewModel @Inject constructor(
 
     fun updateFilterMode(mode: String) {
         updateConfig { it.copy(filterMode = mode) }
+    }
+
+    fun updateSystemEngine(engine: String) {
+        updateConfig {
+            it.copy(
+                systemEngine = engine,
+                systemVoice = ""  // Reset voice when engine changes
+            )
+        }
+        viewModelScope.launch {
+            val voices = ttsManager.getVoicesForSystemEngine(
+                if (engine.isNotEmpty()) engine else null
+            )
+            _uiState.update { it.copy(systemVoices = voices) }
+        }
+    }
+
+    fun updateSystemVoice(voice: String) {
+        updateConfig { it.copy(systemVoice = voice) }
     }
 
     fun testVoice() {

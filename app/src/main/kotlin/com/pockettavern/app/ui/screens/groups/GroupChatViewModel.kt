@@ -448,6 +448,7 @@ class GroupChatViewModel @Inject constructor(
                         groupStorage.appendMessage(group.id, chatFileName, aiMsg)
                         generationJob = null
                     }
+                    is StreamEvent.ThinkingToken -> {}
                     is StreamEvent.Error -> {
                         _uiState.update {
                             it.copy(
@@ -617,6 +618,7 @@ class GroupChatViewModel @Inject constructor(
                         groupStorage.appendMessage(group.id, chatFileName, narratorMsg)
                         generationJob = null
                     }
+                    is StreamEvent.ThinkingToken -> {}
                     is StreamEvent.Error -> {
                         _uiState.update {
                             it.copy(
@@ -720,6 +722,7 @@ class GroupChatViewModel @Inject constructor(
                         groupStorage.appendMessage(group.id, chatFileName, aiMsg)
                         generationJob = null
                     }
+                    is StreamEvent.ThinkingToken -> {}
                     is StreamEvent.Error -> {
                         _uiState.update {
                             it.copy(

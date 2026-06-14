@@ -50,7 +50,8 @@ fun ChatBubble(
     onHeaderActionClick: ((String, String) -> Unit)? = null,
     onBubbleLongPress: (() -> Unit)? = null,
     onImageAction: (() -> Unit)? = null,
-    getSpriteFile: ((String) -> File?)? = null
+    getSpriteFile: ((String) -> File?)? = null,
+    showReasoning: Boolean = true
 ) {
     // Narrator/system messages render as full-width centered italic text
     if (message.isNarrator) {
@@ -280,6 +281,50 @@ fun ChatBubble(
                 }
             }
         }
+        // Collapsible reasoning block (DeepSeek R1 / thinking models)
+        if (!message.isUser && message.reasoning != null && showReasoning) {
+            var reasoningExpanded by remember { mutableStateOf(false) }
+            Surface(
+                modifier = Modifier
+                    .widthIn(max = 320.dp)
+                    .padding(bottom = 4.dp)
+                    .combinedClickable(
+                        onClick = { reasoningExpanded = !reasoningExpanded },
+                        onLongClick = {}
+                    ),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = if (reasoningExpanded) "▾" else "▸",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Reasoning",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    AnimatedVisibility(visible = reasoningExpanded) {
+                        Column {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = message.reasoning,
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Default),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         Surface(
             modifier = Modifier
                 .widthIn(max = 320.dp)
@@ -345,6 +390,24 @@ fun ChatBubble(
                                 contentScale = ContentScale.FillWidth
                             )
                         }
+                        is MessageChunk.Base64ImageChunk -> {
+                            val bitmap = remember(chunk.bytes) {
+                                android.graphics.BitmapFactory.decodeByteArray(chunk.bytes, 0, chunk.bytes.size)
+                            }
+                            if (bitmap != null) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = chunk.alt.ifEmpty { "image" },
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.85f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .align(Alignment.CenterHorizontally)
+                                        .padding(vertical = 4.dp),
+                                    contentScale = ContentScale.FillWidth
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -393,6 +456,44 @@ fun StreamingChatBubble(
     }
 }
 
+@Composable
+fun StreamingThinkingBubble(
+    content: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .widthIn(max = 320.dp)
+            .padding(bottom = 4.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(10.dp),
+                    strokeWidth = 1.5.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Reasoning...",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = content + "▌",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
 // Matches sprite/expression commands in all formats:
 //   Group 1: <img cmd="name">       double quotes
 //   Group 2: <img cmd=''name''>     double single quotes
@@ -402,6 +503,7 @@ fun StreamingChatBubble(
 //   Group 6: bare img src=(name)    model often omits brackets
 //   Group 7: <img src='name'>       single-quoted src (SillyTavern emotion format)
 //   Group 8: <img src="name">       double-quoted src (non-URL)
+//   Group 9: <img="name">           shorthand (no src/cmd keyword)
 private val SPRITE_REGEX = Regex(
     """<\s*img\s+cmd="([^"]+)"[^>]*>""" +
     """|<\s*img\s+cmd=''([^']+)''[^>]*>""" +
@@ -410,7 +512,8 @@ private val SPRITE_REGEX = Regex(
     """|<\s*img\s+src=\(([^)]+)\)\s*>""" +
     """|\bimg\s+src=\(([^)]+)\)""" +
     """|<\s*img\s+src='([^']+)'\s*/?>""" +
-    """|<\s*img\s+src="([^"]+)"\s*/?>""",
+    """|<\s*img\s+src="([^"]+)"\s*/?>""" +
+    """|<\s*img\s*=\s*"([^"]+)"\s*/?>""",
     RegexOption.IGNORE_CASE
 )
 
@@ -430,6 +533,7 @@ private sealed class MessageChunk {
     data class TextChunk(val text: String) : MessageChunk()
     data class SpriteChunk(val name: String) : MessageChunk()
     data class ImageChunk(val url: String, val alt: String) : MessageChunk()
+    data class Base64ImageChunk(val bytes: ByteArray, val alt: String) : MessageChunk()
 }
 
 private fun splitIntoChunks(text: String): List<MessageChunk> {
@@ -439,7 +543,7 @@ private fun splitIntoChunks(text: String): List<MessageChunk> {
     for (m in SPRITE_REGEX.findAll(text)) {
         val name = (m.groupValues[1].ifEmpty { m.groupValues[2] }.ifEmpty { m.groupValues[3] }
             .ifEmpty { m.groupValues[4] }.ifEmpty { m.groupValues[5] }.ifEmpty { m.groupValues[6] }
-            .ifEmpty { m.groupValues[7] }.ifEmpty { m.groupValues[8] }).trim()
+            .ifEmpty { m.groupValues[7] }.ifEmpty { m.groupValues[8] }.ifEmpty { m.groupValues[9] }).trim()
         if (name.isNotEmpty()) {
             // If the "sprite name" is actually a URL, treat it as a remote image
             val chunk = if (name.startsWith("http://") || name.startsWith("https://"))
@@ -452,7 +556,18 @@ private fun splitIntoChunks(text: String): List<MessageChunk> {
     for (m in MD_IMAGE_REGEX.findAll(text)) {
         val url = m.groupValues[2].trim()
         val alt = m.groupValues[1].trim()
-        if (url.isNotEmpty()) matches.add(RawMatch(m.range.first, m.range.last + 1, MessageChunk.ImageChunk(url, alt)))
+        if (url.isEmpty()) continue
+        if (url.startsWith("data:image")) {
+            val commaIdx = url.indexOf(',')
+            if (commaIdx >= 0) {
+                try {
+                    val bytes = android.util.Base64.decode(url.substring(commaIdx + 1), android.util.Base64.DEFAULT)
+                    matches.add(RawMatch(m.range.first, m.range.last + 1, MessageChunk.Base64ImageChunk(bytes, alt)))
+                } catch (_: Exception) { }
+            }
+        } else {
+            matches.add(RawMatch(m.range.first, m.range.last + 1, MessageChunk.ImageChunk(url, alt)))
+        }
     }
     for (m in HTML_IMG_REGEX.findAll(text)) {
         val url = (m.groupValues[1].ifEmpty { m.groupValues[2] }).trim()

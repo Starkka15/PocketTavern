@@ -63,11 +63,18 @@ data class ChatUiState(
     val isLoading: Boolean = true,
     val isGenerating: Boolean = false,
     val streamingContent: String = "",
+    val streamingThinking: String = "",
+    val showReasoningBubbles: Boolean = true,
+    val apiShowThoughtsEnabled: Boolean = false,
     val currentChatFileName: String? = null,
     val availableChats: List<ChatInfo> = emptyList(),
     val showChatSelector: Boolean = false,
     val error: String? = null,
     val showDeleteDialog: Boolean = false,
+    // Chat rename dialog
+    val showRenameChatDialog: Boolean = false,
+    val renameChatTargetFileName: String? = null,
+    val renameChatInput: String = "",
     // Message action menu state
     val selectedMessageIndex: Int? = null,
     val showMessageActions: Boolean = false,
@@ -128,6 +135,11 @@ data class ChatUiState(
     val showModelPicker: Boolean = false,
     val availableModels: List<String> = emptyList(),
     val modelPickerLoading: Boolean = false,
+    // Generate first message dialog
+    val showGenerateGreetingPrompt: Boolean = false,
+    val generatingFirstMessage: Boolean = false,
+    val generatedFirstMessage: String = "",
+    val generateFirstMessageError: String? = null,
 )
 
 data class GalleryImage(
@@ -296,7 +308,8 @@ class ChatViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         currentApiName = config.displayName,
-                        currentModelName = config.currentModel
+                        currentModelName = config.currentModel,
+                        apiShowThoughtsEnabled = config.showThoughts
                     )
                 }
             }
@@ -562,16 +575,27 @@ class ChatViewModel @Inject constructor(
                 if (character.firstMessage.isNotBlank()) add(character.firstMessage)
                 addAll(character.alternateGreetings.filter { it.isNotBlank() })
             }
-            if (allGreetings.size > 1) {
-                _uiState.update {
-                    it.copy(
-                        showGreetingPicker = true,
-                        availableGreetings = allGreetings,
-                        isLoading = false
-                    )
+            when {
+                allGreetings.size > 1 -> {
+                    _uiState.update {
+                        it.copy(
+                            showGreetingPicker = true,
+                            availableGreetings = allGreetings,
+                            isLoading = false
+                        )
+                    }
                 }
-            } else {
-                startNewChatWithGreeting(allGreetings.firstOrNull())
+                allGreetings.isEmpty() -> {
+                    _uiState.update {
+                        it.copy(
+                            showGenerateGreetingPrompt = true,
+                            generatedFirstMessage = "",
+                            generateFirstMessageError = null,
+                            isLoading = false
+                        )
+                    }
+                }
+                else -> startNewChatWithGreeting(allGreetings.firstOrNull())
             }
         }
     }
@@ -583,6 +607,97 @@ class ChatViewModel @Inject constructor(
     fun selectGreeting(greeting: String?) {
         _uiState.update { it.copy(showGreetingPicker = false, availableGreetings = emptyList()) }
         startNewChatWithGreeting(greeting)
+    }
+
+    fun dismissGenerateGreetingPrompt() {
+        _uiState.update {
+            it.copy(
+                showGenerateGreetingPrompt = false,
+                generatingFirstMessage = false,
+                generatedFirstMessage = "",
+                generateFirstMessageError = null
+            )
+        }
+        startNewChatWithGreeting(null)
+    }
+
+    fun confirmGeneratedGreeting() {
+        val text = _uiState.value.generatedFirstMessage
+        _uiState.update {
+            it.copy(
+                showGenerateGreetingPrompt = false,
+                generatingFirstMessage = false,
+                generatedFirstMessage = "",
+                generateFirstMessageError = null
+            )
+        }
+        startNewChatWithGreeting(text.ifBlank { null })
+    }
+
+    fun generateFirstMessage() {
+        val character = _uiState.value.character ?: return
+        val config = _currentConfig
+        _uiState.update {
+            it.copy(
+                generatingFirstMessage = true,
+                generatedFirstMessage = "",
+                generateFirstMessageError = null
+            )
+        }
+        viewModelScope.launch {
+            try {
+                val cardInfo = buildString {
+                    appendLine("Name: ${character.name}")
+                    if (character.description.isNotBlank()) appendLine("Description: ${character.description}")
+                    if (character.personality.isNotBlank()) appendLine("Personality: ${character.personality}")
+                    if (character.scenario.isNotBlank()) appendLine("Scenario: ${character.scenario}")
+                    if (character.creatorNotes.isNotBlank()) appendLine("Creator notes: ${character.creatorNotes}")
+                    if (character.systemPrompt.isNotBlank()) appendLine("System prompt: ${character.systemPrompt}")
+                    if (character.messageExample.isNotBlank()) appendLine("Example dialogue:\n${character.messageExample}")
+                }
+                val userName = settingsDataStore.getUserPersonaName().ifBlank { "User" }
+                val prompt = """You are writing the opening message for a roleplay character.
+Write a first message as ${character.name} that establishes their personality, voice, and the scenario.
+The user's name is $userName. Use {{user}} for the user and {{char}} for the character name.
+Write only the character's opening message — no preamble, no meta-commentary, no instructions.
+
+CHARACTER CARD:
+$cardInfo""".trimIndent()
+
+                val oaiMessages = if (config.usesChatCompletions)
+                    listOf(com.pockettavern.app.domain.model.PromptMessage("user", prompt))
+                else null
+
+                llmRepository.generate(prompt, config, null, emptyList(), oaiMessages, null).collect { event ->
+                    when (event) {
+                        is com.pockettavern.app.domain.model.StreamEvent.Token ->
+                            _uiState.update { it.copy(generatedFirstMessage = event.accumulated) }
+                        is com.pockettavern.app.domain.model.StreamEvent.Complete ->
+                            _uiState.update {
+                                it.copy(
+                                    generatedFirstMessage = event.fullText,
+                                    generatingFirstMessage = false
+                                )
+                            }
+                        is com.pockettavern.app.domain.model.StreamEvent.Error ->
+                            _uiState.update {
+                                it.copy(
+                                    generatingFirstMessage = false,
+                                    generateFirstMessageError = event.message
+                                )
+                            }
+                        else -> {}
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        generatingFirstMessage = false,
+                        generateFirstMessageError = e.message ?: "Generation failed"
+                    )
+                }
+            }
+        }
     }
 
     private fun startNewChatWithGreeting(greeting: String?) {
@@ -855,16 +970,21 @@ No preamble, no explanation. Just the numbered list."""
                     is StreamEvent.Token -> {
                         _uiState.update { it.copy(streamingContent = event.accumulated) }
                     }
+                    is StreamEvent.ThinkingToken -> {
+                        _uiState.update { it.copy(streamingThinking = event.accumulatedThinking) }
+                    }
                     is StreamEvent.Complete -> {
                         // Step 1: apply regex rules + multi-turn trim (keeps extension tags intact)
                         val processed = trimMultiTurn(extensionManager.processOutput(event.fullText))
+                        val reasoning = event.thinkingText.ifBlank { null }
                         // Step 2: add message with raw text so we can emit MESSAGE_RECEIVED first
-                        val rawMessage = ChatMessage(content = processed, isUser = false)
+                        val rawMessage = ChatMessage(content = processed, isUser = false, reasoning = reasoning)
                         _uiState.update {
                             it.copy(
                                 messages = it.messages + rawMessage,
                                 isGenerating = false,
-                                streamingContent = ""
+                                streamingContent = "",
+                                streamingThinking = ""
                             )
                         }
                         // Step 3: update extension context, then emit MESSAGE_RECEIVED
@@ -913,7 +1033,7 @@ No preamble, no explanation. Just the numbered list."""
                     }
                     is StreamEvent.Error -> {
                         _uiState.update {
-                            it.copy(isGenerating = false, streamingContent = "", error = event.message)
+                            it.copy(isGenerating = false, streamingContent = "", streamingThinking = "", error = event.message)
                         }
                         extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
                         generationJob = null
@@ -990,7 +1110,7 @@ No preamble, no explanation. Just the numbered list."""
             }
         }
 
-        llmRepository.generate(prompt, config, preset, stopSequences, messages, oaiPreset).collect { emit(it) }
+        llmRepository.generate(prompt, config, preset, stopSequences, messages, oaiPreset, config.showThoughts).collect { emit(it) }
     }.flowOn(Dispatchers.IO)
 
     fun stopGeneration() {
@@ -1512,7 +1632,8 @@ No preamble, no explanation. Just the numbered list."""
                 when (event) {
                     is StreamEvent.Complete -> resultText = event.fullText
                     is StreamEvent.Error -> resultText = ""
-                    is StreamEvent.Token -> { /* ignore streaming tokens */ }
+                    is StreamEvent.Token -> { /* ignore */ }
+                    is StreamEvent.ThinkingToken -> { /* ignore */ }
                 }
             }
             extensionManager.jsHost.completeHiddenGenerate(callbackId, resultText)
@@ -1718,6 +1839,62 @@ No preamble, no explanation. Just the numbered list."""
         }
     }
 
+    // ========== Chat Rename ==========
+
+    fun showRenameChatDialog(fileName: String) {
+        _uiState.update { it.copy(showRenameChatDialog = true, renameChatTargetFileName = fileName, renameChatInput = "") }
+    }
+
+    fun dismissRenameChatDialog() {
+        _uiState.update { it.copy(showRenameChatDialog = false, renameChatTargetFileName = null, renameChatInput = "") }
+    }
+
+    fun updateRenameChatInput(value: String) {
+        _uiState.update { it.copy(renameChatInput = value) }
+    }
+
+    fun confirmRenameChat() {
+        val character = _uiState.value.character ?: return
+        val oldFileName = _uiState.value.renameChatTargetFileName ?: return
+        val newName = _uiState.value.renameChatInput.trim()
+        if (newName.isBlank()) return
+        viewModelScope.launch {
+            when (val result = localRepository.renameChat(character.name, oldFileName, newName)) {
+                is Result.Success -> {
+                    val newFileName = result.data
+                    val wasCurrent = _uiState.value.currentChatFileName == oldFileName
+                    dismissRenameChatDialog()
+                    refreshChatsList()
+                    if (wasCurrent) _uiState.update { it.copy(currentChatFileName = newFileName) }
+                }
+                is Result.Error -> {
+                    _uiState.update { it.copy(error = "Failed to rename chat") }
+                    dismissRenameChatDialog()
+                }
+            }
+        }
+    }
+
+    // ========== Fork / Branch Chat ==========
+
+    fun forkChatAtMessage(messageIndex: Int) {
+        val character = _uiState.value.character ?: return
+        val messages = _uiState.value.messages.take(messageIndex + 1)
+        viewModelScope.launch {
+            _uiState.update { it.copy(showMessageActions = false, selectedMessageIndex = null, isLoading = true) }
+            when (val result = localRepository.forkChat(character.name, messages)) {
+                is Result.Success -> {
+                    val newFileName = result.data
+                    refreshChatsList()
+                    loadExistingChat(character, newFileName)
+                }
+                is Result.Error -> {
+                    _uiState.update { it.copy(isLoading = false, error = "Failed to fork chat") }
+                }
+            }
+        }
+    }
+
     fun exportCurrentChat(uri: android.net.Uri) {
         val charName = _uiState.value.character?.name ?: return
         val chatFileName = _uiState.value.currentChatFileName ?: return
@@ -1736,6 +1913,10 @@ No preamble, no explanation. Just the numbered list."""
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    fun toggleReasoningBubbles() {
+        _uiState.update { it.copy(showReasoningBubbles = !it.showReasoningBubbles) }
     }
 
     // ========== Message Search ==========
@@ -1870,9 +2051,12 @@ No preamble, no explanation. Just the numbered list."""
                             continueGeneration()
                         }
                     }
+                    is StreamEvent.ThinkingToken -> {
+                        _uiState.update { it.copy(streamingThinking = event.accumulatedThinking) }
+                    }
                     is StreamEvent.Error -> {
                         _uiState.update {
-                            it.copy(isGenerating = false, streamingContent = "", error = event.message)
+                            it.copy(isGenerating = false, streamingContent = "", streamingThinking = "", error = event.message)
                         }
                         extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
                         generationJob = null
@@ -1920,9 +2104,10 @@ No preamble, no explanation. Just the numbered list."""
                         generationJob = null
                         saveCurrentChat()
                     }
+                    is StreamEvent.ThinkingToken -> {}
                     is StreamEvent.Error -> {
                         _uiState.update {
-                            it.copy(isGenerating = false, streamingContent = "", error = event.message)
+                            it.copy(isGenerating = false, streamingContent = "", streamingThinking = "", error = event.message)
                         }
                         extensionManager.emit(ExtensionEvent.GENERATION_STOPPED)
                         generationJob = null
@@ -2014,6 +2199,7 @@ No preamble, no explanation. Just the numbered list."""
                         generationJob = null
                         saveCurrentChat()
                     }
+                    is StreamEvent.ThinkingToken -> {}
                     is StreamEvent.Error -> {
                         _uiState.update {
                             it.copy(
