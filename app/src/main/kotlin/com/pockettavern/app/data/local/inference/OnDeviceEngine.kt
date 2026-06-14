@@ -121,18 +121,26 @@ class OnDeviceEngine @Inject constructor(
             )
         )
 
+        val t0 = System.currentTimeMillis()
+        DebugLogger.log("OnDeviceEngine: prefill start (system ${system?.length ?: 0} + user ${userMessage.length} chars, ${initialMessages.size} history msgs)")
+        var firstToken = true
         conversation.sendMessageAsync(
             Contents.of(listOf(Content.Text(userMessage))),
             object : MessageCallback {
                 override fun onMessage(message: Message) {
                     val delta = message.toString()
                     if (delta.startsWith("<ctrl")) return  // skip control tokens
+                    if (firstToken) {
+                        firstToken = false
+                        DebugLogger.log("OnDeviceEngine: first token after ${System.currentTimeMillis() - t0}ms")
+                    }
                     val thought = message.channels["thought"]
                     if (!thought.isNullOrEmpty()) trySend(Chunk.Thinking(thought))
                     if (delta.isNotEmpty()) trySend(Chunk.Token(delta))
                 }
 
                 override fun onDone() {
+                    DebugLogger.log("OnDeviceEngine: done in ${System.currentTimeMillis() - t0}ms")
                     trySend(Chunk.Done); close()
                 }
 

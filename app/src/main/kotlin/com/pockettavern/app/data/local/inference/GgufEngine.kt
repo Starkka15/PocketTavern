@@ -40,14 +40,38 @@ class GgufEngine @Inject constructor(
 
     val isLoaded: Boolean get() = loadedModelPath != null
 
-    private suspend fun ensureLoaded(modelPath: String) = lock.withLock {
-        if (loadedModelPath == modelPath) return@withLock
-        DebugLogger.log("GgufEngine: loading $modelPath")
+    private var loadedCtx = 0
+    private var loadedGpuLayers = 0
+
+    private fun applyParams(ctx: Int, threads: Int, params: Params) {
+        LlamaBridge.updateGenerateParams(
+            temperature = params.temperature,
+            maxTokens = params.maxTokens,
+            topP = params.topP,
+            topK = params.topK,
+            repeatPenalty = params.repeatPenalty,
+            contextLength = ctx,
+            numThreads = threads,
+            useMmap = true,
+            flashAttention = false,
+            batchSize = 512,
+            gpuLayers = params.gpuLayers,
+        )
+    }
+
+    private suspend fun ensureLoaded(modelPath: String, ctx: Int, threads: Int, params: Params) = lock.withLock {
+        if (loadedModelPath == modelPath && loadedCtx == ctx && loadedGpuLayers == params.gpuLayers) return@withLock
+        // Reload-dependent params (contextLength, useMmap, gpuLayers) MUST be set BEFORE load,
+        // or llama.cpp loads with defaults (slow/wrong context). Set them, then load.
+        applyParams(ctx, threads, params)
+        DebugLogger.log("GgufEngine: loading $modelPath (ctx=$ctx threads=$threads gpuLayers=${params.gpuLayers})")
         if (!LlamaBridge.initGenerateModel(modelPath)) {
             loadedModelPath = null
             throw IllegalStateException("llama.cpp failed to load model")
         }
         loadedModelPath = modelPath
+        loadedCtx = ctx
+        loadedGpuLayers = params.gpuLayers
         DebugLogger.log("GgufEngine: model loaded")
     }
 
@@ -60,27 +84,15 @@ class GgufEngine @Inject constructor(
         modelPath: String,
         params: Params,
     ): Flow<OnDeviceEngine.Chunk> = callbackFlow {
-        ensureLoaded(modelPath)
-
         // Scale context + threads to the device unless the caller overrides contextLength.
         val ctx = if (params.contextLength > 0) params.contextLength
                   else DeviceCapabilities.recommendedContextLength(context)
         val threads = DeviceCapabilities.recommendedThreads()
         DebugLogger.log("GgufEngine: ${"%.1f".format(DeviceCapabilities.totalRamGb(context))}GB RAM → ctx=$ctx threads=$threads")
 
-        LlamaBridge.updateGenerateParams(
-            temperature = params.temperature,
-            maxTokens = params.maxTokens,
-            topP = params.topP,
-            topK = params.topK,
-            repeatPenalty = params.repeatPenalty,
-            contextLength = ctx,
-            numThreads = threads,
-            useMmap = true,
-            flashAttention = false,
-            batchSize = 256,
-            gpuLayers = params.gpuLayers,
-        )
+        ensureLoaded(modelPath, ctx, threads, params)
+        // Refresh sampling params post-load (in case the preset changed without a reload).
+        applyParams(ctx, threads, params)
 
         // Apply the GGUF's embedded chat template; fall back to a simple join if absent.
         val prompt = LlamaBridge.applyChatTemplate(messages, addAssistantPrefix = true)
