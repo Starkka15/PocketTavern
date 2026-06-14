@@ -26,12 +26,12 @@ class GgufEngine @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     data class Params(
-        val maxTokens: Int = 1024,
+        val maxTokens: Int = 512,
         val topK: Int = 40,
         val topP: Float = 0.95f,
         val temperature: Float = 0.8f,
         val repeatPenalty: Float = 1.1f,
-        val contextLength: Int = 4096,
+        val contextLength: Int = 0,  // 0 = auto (scaled to device RAM)
         val gpuLayers: Int = 0,  // 0 = CPU (reliable on mobile); -1 = offload all to GPU/Vulkan
     )
 
@@ -62,17 +62,23 @@ class GgufEngine @Inject constructor(
     ): Flow<OnDeviceEngine.Chunk> = callbackFlow {
         ensureLoaded(modelPath)
 
+        // Scale context + threads to the device unless the caller overrides contextLength.
+        val ctx = if (params.contextLength > 0) params.contextLength
+                  else DeviceCapabilities.recommendedContextLength(context)
+        val threads = DeviceCapabilities.recommendedThreads()
+        DebugLogger.log("GgufEngine: ${"%.1f".format(DeviceCapabilities.totalRamGb(context))}GB RAM → ctx=$ctx threads=$threads")
+
         LlamaBridge.updateGenerateParams(
             temperature = params.temperature,
             maxTokens = params.maxTokens,
             topP = params.topP,
             topK = params.topK,
             repeatPenalty = params.repeatPenalty,
-            contextLength = params.contextLength,
-            numThreads = Runtime.getRuntime().availableProcessors().coerceAtLeast(2),
+            contextLength = ctx,
+            numThreads = threads,
             useMmap = true,
             flashAttention = false,
-            batchSize = 512,
+            batchSize = 256,
             gpuLayers = params.gpuLayers,
         )
 
@@ -80,11 +86,19 @@ class GgufEngine @Inject constructor(
         val prompt = LlamaBridge.applyChatTemplate(messages, addAssistantPrefix = true)
             ?: messages.joinToString("\n") { (role, content) -> "$role: $content" } + "\nassistant:"
 
+        val t0 = System.currentTimeMillis()
+        DebugLogger.log("GgufEngine: prefill start (prompt ${prompt.length} chars)")
+        var firstToken = true
         LlamaBridge.generateStream(prompt, object : GenStream {
             override fun onDelta(text: String) {
+                if (firstToken) {
+                    firstToken = false
+                    DebugLogger.log("GgufEngine: first token after ${System.currentTimeMillis() - t0}ms")
+                }
                 if (text.isNotEmpty()) trySend(OnDeviceEngine.Chunk.Token(text))
             }
             override fun onComplete() {
+                DebugLogger.log("GgufEngine: done in ${System.currentTimeMillis() - t0}ms")
                 trySend(OnDeviceEngine.Chunk.Done); close()
             }
             override fun onError(message: String) {

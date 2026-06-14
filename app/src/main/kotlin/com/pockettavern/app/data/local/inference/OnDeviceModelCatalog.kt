@@ -124,6 +124,18 @@ object OnDeviceModelCatalog {
      */
     val ggufModels: List<CatalogModel> = listOf(
         CatalogModel(
+            name = "Josiefied Llama 3.2 1B (uncensored)", category = "Small / Uncensored",
+            description = "Tiny uncensored 1B — best for budget/4GB phones (~770MB Q4_K_M). Won't refuse.",
+            url = "https://huggingface.co/mradermacher/Josiefied-Llama-3.2-1B-Instruct-abliterated-v1-GGUF/resolve/main/Josiefied-Llama-3.2-1B-Instruct-abliterated-v1.Q4_K_M.gguf?download=true",
+            sizeBytes = 770 * MB,
+        ),
+        CatalogModel(
+            name = "Josiefied Qwen2.5 1.5B (uncensored)", category = "Small / Uncensored",
+            description = "Uncensored 1.5B — small but more capable than 1B (~940MB Q4_K_M).",
+            url = "https://huggingface.co/Goekdeniz-Guelmez/Josiefied-Qwen2.5-1.5B-Instruct-abliterated-v2-gguf/resolve/main/josiefied-qwen2.5-1.5b-instruct-abliterated-v2.Q4_K_M.gguf?download=true",
+            sizeBytes = 940 * MB,
+        ),
+        CatalogModel(
             name = "Impish LLAMA 3B (RP)", category = "Roleplay / Uncensored",
             description = "RP-tuned, uncensored 3B. Great for character chat (~1.9GB Q4_K_M).",
             url = "https://huggingface.co/SicariusSicariiStuff/Impish_LLAMA_3B_GGUF/resolve/main/Impish_LLAMA_3B-Q4_K_M.gguf?download=true",
