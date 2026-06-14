@@ -73,8 +73,11 @@ object NetworkModule {
     @Singleton
     fun provideLlmRepository(
         settingsDataStore: SettingsDataStore,
-        @Named("LLM") okHttpClient: OkHttpClient
-    ): LlmRepository = LlmRepository(settingsDataStore, okHttpClient)
+        @Named("LLM") okHttpClient: OkHttpClient,
+        onDeviceEngine: com.pockettavern.app.data.local.inference.OnDeviceEngine,
+        ggufEngine: com.pockettavern.app.data.local.inference.GgufEngine,
+        onDeviceModels: com.pockettavern.app.data.local.inference.OnDeviceModelManager
+    ): LlmRepository = LlmRepository(settingsDataStore, okHttpClient, onDeviceEngine, ggufEngine, onDeviceModels)
 
     // ── Forge (Stable Diffusion) ─────────────────────────────────────────────
 

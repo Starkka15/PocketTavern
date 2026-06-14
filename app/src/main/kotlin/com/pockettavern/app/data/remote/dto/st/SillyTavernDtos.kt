@@ -824,8 +824,12 @@ object ChatCompletionSources {
     const val AZURE_OPENAI = "azure_openai"
     const val ZAI = "zai"
     const val SILICONFLOW = "siliconflow"
+    const val ONDEVICE = "ondevice"
+    const val ONDEVICE_GGUF = "ondevice-gguf"
 
     val all = listOf(
+        ONDEVICE_GGUF to "On-device GGUF (llama.cpp)",
+        ONDEVICE to "On-device (LiteRT-LM)",
         OPENAI to "OpenAI",
         CLAUDE to "Anthropic Claude",
         OPENROUTER to "OpenRouter",

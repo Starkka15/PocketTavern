@@ -1,6 +1,9 @@
 package com.pockettavern.app.data.repository
 
 import com.pockettavern.app.data.local.SettingsDataStore
+import com.pockettavern.app.data.local.inference.GgufEngine
+import com.pockettavern.app.data.local.inference.OnDeviceEngine
+import com.pockettavern.app.data.local.inference.OnDeviceModelManager
 import com.pockettavern.app.data.remote.api.*
 import com.pockettavern.app.domain.model.*
 import com.pockettavern.app.domain.model.OaiPreset
@@ -31,7 +34,10 @@ import javax.inject.Singleton
 @Singleton
 class LlmRepository @Inject constructor(
     private val settingsDataStore: SettingsDataStore,
-    @Named("LLM") private val okHttpClient: OkHttpClient
+    @Named("LLM") private val okHttpClient: OkHttpClient,
+    private val onDeviceEngine: OnDeviceEngine,
+    private val ggufEngine: GgufEngine,
+    private val onDeviceModels: OnDeviceModelManager
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -96,6 +102,8 @@ class LlmRepository @Inject constructor(
     suspend fun getAvailableModels(config: ApiConfiguration): List<AvailableModel> {
         return try {
             when {
+                config.isOnDevice -> onDeviceModels.listModels(OnDeviceModelManager.LITERTLM_EXTS)
+                config.isOnDeviceGguf -> onDeviceModels.listModels(OnDeviceModelManager.GGUF_EXTS)
                 config.usesChatCompletions || config.textGenType in setOf("ooba", "vllm", "aphrodite", "tabby") ->
                     fetchOaiModels(config)
                 config.textGenType == "ollama" -> fetchOllamaModels(config)
@@ -112,6 +120,8 @@ class LlmRepository @Inject constructor(
     suspend fun testConnection(config: ApiConfiguration): Boolean {
         return try {
             when {
+                config.isOnDevice -> onDeviceModels.pathFor(config.currentModel, OnDeviceModelManager.LITERTLM_EXTS) != null
+                config.isOnDeviceGguf -> onDeviceModels.pathFor(config.currentModel, OnDeviceModelManager.GGUF_EXTS) != null
                 config.textGenType == "koboldcpp" -> {
                     val url = "${config.apiServer.trimEnd('/')}/api/v1/model"
                     val resp = okHttpClient.newCall(Request.Builder().url(url).build()).execute()
@@ -373,6 +383,96 @@ class LlmRepository @Inject constructor(
 
     // ── OpenAI Chat Completions (shared by many backends) ────────────────────
 
+    /**
+     * On-device generation via LiteRT-LM. System messages become the systemInstruction, prior
+     * turns become conversation history, and the final message is the turn to respond to.
+     * Sampler params come from the Chat Completion Preset (the only knobs LiteRT-LM exposes).
+     */
+    private fun streamOnDevice(
+        messages: List<PromptMessage>?,
+        prompt: String,
+        config: ApiConfiguration,
+        oaiPreset: OaiPreset?
+    ): Flow<StreamEvent> = flow {
+        val modelPath = onDeviceModels.pathFor(config.currentModel, OnDeviceModelManager.LITERTLM_EXTS)
+        if (modelPath == null) {
+            emit(StreamEvent.Error("On-device model \"${config.currentModel}\" is not downloaded."))
+            return@flow
+        }
+
+        val msgs = messages ?: listOf(PromptMessage("user", prompt))
+        val system = msgs.filter { it.role.equals("system", true) }
+            .joinToString("\n\n") { it.content }.ifBlank { null }
+        val convo = msgs.filterNot { it.role.equals("system", true) }
+        val userMessage = convo.lastOrNull()?.content ?: prompt
+        val history = convo.dropLast(1).map {
+            OnDeviceEngine.Turn(isUser = !it.role.equals("assistant", true), content = it.content)
+        }
+
+        val params = OnDeviceEngine.Params(
+            maxTokens = if (oaiPreset != null && oaiPreset.maxTokensEnabled) oaiPreset.maxTokens else 1024,
+            topK = if (oaiPreset != null && oaiPreset.topKEnabled) oaiPreset.topK else 40,
+            topP = if (oaiPreset != null && oaiPreset.topPEnabled) oaiPreset.topP else 0.95f,
+            temperature = if (oaiPreset != null && oaiPreset.temperatureEnabled) oaiPreset.temperature else 0.8f,
+        )
+
+        val acc = StringBuilder()
+        val think = StringBuilder()
+        onDeviceEngine.generate(system, history, userMessage, modelPath, useGpu = true, params)
+            .collect { chunk ->
+                when (chunk) {
+                    is OnDeviceEngine.Chunk.Token -> {
+                        acc.append(chunk.text)
+                        emit(StreamEvent.Token(chunk.text, acc.toString()))
+                    }
+                    is OnDeviceEngine.Chunk.Thinking -> {
+                        think.append(chunk.text)
+                        emit(StreamEvent.ThinkingToken(chunk.text, think.toString()))
+                    }
+                    is OnDeviceEngine.Chunk.Done ->
+                        emit(StreamEvent.Complete(acc.toString(), think.toString()))
+                    is OnDeviceEngine.Chunk.Error ->
+                        emit(StreamEvent.Error(chunk.message))
+                }
+            }
+    }
+
+    /**
+     * On-device GGUF generation via llama.cpp (Llamatik). Chat-completion path: messages are
+     * fed through the GGUF's embedded chat template. Samplers from the Chat Completion Preset.
+     */
+    private fun streamOnDeviceGguf(
+        messages: List<PromptMessage>?,
+        prompt: String,
+        config: ApiConfiguration,
+        oaiPreset: OaiPreset?
+    ): Flow<StreamEvent> = flow {
+        val modelPath = onDeviceModels.pathFor(config.currentModel, OnDeviceModelManager.GGUF_EXTS)
+        if (modelPath == null) {
+            emit(StreamEvent.Error("GGUF model \"${config.currentModel}\" is not downloaded."))
+            return@flow
+        }
+        val msgs = messages ?: listOf(PromptMessage("user", prompt))
+        val pairs = msgs.map { it.role to it.content }
+        val params = GgufEngine.Params(
+            maxTokens = if (oaiPreset != null && oaiPreset.maxTokensEnabled) oaiPreset.maxTokens else 1024,
+            topK = if (oaiPreset != null && oaiPreset.topKEnabled) oaiPreset.topK else 40,
+            topP = if (oaiPreset != null && oaiPreset.topPEnabled) oaiPreset.topP else 0.95f,
+            temperature = if (oaiPreset != null && oaiPreset.temperatureEnabled) oaiPreset.temperature else 0.8f,
+            repeatPenalty = if (oaiPreset != null && oaiPreset.repetitionPenaltyEnabled) oaiPreset.repetitionPenalty else 1.1f,
+        )
+        val acc = StringBuilder()
+        val think = StringBuilder()
+        ggufEngine.generate(pairs, modelPath, params).collect { chunk ->
+            when (chunk) {
+                is OnDeviceEngine.Chunk.Token -> { acc.append(chunk.text); emit(StreamEvent.Token(chunk.text, acc.toString())) }
+                is OnDeviceEngine.Chunk.Thinking -> { think.append(chunk.text); emit(StreamEvent.ThinkingToken(chunk.text, think.toString())) }
+                is OnDeviceEngine.Chunk.Done -> emit(StreamEvent.Complete(acc.toString(), think.toString()))
+                is OnDeviceEngine.Chunk.Error -> emit(StreamEvent.Error(chunk.message))
+            }
+        }
+    }
+
     private fun streamChatCompletions(
         prompt: String,
         messages: List<PromptMessage>?,
@@ -383,6 +483,16 @@ class LlmRepository @Inject constructor(
         apiKey: String,
         showThoughts: Boolean = false
     ): Flow<StreamEvent> = flow {
+        // On-device: run locally instead of an HTTP chat-completion call.
+        if (config.isOnDevice) {
+            streamOnDevice(messages, prompt, config, oaiPreset).collect { emit(it) }
+            return@flow
+        }
+        if (config.isOnDeviceGguf) {
+            streamOnDeviceGguf(messages, prompt, config, oaiPreset).collect { emit(it) }
+            return@flow
+        }
+
         val baseUrl = config.effectiveBaseUrl.trimEnd('/').removeSuffix("/v1")
 
         // Use structured messages from PromptBuilder when available,

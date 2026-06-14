@@ -1,11 +1,13 @@
 package com.pockettavern.app.ui.screens.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -154,7 +156,13 @@ fun ApiConfigScreen(
                         onCustomUrlChange = { viewModel.setCustomUrl(it) },
                         onModelChange = { viewModel.setCurrentModel(it) },
                         onRefreshModels = { viewModel.fetchModels() },
-                        sourceOptions = viewModel.chatCompletionSourceOptions
+                        sourceOptions = viewModel.chatCompletionSourceOptions,
+                        catalog = viewModel.catalogFor(uiState.config.chatCompletionSource),
+                        isDownloading = uiState.isDownloading,
+                        downloadProgress = uiState.downloadProgress,
+                        downloadStatus = uiState.downloadStatus,
+                        onDownloadModel = { url, token -> viewModel.downloadOnDeviceModel(url, token) },
+                        onDeleteModel = { viewModel.deleteOnDeviceModel(it) }
                     )
                 }
 
@@ -257,7 +265,14 @@ private fun ChatCompletionSettings(
     onCustomUrlChange: (String) -> Unit,
     onModelChange: (String) -> Unit,
     onRefreshModels: () -> Unit,
-    sourceOptions: List<Pair<String, String>>
+    sourceOptions: List<Pair<String, String>>,
+    // On-device (LiteRT-LM)
+    catalog: List<com.pockettavern.app.data.local.inference.CatalogModel> = emptyList(),
+    isDownloading: Boolean = false,
+    downloadProgress: Float? = null,
+    downloadStatus: String? = null,
+    onDownloadModel: (String, String?) -> Unit = { _, _ -> },
+    onDeleteModel: (String) -> Unit = {}
 ) {
     Card(
         modifier = Modifier.fillMaxWidth()
@@ -278,65 +293,215 @@ private fun ChatCompletionSettings(
                 onValueChange = onSourceChange
             )
 
-            // Show custom URL field for "custom" source
-            if (chatCompletionSource == "custom") {
-                OutlinedTextField(
-                    value = customUrl ?: "",
-                    onValueChange = onCustomUrlChange,
-                    label = { Text("Custom API URL") },
-                    placeholder = { Text("https://api.example.com/v1") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+            if (chatCompletionSource == "ondevice" || chatCompletionSource == "ondevice-gguf") {
+                OnDeviceModelSection(
+                    currentModel = currentModel,
+                    models = availableModels,
+                    catalog = catalog,
+                    isDownloading = isDownloading,
+                    downloadProgress = downloadProgress,
+                    downloadStatus = downloadStatus,
+                    onSelectModel = onModelChange,
+                    onDownload = onDownloadModel,
+                    onDelete = onDeleteModel
                 )
-            }
+            } else {
+                // Show custom URL field for "custom" source
+                if (chatCompletionSource == "custom") {
+                    OutlinedTextField(
+                        value = customUrl ?: "",
+                        onValueChange = onCustomUrlChange,
+                        label = { Text("Custom API URL") },
+                        placeholder = { Text("https://api.example.com/v1") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
 
-            // Model Selection
+                // Model Selection
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (availableModels.isNotEmpty()) {
+                        DropdownSelector(
+                            label = "Model",
+                            selectedValue = currentModel,
+                            options = availableModels.map { it.id to it.name },
+                            onValueChange = onModelChange,
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        OutlinedTextField(
+                            value = currentModel,
+                            onValueChange = onModelChange,
+                            label = { Text("Model") },
+                            placeholder = { Text("Enter model name") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onRefreshModels,
+                        enabled = !isLoadingModels
+                    ) {
+                        if (isLoadingModels) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(Icons.Default.Refresh, "Refresh models")
+                        }
+                    }
+                }
+
+                if (availableModels.isNotEmpty()) {
+                    Text(
+                        text = "${availableModels.size} models available",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnDeviceModelSection(
+    currentModel: String,
+    models: List<com.pockettavern.app.domain.model.AvailableModel>,
+    catalog: List<com.pockettavern.app.data.local.inference.CatalogModel>,
+    isDownloading: Boolean,
+    downloadProgress: Float?,
+    downloadStatus: String?,
+    onSelectModel: (String) -> Unit,
+    onDownload: (String, String?) -> Unit,
+    onDelete: (String) -> Unit
+) {
+    var url by remember { mutableStateOf("") }
+    var token by remember { mutableStateOf("") }
+    val downloadedIds = remember(models) { models.map { it.id }.toSet() }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Models run fully on your device. Nothing is sent to a server.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        // Shared access token (for gated catalog models and gated manual URLs)
+        OutlinedTextField(
+            value = token,
+            onValueChange = { token = it },
+            label = { Text("HuggingFace token (for 🔒 gated models)") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            enabled = !isDownloading
+        )
+
+        // Recommended catalog (mirrors Google AI Edge Gallery's list)
+        Text("Recommended models", style = MaterialTheme.typography.labelLarge)
+        catalog.forEach { cm ->
+            val isDownloaded = cm.modelId in downloadedIds
+            val sizeMb = cm.sizeBytes / (1024 * 1024)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (availableModels.isNotEmpty()) {
-                    DropdownSelector(
-                        label = "Model",
-                        selectedValue = currentModel,
-                        options = availableModels.map { it.id to it.name },
-                        onValueChange = onModelChange,
-                        modifier = Modifier.weight(1f)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = cm.name + if (cm.gated) "  🔒" else "",
+                        style = MaterialTheme.typography.bodyMedium
                     )
-                } else {
-                    OutlinedTextField(
-                        value = currentModel,
-                        onValueChange = onModelChange,
-                        label = { Text("Model") },
-                        placeholder = { Text("Enter model name") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
+                    Text(
+                        text = "$sizeMb MB · ${cm.description}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                if (isDownloaded) {
+                    Icon(Icons.Default.Check, contentDescription = "Downloaded", tint = MaterialTheme.colorScheme.primary)
+                } else {
+                    TextButton(
+                        onClick = { onDownload(cm.url, token) },
+                        enabled = !isDownloading
+                    ) { Text("Download") }
+                }
+            }
+        }
 
-                IconButton(
-                    onClick = onRefreshModels,
-                    enabled = !isLoadingModels
+        HorizontalDivider()
+
+        if (models.isEmpty()) {
+            Text(
+                text = "No models downloaded yet.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        } else {
+            Text("Downloaded models", style = MaterialTheme.typography.labelLarge)
+            models.forEach { model ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !isDownloading) { onSelectModel(model.id) },
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (isLoadingModels) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(Icons.Default.Refresh, "Refresh models")
+                    RadioButton(
+                        selected = currentModel == model.id,
+                        onClick = { onSelectModel(model.id) },
+                        enabled = !isDownloading
+                    )
+                    Text(model.name, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { onDelete(model.id) }, enabled = !isDownloading) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete ${model.name}")
                     }
                 }
             }
+        }
 
-            if (availableModels.isNotEmpty()) {
-                Text(
-                    text = "${availableModels.size} models available",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+        HorizontalDivider()
+
+        Text("Or download by URL (.task / .litertlm)", style = MaterialTheme.typography.labelLarge)
+        OutlinedTextField(
+            value = url,
+            onValueChange = { url = it },
+            label = { Text("Model URL") },
+            placeholder = { Text("https://huggingface.co/.../model.task") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            enabled = !isDownloading
+        )
+
+        if (isDownloading) {
+            if (downloadProgress != null) {
+                LinearProgressIndicator(
+                    progress = { downloadProgress },
+                    modifier = Modifier.fillMaxWidth()
                 )
+            } else {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
+        }
+
+        Button(
+            onClick = { onDownload(url, token) },
+            enabled = !isDownloading && url.isNotBlank(),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (isDownloading) "Downloading…" else "Download")
+        }
+
+        downloadStatus?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

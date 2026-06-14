@@ -36,7 +36,21 @@ data class ApiConfiguration(
      * Whether this configuration uses chat completions (OpenAI-style) or text completions
      */
     val usesChatCompletions: Boolean
-        get() = mainApi.lowercase() == "openai"
+        get() = mainApi.lowercase() == "openai" || isOnDevice || isOnDeviceGguf
+
+    /**
+     * On-device inference (LiteRT-LM). Modeled as a chat-completion source so it reuses the
+     * messages pipeline + Chat Completion Presets, but generation runs locally (no HTTP).
+     */
+    val isOnDevice: Boolean
+        get() = chatCompletionSource.equals("ondevice", ignoreCase = true)
+
+    /** On-device GGUF inference via llama.cpp (Llamatik). Also rides the chat-completion path. */
+    val isOnDeviceGguf: Boolean
+        get() = chatCompletionSource.equals("ondevice-gguf", ignoreCase = true)
+
+    /** Either on-device backend. */
+    val isAnyOnDevice: Boolean get() = isOnDevice || isOnDeviceGguf
 
     /**
      * Canonical base URL for chat completion providers.
