@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
@@ -704,7 +705,18 @@ fun ChatScreen(
             currentChatFileName = uiState.currentChatFileName,
             onSelectChat = { viewModel.selectChat(it) },
             onNewChat = { viewModel.createNewChat() },
+            onRenameChat = { viewModel.showRenameChatDialog(it) },
             onDismiss = { viewModel.dismissChatSelector() }
+        )
+    }
+
+    // Chat rename dialog
+    if (uiState.showRenameChatDialog) {
+        RenameChatDialog(
+            currentInput = uiState.renameChatInput,
+            onInputChange = { viewModel.updateRenameChatInput(it) },
+            onConfirm = { viewModel.confirmRenameChat() },
+            onDismiss = { viewModel.dismissRenameChatDialog() }
         )
     }
 
@@ -783,6 +795,9 @@ fun ChatScreen(
                 onDeleteFromHere = {
                     viewModel.deleteMessagesFromIndex(messageIndex)
                 },
+                onForkHere = {
+                    viewModel.forkChatAtMessage(messageIndex)
+                },
                 onSaveImage = {
                     viewModel.saveImageMessageToGallery(messageIndex)
                     viewModel.dismissMessageActions()
@@ -828,12 +843,14 @@ fun ChatScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ChatSelectorDialog(
     chats: List<com.pockettavern.app.domain.model.ChatInfo>,
     currentChatFileName: String?,
     onSelectChat: (String) -> Unit,
     onNewChat: () -> Unit,
+    onRenameChat: (String) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -857,7 +874,10 @@ private fun ChatSelectorDialog(
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { onSelectChat(chat.fileName) },
+                                    .combinedClickable(
+                                        onClick = { onSelectChat(chat.fileName) },
+                                        onLongClick = { onRenameChat(chat.fileName) }
+                                    ),
                                 color = if (isSelected)
                                     MaterialTheme.colorScheme.primaryContainer
                                 else
@@ -931,7 +951,7 @@ private fun formatChatFileName(fileName: String): String {
         }
         "$monthName ${day.toInt()}, $year $hour12:$minute $amPm"
     } else {
-        fileName
+        fileName.removeSuffix(".jsonl")
     }
 }
 
@@ -1045,6 +1065,7 @@ private fun MessageActionsDialog(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onDeleteFromHere: () -> Unit,
+    onForkHere: () -> Unit = {},
     onRegenerate: () -> Unit,
     onSaveImage: () -> Unit = {},
     onSpeakTts: () -> Unit = {},
@@ -1138,6 +1159,21 @@ private fun MessageActionsDialog(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text("Delete From Here", color = MaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+
+                // Fork — branch a new chat with history up to this message
+                TextButton(
+                    onClick = onForkHere,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.CallSplit,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Fork From Here")
                     Spacer(modifier = Modifier.weight(1f))
                 }
 
@@ -1430,6 +1466,36 @@ private fun GenerateFirstMessageDialog(
         },
         dismissButton = {
             TextButton(onClick = onSkip) { Text("Skip") }
+        }
+    )
+}
+
+@Composable
+private fun RenameChatDialog(
+    currentInput: String,
+    onInputChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rename Chat") },
+        text = {
+            OutlinedTextField(
+                value = currentInput,
+                onValueChange = onInputChange,
+                label = { Text("New name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = currentInput.isNotBlank()) {
+                Text("Rename")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
 }

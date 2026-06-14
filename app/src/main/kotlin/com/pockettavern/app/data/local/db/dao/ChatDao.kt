@@ -32,4 +32,7 @@ interface ChatDao {
 
     @Query("UPDATE chats SET memoryBlock = :block, summarizedTurnCount = :count WHERE fileName = :fileName")
     suspend fun updateMemoryBlock(fileName: String, block: String, count: Int)
+
+    @Query("UPDATE chats SET fileName = :newFileName WHERE fileName = :oldFileName")
+    suspend fun renameChat(oldFileName: String, newFileName: String)
 }

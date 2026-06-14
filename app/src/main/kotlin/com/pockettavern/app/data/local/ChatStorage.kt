@@ -216,6 +216,56 @@ class ChatStorage @Inject constructor(
         )
     }
 
+    /** Rename a chat file and update Room index. Returns the new filename. */
+    suspend fun renameChat(characterName: String, oldFileName: String, newDisplayName: String): String = withContext(Dispatchers.IO) {
+        val dir = characterDir(characterName)
+        val oldFile = File(dir, oldFileName)
+        if (!oldFile.exists()) return@withContext oldFileName
+
+        val safeName = sanitizeFileName(newDisplayName).ifBlank { return@withContext oldFileName }
+        val newFileName = "$safeName.jsonl"
+        val newFile = File(dir, newFileName)
+        if (newFile.exists()) return@withContext oldFileName // collision — bail
+
+        oldFile.renameTo(newFile)
+        chatDao.renameChat(oldFileName, newFileName)
+        newFileName
+    }
+
+    /** Fork a chat at a given message index: creates a new file with messages 0..upToIndex. */
+    suspend fun forkChat(characterName: String, messages: List<ChatMessage>, userName: String): String = withContext(Dispatchers.IO) {
+        val newFileName = generateFileName(characterName)
+        val file = File(characterDir(characterName), newFileName)
+
+        val lines = buildList {
+            add(json.encodeToString(ChatHeader(userName = userName, characterName = characterName, createDate = formatDate(Instant.now()))))
+            for (message in messages) {
+                add(json.encodeToString(ChatLine(
+                    name = when {
+                        message.isUser -> userName
+                        message.isNarrator -> "narrator"
+                        else -> characterName
+                    },
+                    isUser = message.isUser,
+                    isSystem = message.isNarrator,
+                    send_date = formatDate(message.timestamp),
+                    mes = message.content,
+                    extra = buildExtra(message)
+                )))
+            }
+        }
+
+        file.writeText(lines.joinToString("\n"))
+        chatDao.upsert(ChatEntity(
+            fileName = newFileName,
+            characterName = characterName,
+            createDate = System.currentTimeMillis(),
+            modifyDate = System.currentTimeMillis(),
+            messageCount = messages.size
+        ))
+        newFileName
+    }
+
     /** Generate a new chat file name in ST format. */
     fun generateFileName(characterName: String): String {
         val now = LocalDateTime.now()

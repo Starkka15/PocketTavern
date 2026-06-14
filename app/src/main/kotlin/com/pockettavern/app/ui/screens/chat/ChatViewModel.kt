@@ -71,6 +71,10 @@ data class ChatUiState(
     val showChatSelector: Boolean = false,
     val error: String? = null,
     val showDeleteDialog: Boolean = false,
+    // Chat rename dialog
+    val showRenameChatDialog: Boolean = false,
+    val renameChatTargetFileName: String? = null,
+    val renameChatInput: String = "",
     // Message action menu state
     val selectedMessageIndex: Int? = null,
     val showMessageActions: Boolean = false,
@@ -1830,6 +1834,62 @@ No preamble, no explanation. Just the numbered list."""
                 is Result.Success -> { /* navigation handles going back */ }
                 is Result.Error -> {
                     _uiState.update { it.copy(error = "Failed to delete character") }
+                }
+            }
+        }
+    }
+
+    // ========== Chat Rename ==========
+
+    fun showRenameChatDialog(fileName: String) {
+        _uiState.update { it.copy(showRenameChatDialog = true, renameChatTargetFileName = fileName, renameChatInput = "") }
+    }
+
+    fun dismissRenameChatDialog() {
+        _uiState.update { it.copy(showRenameChatDialog = false, renameChatTargetFileName = null, renameChatInput = "") }
+    }
+
+    fun updateRenameChatInput(value: String) {
+        _uiState.update { it.copy(renameChatInput = value) }
+    }
+
+    fun confirmRenameChat() {
+        val character = _uiState.value.character ?: return
+        val oldFileName = _uiState.value.renameChatTargetFileName ?: return
+        val newName = _uiState.value.renameChatInput.trim()
+        if (newName.isBlank()) return
+        viewModelScope.launch {
+            when (val result = localRepository.renameChat(character.name, oldFileName, newName)) {
+                is Result.Success -> {
+                    val newFileName = result.data
+                    val wasCurrent = _uiState.value.currentChatFileName == oldFileName
+                    dismissRenameChatDialog()
+                    refreshChatsList()
+                    if (wasCurrent) _uiState.update { it.copy(currentChatFileName = newFileName) }
+                }
+                is Result.Error -> {
+                    _uiState.update { it.copy(error = "Failed to rename chat") }
+                    dismissRenameChatDialog()
+                }
+            }
+        }
+    }
+
+    // ========== Fork / Branch Chat ==========
+
+    fun forkChatAtMessage(messageIndex: Int) {
+        val character = _uiState.value.character ?: return
+        val messages = _uiState.value.messages.take(messageIndex + 1)
+        viewModelScope.launch {
+            _uiState.update { it.copy(showMessageActions = false, selectedMessageIndex = null, isLoading = true) }
+            when (val result = localRepository.forkChat(character.name, messages)) {
+                is Result.Success -> {
+                    val newFileName = result.data
+                    refreshChatsList()
+                    loadExistingChat(character, newFileName)
+                }
+                is Result.Error -> {
+                    _uiState.update { it.copy(isLoading = false, error = "Failed to fork chat") }
                 }
             }
         }
