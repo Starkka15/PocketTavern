@@ -234,6 +234,9 @@ class ApiConfigViewModel @Inject constructor(
     val mainApiOptions: List<Pair<String, String>> = MainApiTypes.all
     val textGenTypeOptions: List<Pair<String, String>> = TextGenTypes.all
     val chatCompletionSourceOptions: List<Pair<String, String>> = ChatCompletionSources.all
+    /** Device summary (RAM · cores) for the on-device expectations notice. */
+    val deviceSummary: String get() = onDeviceModels.deviceSummary
+
     /** Catalog for the selected on-device source: GGUF list for llama.cpp, else the LiteRT-LM list. */
     fun catalogFor(source: String): List<com.pockettavern.app.data.local.inference.CatalogModel> =
         if (source.equals("ondevice-gguf", ignoreCase = true))

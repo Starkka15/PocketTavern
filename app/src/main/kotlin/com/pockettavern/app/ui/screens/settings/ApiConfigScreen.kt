@@ -158,6 +158,7 @@ fun ApiConfigScreen(
                         onRefreshModels = { viewModel.fetchModels() },
                         sourceOptions = viewModel.chatCompletionSourceOptions,
                         catalog = viewModel.catalogFor(uiState.config.chatCompletionSource),
+                        deviceSummary = viewModel.deviceSummary,
                         isDownloading = uiState.isDownloading,
                         downloadProgress = uiState.downloadProgress,
                         downloadStatus = uiState.downloadStatus,
@@ -268,6 +269,7 @@ private fun ChatCompletionSettings(
     sourceOptions: List<Pair<String, String>>,
     // On-device (LiteRT-LM)
     catalog: List<com.pockettavern.app.data.local.inference.CatalogModel> = emptyList(),
+    deviceSummary: String = "",
     isDownloading: Boolean = false,
     downloadProgress: Float? = null,
     downloadStatus: String? = null,
@@ -298,6 +300,7 @@ private fun ChatCompletionSettings(
                     currentModel = currentModel,
                     models = availableModels,
                     catalog = catalog,
+                    deviceSummary = deviceSummary,
                     isDownloading = isDownloading,
                     downloadProgress = downloadProgress,
                     downloadStatus = downloadStatus,
@@ -375,6 +378,7 @@ private fun OnDeviceModelSection(
     currentModel: String,
     models: List<com.pockettavern.app.domain.model.AvailableModel>,
     catalog: List<com.pockettavern.app.data.local.inference.CatalogModel>,
+    deviceSummary: String,
     isDownloading: Boolean,
     downloadProgress: Float?,
     downloadStatus: String?,
@@ -392,6 +396,19 @@ private fun OnDeviceModelSection(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        Surface(
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            shape = MaterialTheme.shapes.small,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "⚠ Speed depends heavily on your device. Recent flagships (esp. Snapdragon/Adreno) " +
+                    "run smoothly; budget or older phones can be very slow or unusable, especially with " +
+                    "larger models or long character prompts. Your device: $deviceSummary.",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(10.dp)
+            )
+        }
 
         // Shared access token (for gated catalog models and gated manual URLs)
         OutlinedTextField(

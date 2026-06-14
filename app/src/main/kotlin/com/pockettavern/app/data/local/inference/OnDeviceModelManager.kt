@@ -62,6 +62,12 @@ class OnDeviceModelManager @Inject constructor(
     /** Bytes free on the models volume — used to warn before a large download. */
     fun freeSpaceBytes(): Long = modelsDir.usableSpace
 
+    /** Short device summary for the on-device UI (so users can gauge expected speed). */
+    val deviceSummary: String
+        get() = "%.0f GB RAM · %d cores".format(
+            DeviceCapabilities.totalRamGb(context), DeviceCapabilities.cores()
+        )
+
     sealed class Progress {
         data class Downloading(val bytesDownloaded: Long, val totalBytes: Long) : Progress()
         data class Done(val path: String) : Progress()
