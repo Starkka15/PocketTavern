@@ -18,6 +18,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
@@ -46,7 +47,8 @@ class OnDeviceEngine @Inject constructor(
     /** A prior conversation turn (system messages go to systemInstruction instead). */
     data class Turn(val isUser: Boolean, val content: String)
 
-    private val loadMutex = Mutex()
+    private val loadMutex = Mutex()  // serializes model load
+    private val genMutex = Mutex()   // serializes generation (shared Engine, one at a time)
     private var engine: Engine? = null
     private var loadedModelPath: String? = null
 
@@ -109,66 +111,82 @@ class OnDeviceEngine @Inject constructor(
         useGpu: Boolean,
         params: Params,
     ): Flow<Chunk> = callbackFlow {
-        ensureLoaded(modelPath, useGpu)
-        val activeEngine = engine ?: run {
-            trySend(Chunk.Error("On-device engine failed to load"))
-            close(); return@callbackFlow
-        }
+        // Serialize generations: the LiteRT [Engine] is shared, so overlapping generations (e.g.
+        // cancel-then-regenerate) on it can crash. genMutex is held for the whole async generation
+        // (released when it completes/errs/cancels via [finished]).
+        var conversation: Conversation? = null
+        val finished = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val job = launch {
+            try {
+                genMutex.withLock {
+                    ensureLoaded(modelPath, useGpu)
+                    val activeEngine = engine ?: throw IllegalStateException("On-device engine failed to load")
 
-        val initialMessages = history.map { turn ->
-            if (turn.isUser) Message.user(turn.content) else Message.model(turn.content)
-        }
-
-        val conversation: Conversation = activeEngine.createConversation(
-            ConversationConfig(
-                systemInstruction = if (system.isNullOrBlank()) null else Contents.of(system),
-                initialMessages = initialMessages,
-                samplerConfig = SamplerConfig(
-                    topK = params.topK,
-                    topP = params.topP.toDouble(),
-                    temperature = params.temperature.toDouble(),
-                ),
-            )
-        )
-
-        val t0 = System.currentTimeMillis()
-        DebugLogger.log("OnDeviceEngine: prefill start (system ${system?.length ?: 0} + user ${userMessage.length} chars, ${initialMessages.size} history msgs)")
-        var firstToken = true
-        conversation.sendMessageAsync(
-            Contents.of(listOf(Content.Text(userMessage))),
-            object : MessageCallback {
-                override fun onMessage(message: Message) {
-                    val delta = message.toString()
-                    if (delta.startsWith("<ctrl")) return  // skip control tokens
-                    if (firstToken) {
-                        firstToken = false
-                        DebugLogger.log("OnDeviceEngine: first token after ${System.currentTimeMillis() - t0}ms")
+                    val initialMessages = history.map { turn ->
+                        if (turn.isUser) Message.user(turn.content) else Message.model(turn.content)
                     }
-                    val thought = message.channels["thought"]
-                    if (!thought.isNullOrEmpty()) trySend(Chunk.Thinking(thought))
-                    if (delta.isNotEmpty()) trySend(Chunk.Token(delta))
-                }
+                    val conv = activeEngine.createConversation(
+                        ConversationConfig(
+                            systemInstruction = if (system.isNullOrBlank()) null else Contents.of(system),
+                            initialMessages = initialMessages,
+                            samplerConfig = SamplerConfig(
+                                topK = params.topK,
+                                topP = params.topP.toDouble(),
+                                temperature = params.temperature.toDouble(),
+                            ),
+                        )
+                    )
+                    conversation = conv
 
-                override fun onDone() {
-                    DebugLogger.log("OnDeviceEngine: done in ${System.currentTimeMillis() - t0}ms")
-                    trySend(Chunk.Done); close()
-                }
+                    val t0 = System.currentTimeMillis()
+                    DebugLogger.log("OnDeviceEngine: prefill start (system ${system?.length ?: 0} + user ${userMessage.length} chars, ${initialMessages.size} history msgs)")
+                    var firstToken = true
+                    conv.sendMessageAsync(
+                        Contents.of(listOf(Content.Text(userMessage))),
+                        object : MessageCallback {
+                            override fun onMessage(message: Message) {
+                                val delta = message.toString()
+                                if (delta.startsWith("<ctrl")) return  // skip control tokens
+                                if (firstToken) {
+                                    firstToken = false
+                                    DebugLogger.log("OnDeviceEngine: first token after ${System.currentTimeMillis() - t0}ms")
+                                }
+                                val thought = message.channels["thought"]
+                                if (!thought.isNullOrEmpty()) trySend(Chunk.Thinking(thought))
+                                if (delta.isNotEmpty()) trySend(Chunk.Token(delta))
+                            }
 
-                override fun onError(throwable: Throwable) {
-                    if (throwable is CancellationException) {
-                        trySend(Chunk.Done)
-                    } else {
-                        DebugLogger.logError("OnDeviceEngine", "inference error", throwable)
-                        trySend(Chunk.Error(throwable.message ?: "On-device inference failed"))
-                    }
-                    close()
+                            override fun onDone() {
+                                DebugLogger.log("OnDeviceEngine: done in ${System.currentTimeMillis() - t0}ms")
+                                trySend(Chunk.Done)
+                                finished.complete(Unit)
+                            }
+
+                            override fun onError(throwable: Throwable) {
+                                if (throwable is CancellationException) {
+                                    trySend(Chunk.Done)
+                                } else {
+                                    DebugLogger.logError("OnDeviceEngine", "inference error", throwable)
+                                    trySend(Chunk.Error(throwable.message ?: "On-device inference failed"))
+                                }
+                                finished.complete(Unit)
+                            }
+                        }
+                    )
+                    finished.await()  // hold genMutex until this generation actually finishes
                 }
+            } catch (e: Exception) {
+                trySend(Chunk.Error(e.message ?: "On-device inference failed"))
+            } finally {
+                try { conversation?.close() } catch (_: Exception) {}
+                close()
             }
-        )
+        }
 
         awaitClose {
-            try { conversation.cancelProcess() } catch (_: Exception) {}
-            try { conversation.close() } catch (_: Exception) {}
+            try { conversation?.cancelProcess() } catch (_: Exception) {}
+            finished.complete(Unit)  // release the await → genMutex frees for the next gen
+            job.cancel()
         }
     }
 

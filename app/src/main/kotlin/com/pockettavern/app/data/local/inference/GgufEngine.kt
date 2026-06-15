@@ -5,9 +5,11 @@ import com.llamatik.library.platform.LlamaBridge
 import com.pockettavern.app.util.DebugLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
 import android.content.Context
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
@@ -35,7 +37,8 @@ class GgufEngine @Inject constructor(
         val gpuLayers: Int = 0,  // 0 = CPU (reliable on mobile); -1 = offload all to GPU/Vulkan
     )
 
-    private val lock = Mutex()
+    private val lock = Mutex()      // serializes model load
+    private val genMutex = Mutex()  // serializes generation (global native engine, one at a time)
     private var loadedModelPath: String? = null
 
     val isLoaded: Boolean get() = loadedModelPath != null
@@ -84,43 +87,57 @@ class GgufEngine @Inject constructor(
         modelPath: String,
         params: Params,
     ): Flow<OnDeviceEngine.Chunk> = callbackFlow {
-        // Scale context + threads to the device unless the caller overrides contextLength.
-        val ctx = if (params.contextLength > 0) params.contextLength
-                  else DeviceCapabilities.recommendedContextLength(context)
-        val threads = DeviceCapabilities.recommendedThreads()
-        DebugLogger.log("GgufEngine: ${"%.1f".format(DeviceCapabilities.totalRamGb(context))}GB RAM → ctx=$ctx threads=$threads")
+        // generateStream() is a BLOCKING native call, so run it in a child job (otherwise the
+        // callbackFlow never reaches awaitClose and cancellation can't fire nativeCancelGenerate).
+        // genMutex serializes generations: LlamaBridge is a global singleton, so two overlapping
+        // native generations (e.g. cancel-then-regenerate, since the native call ignores coroutine
+        // cancellation) would corrupt/crash. The next gen waits until this native call returns.
+        val job = launch(Dispatchers.IO) {
+            try {
+                genMutex.withLock {
+                    val ctx = if (params.contextLength > 0) params.contextLength
+                              else DeviceCapabilities.recommendedContextLength(context)
+                    val threads = DeviceCapabilities.recommendedThreads()
+                    DebugLogger.log("GgufEngine: ${"%.1f".format(DeviceCapabilities.totalRamGb(context))}GB RAM → ctx=$ctx threads=$threads")
 
-        ensureLoaded(modelPath, ctx, threads, params)
-        // Refresh sampling params post-load (in case the preset changed without a reload).
-        applyParams(ctx, threads, params)
+                    ensureLoaded(modelPath, ctx, threads, params)
+                    applyParams(ctx, threads, params)
 
-        // Apply the GGUF's embedded chat template; fall back to a simple join if absent.
-        val prompt = LlamaBridge.applyChatTemplate(messages, addAssistantPrefix = true)
-            ?: messages.joinToString("\n") { (role, content) -> "$role: $content" } + "\nassistant:"
+                    val prompt = LlamaBridge.applyChatTemplate(messages, addAssistantPrefix = true)
+                        ?: messages.joinToString("\n") { (role, content) -> "$role: $content" } + "\nassistant:"
 
-        val t0 = System.currentTimeMillis()
-        DebugLogger.log("GgufEngine: prefill start (prompt ${prompt.length} chars)")
-        var firstToken = true
-        LlamaBridge.generateStream(prompt, object : GenStream {
-            override fun onDelta(text: String) {
-                if (firstToken) {
-                    firstToken = false
-                    DebugLogger.log("GgufEngine: first token after ${System.currentTimeMillis() - t0}ms")
+                    val t0 = System.currentTimeMillis()
+                    DebugLogger.log("GgufEngine: prefill start (prompt ${prompt.length} chars)")
+                    var firstToken = true
+                    LlamaBridge.generateStream(prompt, object : GenStream {
+                        override fun onDelta(text: String) {
+                            if (firstToken) {
+                                firstToken = false
+                                DebugLogger.log("GgufEngine: first token after ${System.currentTimeMillis() - t0}ms")
+                            }
+                            if (text.isNotEmpty()) trySend(OnDeviceEngine.Chunk.Token(text))
+                        }
+                        override fun onComplete() {
+                            DebugLogger.log("GgufEngine: done in ${System.currentTimeMillis() - t0}ms")
+                            trySend(OnDeviceEngine.Chunk.Done)
+                        }
+                        override fun onError(message: String) {
+                            DebugLogger.log("GgufEngine inference error: $message")
+                            trySend(OnDeviceEngine.Chunk.Error(message))
+                        }
+                    })
                 }
-                if (text.isNotEmpty()) trySend(OnDeviceEngine.Chunk.Token(text))
+            } catch (e: Exception) {
+                trySend(OnDeviceEngine.Chunk.Error(e.message ?: "On-device GGUF generation failed"))
+            } finally {
+                close()
             }
-            override fun onComplete() {
-                DebugLogger.log("GgufEngine: done in ${System.currentTimeMillis() - t0}ms")
-                trySend(OnDeviceEngine.Chunk.Done); close()
-            }
-            override fun onError(message: String) {
-                DebugLogger.log("GgufEngine inference error: $message")
-                trySend(OnDeviceEngine.Chunk.Error(message)); close()
-            }
-        })
+        }
 
         awaitClose {
+            // Ask the native loop to stop; generateStream returns, releasing genMutex for the next gen.
             try { LlamaBridge.nativeCancelGenerate() } catch (_: Exception) {}
+            job.cancel()
         }
     }
 
