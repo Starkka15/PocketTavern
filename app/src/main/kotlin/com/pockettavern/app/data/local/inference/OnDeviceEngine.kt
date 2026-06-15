@@ -49,7 +49,10 @@ class OnDeviceEngine @Inject constructor(
     private val loadMutex = Mutex()
     private var engine: Engine? = null
     private var loadedModelPath: String? = null
-    private var loadedUseGpu: Boolean = true
+
+    /** Backend the loaded model is actually running on ("NPU"/"GPU"/"CPU"), for reporting. */
+    @Volatile var activeBackend: String? = null
+        private set
 
     val isLoaded: Boolean get() = engine != null
 
@@ -57,28 +60,35 @@ class OnDeviceEngine @Inject constructor(
     private suspend fun ensureLoaded(modelPath: String, useGpu: Boolean) = loadMutex.withLock {
         if (engine != null && loadedModelPath == modelPath) return@withLock
         closeInternal()
-        // Try the preferred backend first; many generic .litertlm models don't have a working
-        // GPU/OpenCL delegate on a given device, so fall back to CPU rather than failing.
-        val order = if (useGpu) listOf(true, false) else listOf(false)
+        // Attempt best→safest backend with fallback. NPU only on capable SoCs (needs a vendor
+        // delegate that may be absent → falls back). GPU/OpenCL works on most Adreno (and some
+        // Mali); generic .litertlm models that lack a working GPU delegate fall back to CPU.
+        val attempts = buildList<Pair<String, () -> Backend>> {
+            if (useGpu && DeviceCapabilities.isNpuCapableSoc()) {
+                add("NPU" to { Backend.NPU(nativeLibraryDir = context.applicationInfo.nativeLibraryDir) })
+            }
+            if (useGpu) add("GPU" to { Backend.GPU() })
+            add("CPU" to { Backend.CPU() })
+        }
         var lastError: Exception? = null
-        for (gpu in order) {
+        for ((label, backendFactory) in attempts) {
             try {
-                DebugLogger.log("OnDeviceEngine: loading $modelPath on ${if (gpu) "GPU" else "CPU"}")
+                DebugLogger.log("OnDeviceEngine: loading $modelPath on $label (soc=${DeviceCapabilities.soc()})")
                 val config = EngineConfig(
                     modelPath = modelPath,
-                    backend = if (gpu) Backend.GPU() else Backend.CPU(),
+                    backend = backendFactory(),
                     cacheDir = context.getExternalFilesDir(null)?.absolutePath,
                 )
                 val e = Engine(config)
                 e.initialize()
                 engine = e
                 loadedModelPath = modelPath
-                loadedUseGpu = gpu
-                DebugLogger.log("OnDeviceEngine: model loaded on ${if (gpu) "GPU" else "CPU"}")
+                activeBackend = label
+                DebugLogger.log("OnDeviceEngine: model loaded on $label")
                 return@withLock
             } catch (ex: Exception) {
                 lastError = ex
-                DebugLogger.logError("OnDeviceEngine", "load failed on ${if (gpu) "GPU" else "CPU"}", ex)
+                DebugLogger.logError("OnDeviceEngine", "load failed on $label", ex)
                 closeInternal()
             }
         }
@@ -170,6 +180,7 @@ class OnDeviceEngine @Inject constructor(
         }
         engine = null
         loadedModelPath = null
+        activeBackend = null
     }
 
     sealed class Chunk {

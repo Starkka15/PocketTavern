@@ -2,6 +2,7 @@ package com.pockettavern.app.data.local.inference
 
 import android.app.ActivityManager
 import android.content.Context
+import android.os.Build
 
 /**
  * Detects device RAM / CPU so on-device inference params scale to the hardware instead of being
@@ -44,4 +45,20 @@ object DeviceCapabilities {
     /** Rough guidance: can this device comfortably hold a model of [modelBytes]? (model + KV + headroom) */
     fun canFit(context: Context, modelBytes: Long): Boolean =
         modelBytes + 1_500L * 1024 * 1024 < totalRamBytes(context)  // ~1.5GB headroom for KV + app + OS
+
+    /** SoC identifier, uppercased (e.g. "SM8550", "MT6989"). Empty if unknown. */
+    fun soc(): String = try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) (Build.SOC_MODEL ?: "").uppercase()
+        else (Build.HARDWARE ?: "").uppercase()
+    } catch (e: Exception) { "" }
+
+    /**
+     * Whether this SoC is likely to have a usable LLM NPU/accelerator delegate: Qualcomm 8-series
+     * (Adreno + Hexagon), flagship Dimensity (MT698x/699x), or Google Tensor. Budget MediaTek
+     * (e.g. Dimensity 6300 / Helio) and Exynos mid-range return false.
+     */
+    fun isNpuCapableSoc(): Boolean {
+        val s = soc()
+        return s.startsWith("SM8") || Regex("MT69[89]\\d").containsMatchIn(s) || s.contains("TENSOR")
+    }
 }

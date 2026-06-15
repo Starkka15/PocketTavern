@@ -22,10 +22,13 @@ android {
         applicationId = "com.pockettavern.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 19
-        versionName = "2.2.6"
+        versionCode = 20
+        versionName = "2.3.0-ondevice-test1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Phones are arm64; dropping x86_64 ~halves the APK (large on-device native libs).
+        ndk { abiFilters += "arm64-v8a" }
     }
 
     signingConfigs {
