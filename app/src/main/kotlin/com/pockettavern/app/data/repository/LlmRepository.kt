@@ -392,7 +392,8 @@ class LlmRepository @Inject constructor(
         messages: List<PromptMessage>?,
         prompt: String,
         config: ApiConfiguration,
-        oaiPreset: OaiPreset?
+        oaiPreset: OaiPreset?,
+        stopSequences: List<String>
     ): Flow<StreamEvent> = flow {
         val modelPath = onDeviceModels.pathFor(config.currentModel, OnDeviceModelManager.LITERTLM_EXTS)
         if (modelPath == null) {
@@ -409,38 +410,21 @@ class LlmRepository @Inject constructor(
             OnDeviceEngine.Turn(isUser = !it.role.equals("assistant", true), content = it.content)
         }
 
+        val maxTokens = if (oaiPreset != null && oaiPreset.maxTokensEnabled) oaiPreset.maxTokens else 512
         val params = OnDeviceEngine.Params(
-            maxTokens = if (oaiPreset != null && oaiPreset.maxTokensEnabled) oaiPreset.maxTokens else 1024,
+            maxTokens = maxTokens,
             topK = if (oaiPreset != null && oaiPreset.topKEnabled) oaiPreset.topK else 40,
             topP = if (oaiPreset != null && oaiPreset.topPEnabled) oaiPreset.topP else 0.95f,
             temperature = if (oaiPreset != null && oaiPreset.temperatureEnabled) oaiPreset.temperature else 0.8f,
         )
 
-        val acc = StringBuilder()
-        val think = StringBuilder()
-        // Reasoning models (R1/QwQ/distill) emit <think>…</think>. Their chat template usually
-        // injects the opening <think>, so the model only emits the closing tag → prime inThinkBlock.
-        var inThinkBlock = isReasoningModel(config.currentModel)
-        onDeviceEngine.generate(system, history, userMessage, modelPath, useGpu = true, params)
-            .collect { chunk ->
-                when (chunk) {
-                    is OnDeviceEngine.Chunk.Token ->
-                        emitTokenWithThinkHandling(
-                            chunk.text, config.showThoughts, acc, think,
-                            inThinkBlockRef = { inThinkBlock }, setInThinkBlock = { inThinkBlock = it }
-                        ) { emit(it) }
-                    is OnDeviceEngine.Chunk.Thinking -> {
-                        if (config.showThoughts) {
-                            think.append(chunk.text)
-                            emit(StreamEvent.ThinkingToken(chunk.text, think.toString()))
-                        }
-                    }
-                    is OnDeviceEngine.Chunk.Done ->
-                        emit(StreamEvent.Complete(acc.toString(), think.toString()))
-                    is OnDeviceEngine.Chunk.Error ->
-                        emit(StreamEvent.Error(chunk.message))
-                }
-            }
+        emitOnDeviceStream(
+            onDeviceEngine.generate(system, history, userMessage, modelPath, useGpu = true, params),
+            showThoughts = config.showThoughts,
+            primeThink = isReasoningModel(config.currentModel),
+            maxOutputTokens = maxTokens,
+            stopSequences = stopSequences,
+        ) { emit(it) }
     }
 
     /**
@@ -451,7 +435,8 @@ class LlmRepository @Inject constructor(
         messages: List<PromptMessage>?,
         prompt: String,
         config: ApiConfiguration,
-        oaiPreset: OaiPreset?
+        oaiPreset: OaiPreset?,
+        stopSequences: List<String>
     ): Flow<StreamEvent> = flow {
         val modelPath = onDeviceModels.pathFor(config.currentModel, OnDeviceModelManager.GGUF_EXTS)
         if (modelPath == null) {
@@ -460,30 +445,21 @@ class LlmRepository @Inject constructor(
         }
         val msgs = messages ?: listOf(PromptMessage("user", prompt))
         val pairs = msgs.map { it.role to it.content }
+        val maxTokens = if (oaiPreset != null && oaiPreset.maxTokensEnabled) oaiPreset.maxTokens else 512
         val params = GgufEngine.Params(
-            maxTokens = if (oaiPreset != null && oaiPreset.maxTokensEnabled) oaiPreset.maxTokens else 1024,
+            maxTokens = maxTokens,
             topK = if (oaiPreset != null && oaiPreset.topKEnabled) oaiPreset.topK else 40,
             topP = if (oaiPreset != null && oaiPreset.topPEnabled) oaiPreset.topP else 0.95f,
             temperature = if (oaiPreset != null && oaiPreset.temperatureEnabled) oaiPreset.temperature else 0.8f,
             repeatPenalty = if (oaiPreset != null && oaiPreset.repetitionPenaltyEnabled) oaiPreset.repetitionPenalty else 1.1f,
         )
-        val acc = StringBuilder()
-        val think = StringBuilder()
-        var inThinkBlock = isReasoningModel(config.currentModel)
-        ggufEngine.generate(pairs, modelPath, params).collect { chunk ->
-            when (chunk) {
-                is OnDeviceEngine.Chunk.Token ->
-                    emitTokenWithThinkHandling(
-                        chunk.text, config.showThoughts, acc, think,
-                        inThinkBlockRef = { inThinkBlock }, setInThinkBlock = { inThinkBlock = it }
-                    ) { emit(it) }
-                is OnDeviceEngine.Chunk.Thinking -> {
-                    if (config.showThoughts) { think.append(chunk.text); emit(StreamEvent.ThinkingToken(chunk.text, think.toString())) }
-                }
-                is OnDeviceEngine.Chunk.Done -> emit(StreamEvent.Complete(acc.toString(), think.toString()))
-                is OnDeviceEngine.Chunk.Error -> emit(StreamEvent.Error(chunk.message))
-            }
-        }
+        emitOnDeviceStream(
+            ggufEngine.generate(pairs, modelPath, params),
+            showThoughts = config.showThoughts,
+            primeThink = isReasoningModel(config.currentModel),
+            maxOutputTokens = maxTokens,
+            stopSequences = stopSequences,
+        ) { emit(it) }
     }
 
     /** Reasoning models embed <think>…</think> in their output (often only the closing tag). */
@@ -505,11 +481,11 @@ class LlmRepository @Inject constructor(
     ): Flow<StreamEvent> = flow {
         // On-device: run locally instead of an HTTP chat-completion call.
         if (config.isOnDevice) {
-            streamOnDevice(messages, prompt, config, oaiPreset).collect { emit(it) }
+            streamOnDevice(messages, prompt, config, oaiPreset, stopSequences).collect { emit(it) }
             return@flow
         }
         if (config.isOnDeviceGguf) {
-            streamOnDeviceGguf(messages, prompt, config, oaiPreset).collect { emit(it) }
+            streamOnDeviceGguf(messages, prompt, config, oaiPreset, stopSequences).collect { emit(it) }
             return@flow
         }
 
@@ -780,6 +756,73 @@ private suspend fun emitTokenWithThinkHandling(
             setInThinkBlock(false)
         }
     }
+}
+
+/** Thrown to stop an on-device generation early (stop sequence / max tokens / loop). */
+private class OnDeviceStop : RuntimeException()
+
+/**
+ * Degeneration guard for engines without a repetition penalty (LiteRT-LM): if the trailing
+ * window has already appeared 3+ times, the model is looping — bail. Conservative (48-char
+ * exact repeats are vanishingly rare in good prose).
+ */
+private fun isDegenerateLoop(s: CharSequence): Boolean {
+    if (s.length < 300) return false
+    val w = s.substring(s.length - 48)
+    var idx = s.indexOf(w); var count = 0
+    while (idx >= 0) { count++; if (count >= 3) return true; idx = s.indexOf(w, idx + 1) }
+    return false
+}
+
+/** Trim a looping tail back to the second occurrence of the repeating window. */
+private fun trimLoop(s: CharSequence): String {
+    val str = s.toString()
+    val w = str.substring(str.length - 48)
+    val first = str.indexOf(w)
+    val second = if (first >= 0) str.indexOf(w, first + w.length) else -1
+    return if (second > 0) str.substring(0, second).trimEnd() else str
+}
+
+/**
+ * Drives an on-device engine [chunks] flow into [StreamEvent]s, applying the Chat-Completion
+ * settings the engines don't enforce natively: <think> splitting, stop sequences, a max-token
+ * (approx via chars) cap, and a repetition/loop guard. Stops the engine early when any fires.
+ */
+private suspend fun emitOnDeviceStream(
+    chunks: Flow<OnDeviceEngine.Chunk>,
+    showThoughts: Boolean,
+    primeThink: Boolean,
+    maxOutputTokens: Int,
+    stopSequences: List<String>,
+    emit: suspend (StreamEvent) -> Unit
+) {
+    val acc = StringBuilder()
+    val think = StringBuilder()
+    var inThink = primeThink
+    val maxChars = maxOutputTokens.coerceAtLeast(16) * 4   // rough tokens→chars
+    val stops = stopSequences.filter { it.isNotBlank() }
+    try {
+        chunks.collect { chunk ->
+            when (chunk) {
+                is OnDeviceEngine.Chunk.Token -> {
+                    val before = acc.length
+                    emitTokenWithThinkHandling(chunk.text, showThoughts, acc, think, { inThink }, { inThink = it }) { emit(it) }
+                    if (!inThink && acc.length > before) {
+                        val cut = stops.mapNotNull { s -> acc.indexOf(s).takeIf { it >= 0 } }.minOrNull()
+                        when {
+                            cut != null -> { emit(StreamEvent.Complete(acc.substring(0, cut).trimEnd(), think.toString())); throw OnDeviceStop() }
+                            acc.length >= maxChars -> { emit(StreamEvent.Complete(acc.toString().trimEnd(), think.toString())); throw OnDeviceStop() }
+                            isDegenerateLoop(acc) -> { emit(StreamEvent.Complete(trimLoop(acc), think.toString())); throw OnDeviceStop() }
+                        }
+                    }
+                }
+                is OnDeviceEngine.Chunk.Thinking ->
+                    if (showThoughts) { think.append(chunk.text); emit(StreamEvent.ThinkingToken(chunk.text, think.toString())) }
+                is OnDeviceEngine.Chunk.Done -> emit(StreamEvent.Complete(acc.toString().trimEnd(), think.toString()))
+                is OnDeviceEngine.Chunk.Error -> emit(StreamEvent.Error(chunk.message))
+            }
+        }
+    } catch (e: OnDeviceStop) { /* early stop — engine cancelled via the flow's awaitClose */ }
 }
 
 /**
