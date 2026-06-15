@@ -418,16 +418,22 @@ class LlmRepository @Inject constructor(
 
         val acc = StringBuilder()
         val think = StringBuilder()
+        // Reasoning models (R1/QwQ/distill) emit <think>…</think>. Their chat template usually
+        // injects the opening <think>, so the model only emits the closing tag → prime inThinkBlock.
+        var inThinkBlock = isReasoningModel(config.currentModel)
         onDeviceEngine.generate(system, history, userMessage, modelPath, useGpu = true, params)
             .collect { chunk ->
                 when (chunk) {
-                    is OnDeviceEngine.Chunk.Token -> {
-                        acc.append(chunk.text)
-                        emit(StreamEvent.Token(chunk.text, acc.toString()))
-                    }
+                    is OnDeviceEngine.Chunk.Token ->
+                        emitTokenWithThinkHandling(
+                            chunk.text, config.showThoughts, acc, think,
+                            inThinkBlockRef = { inThinkBlock }, setInThinkBlock = { inThinkBlock = it }
+                        ) { emit(it) }
                     is OnDeviceEngine.Chunk.Thinking -> {
-                        think.append(chunk.text)
-                        emit(StreamEvent.ThinkingToken(chunk.text, think.toString()))
+                        if (config.showThoughts) {
+                            think.append(chunk.text)
+                            emit(StreamEvent.ThinkingToken(chunk.text, think.toString()))
+                        }
                     }
                     is OnDeviceEngine.Chunk.Done ->
                         emit(StreamEvent.Complete(acc.toString(), think.toString()))
@@ -463,14 +469,28 @@ class LlmRepository @Inject constructor(
         )
         val acc = StringBuilder()
         val think = StringBuilder()
+        var inThinkBlock = isReasoningModel(config.currentModel)
         ggufEngine.generate(pairs, modelPath, params).collect { chunk ->
             when (chunk) {
-                is OnDeviceEngine.Chunk.Token -> { acc.append(chunk.text); emit(StreamEvent.Token(chunk.text, acc.toString())) }
-                is OnDeviceEngine.Chunk.Thinking -> { think.append(chunk.text); emit(StreamEvent.ThinkingToken(chunk.text, think.toString())) }
+                is OnDeviceEngine.Chunk.Token ->
+                    emitTokenWithThinkHandling(
+                        chunk.text, config.showThoughts, acc, think,
+                        inThinkBlockRef = { inThinkBlock }, setInThinkBlock = { inThinkBlock = it }
+                    ) { emit(it) }
+                is OnDeviceEngine.Chunk.Thinking -> {
+                    if (config.showThoughts) { think.append(chunk.text); emit(StreamEvent.ThinkingToken(chunk.text, think.toString())) }
+                }
                 is OnDeviceEngine.Chunk.Done -> emit(StreamEvent.Complete(acc.toString(), think.toString()))
                 is OnDeviceEngine.Chunk.Error -> emit(StreamEvent.Error(chunk.message))
             }
         }
+    }
+
+    /** Reasoning models embed <think>…</think> in their output (often only the closing tag). */
+    private fun isReasoningModel(modelId: String): Boolean {
+        val m = modelId.lowercase()
+        return listOf("r1", "qwq", "distill", "deepseek-r", "reasoning", "-think", "thinking")
+            .any { m.contains(it) }
     }
 
     private fun streamChatCompletions(
