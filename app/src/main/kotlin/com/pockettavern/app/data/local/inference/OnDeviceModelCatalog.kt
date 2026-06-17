@@ -57,6 +57,19 @@ object OnDeviceModelCatalog {
     )
 
     val models: List<CatalogModel> = listOf(
+        // ── PocketTavern (official, RP-tuned, hosted on CharaVault) ───────────
+        CatalogModel(
+            name = "PocketTavern 1.5B (q8)", category = "PocketTavern (official)",
+            description = "Our own RP-tuned model — lean prompt, stays in character, doesn't ramble. Apache-2.0.",
+            url = "https://charavault.net/models/PocketTavern-1.5B.litertlm",
+            sizeBytes = 1490 * MB, topK = 40, topP = 0.9f, temperature = 0.85f,
+        ),
+        CatalogModel(
+            name = "PocketTavern 360M (q8)", category = "PocketTavern (official)",
+            description = "Tiny RP-tuned model for low-end devices. Lean prompt. Apache-2.0.",
+            url = "https://charavault.net/models/PocketTavern-360M.litertlm",
+            sizeBytes = 356 * MB, topK = 40, topP = 0.9f, temperature = 0.85f,
+        ),
         // ── Recommended ──────────────────────────────────────────────────────
         CatalogModel(
             name = "Qwen2.5 1.5B Instruct (q8)", category = "Recommended",
@@ -123,6 +136,19 @@ object OnDeviceModelCatalog {
      * lives — abliterated and RP-tuned fine-tunes that don't exist as .litertlm. Q4_K_M quants.
      */
     val ggufModels: List<CatalogModel> = listOf(
+        // ── PocketTavern (official, RP-tuned) — GGUF supports repetition penalty ──
+        CatalogModel(
+            name = "PocketTavern 1.5B (Q4_K_M)", category = "PocketTavern (official)",
+            description = "Our RP-tuned model, GGUF (repetition penalty available). Apache-2.0.",
+            url = "https://charavault.net/models/PocketTavern-1.5B-Q4_K_M.gguf",
+            sizeBytes = 941 * MB,
+        ),
+        CatalogModel(
+            name = "PocketTavern 360M (Q4_K_M)", category = "PocketTavern (official)",
+            description = "Tiny RP-tuned model for low-end devices, GGUF. Apache-2.0.",
+            url = "https://charavault.net/models/PocketTavern-360M-Q4_K_M.gguf",
+            sizeBytes = 259 * MB,
+        ),
         CatalogModel(
             name = "Josiefied Llama 3.2 1B (uncensored)", category = "Small / Uncensored",
             description = "Tiny uncensored 1B — best for budget/4GB phones (~770MB Q4_K_M). Won't refuse.",

@@ -85,6 +85,11 @@ class OnDeviceModelManager @Inject constructor(
         try {
             val reqBuilder = Request.Builder().url(url)
             if (!authToken.isNullOrBlank()) reqBuilder.addHeader("Authorization", "Bearer $authToken")
+            // PocketTavern's own models are hosted on CharaVault behind an app-only header gate
+            // (no login). Without this the endpoint returns 404. Models are Apache-2.0 licensed;
+            // this is hotlink/bandwidth protection, not secrecy.
+            if (url.contains("charavault.net/models/"))
+                reqBuilder.addHeader("X-PocketTavern-Client", "pt-ondevice-4662928e0c8c910c93ae3620b79812f4")
             okHttpClient.newCall(reqBuilder.build()).execute().use { resp ->
                 if (!resp.isSuccessful) {
                     emit(Progress.Error("Download failed: HTTP ${resp.code}"))
