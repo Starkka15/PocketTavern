@@ -1,6 +1,7 @@
 package com.pockettavern.app.data.repository
 
 import com.pockettavern.app.data.local.SettingsDataStore
+import com.pockettavern.app.data.local.inference.DeviceCapabilities
 import com.pockettavern.app.data.local.inference.GgufEngine
 import com.pockettavern.app.data.local.inference.OnDeviceEngine
 import com.pockettavern.app.data.local.inference.OnDeviceModelManager
@@ -419,7 +420,10 @@ class LlmRepository @Inject constructor(
         )
 
         emitOnDeviceStream(
-            onDeviceEngine.generate(system, history, userMessage, modelPath, useGpu = true, params),
+            // Only attempt GPU on NPU-capable (flagship) SoCs. Budget chips' GPU delegates can
+            // NATIVE-crash during init (uncatchable → app dies instead of falling back), so route
+            // them straight to CPU. Fixes on-device crash on 4GB/older phones (e.g. Moto G Stylus).
+            onDeviceEngine.generate(system, history, userMessage, modelPath, useGpu = DeviceCapabilities.isNpuCapableSoc(), params),
             showThoughts = config.showThoughts,
             primeThink = isReasoningModel(config.currentModel),
             maxOutputTokens = maxTokens,
