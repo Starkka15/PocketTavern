@@ -602,7 +602,7 @@ private data class MarkdownSegment(
 )
 
 @Composable
-private fun formatMessage(text: String): AnnotatedString {
+internal fun formatMessage(text: String): AnnotatedString {
     val segments = parseMarkdown(text)
     val ptColors = LocalPocketTavernColors.current
 

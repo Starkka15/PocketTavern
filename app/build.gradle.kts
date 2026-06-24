@@ -22,8 +22,12 @@ android {
         applicationId = "com.pockettavern.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 20
-        versionName = "2.3.0-ondevice-test1"
+        versionCode = 21
+        versionName = "2.3.0"
+
+        // Stories (native ensemble) = private/dev feature for now. Visible in debug builds,
+        // hidden in the public release (overridden false below). Keeps PocketTavern simple.
+        buildConfigField("boolean", "STORIES_ENABLED", "true")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -44,6 +48,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            buildConfigField("boolean", "STORIES_ENABLED", "false")  // hide Stories in the public release
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

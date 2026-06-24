@@ -618,7 +618,7 @@ PocketTavern uses PNG character cards with embedded metadata (V2 spec) — the s
 <details>
 <summary><b>Can I use a local AI model on my phone?</b></summary>
 
-PocketTavern doesn't run models directly on-device. It connects to LLM servers. Run a model on your PC (KoboldCpp, Ollama, LM Studio) and connect to it over Wi-Fi, or use a cloud API.
+Yes — PocketTavern now runs models on-device: pick an on-device model in the app and it downloads and runs locally, with hardware (NPU/GPU) acceleration on supported phones. You can also still connect to an LLM server on your PC (KoboldCpp, Ollama, LM Studio) over Wi-Fi, or use a cloud API.
 </details>
 
 <details>

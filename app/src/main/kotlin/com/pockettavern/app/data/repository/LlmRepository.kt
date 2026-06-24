@@ -577,7 +577,9 @@ class LlmRepository @Inject constructor(
                                 accumulatedThinking.append(reasoningToken)
                                 emit(StreamEvent.ThinkingToken(reasoningToken, accumulatedThinking.toString()))
                             }
-                            continue
+                            // NB: do NOT `continue` — the same delta may also carry the first
+                            // content token(s) (transition chunk). Skipping it dropped the opening
+                            // words of the response on reasoning models (R1). Fall through.
                         }
 
                         val rawToken = delta.content ?: continue

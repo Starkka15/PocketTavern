@@ -555,7 +555,7 @@ fun SetupGuideScreen(
                 )
                 FaqItem(
                     question = "Can I use a local AI model on my phone?",
-                    answer = "PocketTavern doesn't run models directly on-device. It connects to LLM servers. Run a model on your PC (KoboldCpp, Ollama, LM Studio) and connect to it over Wi-Fi, or use a cloud API."
+                    answer = "Yes — PocketTavern now runs models on-device: pick an on-device model in the app and it downloads and runs locally, with hardware (NPU/GPU) acceleration on supported phones. You can also still connect to an LLM server on your PC (KoboldCpp, Ollama, LM Studio) over Wi-Fi, or use a cloud API."
                 )
                 FaqItem(
                     question = "How do I connect to a local backend like KoboldCpp?",

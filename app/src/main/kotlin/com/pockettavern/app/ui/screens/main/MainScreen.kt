@@ -54,6 +54,7 @@ fun MainScreen(
     onNavigateToCharacters: () -> Unit,
     onNavigateToRecentChats: () -> Unit,
     onNavigateToCreateCharacter: () -> Unit,
+    onNavigateToStories: () -> Unit = {},   // V12: always visible; empty-state prompts import
     onNavigateToCharaVault: () -> Unit,
     onNavigateToRisuRealm: () -> Unit = {},
     onNavigateToBotBooru: () -> Unit = {},
@@ -207,6 +208,19 @@ fun MainScreen(
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
+
+                // Stories (native ensemble) — private/dev feature, gated out of the public release (STORIES_ENABLED).
+                if (com.pockettavern.app.BuildConfig.STORIES_ENABLED) {
+                    NavigationCard(
+                        icon = Icons.Default.People,
+                        title = "Stories",
+                        description = "Multi-character ensembles — director-led RP",
+                        iconColor = MaterialTheme.colorScheme.tertiary,
+                        onClick = onNavigateToStories
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
 
                 // Card search — CharaVault or RisuRealm
                 SearchCardsCard(
