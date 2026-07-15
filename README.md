@@ -1171,3 +1171,7 @@ See [LICENSE](LICENSE) for full terms.
 - **[Starkka15](https://github.com/Starkka15)** — Lead Developer
 - **[Kuma3D](https://github.com/Kuma3D)** — UI / Graphical Layout
 - **[SillyTavern](https://github.com/SillyTavern/SillyTavern)** — Instruct/context/textgen preset templates bundled under their open-source license
+
+## AI Disclosure
+
+This project is developed with AI assistance. See **[AI.md](AI.md)** for how AI is used here, the ethical obligations behind it, and how upstream credit and licensing are handled.
