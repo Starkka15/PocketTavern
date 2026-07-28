@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.oaipreset
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -53,7 +55,7 @@ fun OaiPresetSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Chat Completion Presets") },
+                title = { Text(stringResource(R.string.chat_completion_presets)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -91,8 +93,7 @@ fun OaiPresetSettingsScreen(
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
-                Text(
-                    text = "Toggle each parameter on to override the API default. Disabled parameters are omitted from the request.",
+                Text(text = stringResource(R.string.toggle_each_parameter_on_to_override_the_api),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -219,8 +220,7 @@ fun OaiPresetSettingsScreen(
 
                 // ── Prompt Order ─────────────────────────────────────────────
                 OaiSectionHeader("Prompt Order")
-                Text(
-                    text = "Control which blocks are included and their order. Tap a content block to edit its text.",
+                Text(text = stringResource(R.string.control_which_blocks_are_included_and_their_o),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -246,7 +246,7 @@ fun OaiPresetSettingsScreen(
                 ) {
                     Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Add Custom Prompt")
+                    Text(stringResource(R.string.add_custom_prompt))
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
@@ -263,7 +263,7 @@ fun OaiPresetSettingsScreen(
                     ) {
                         Icon(Icons.Default.Save, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Save Preset")
+                        Text(stringResource(R.string.save_preset))
                     }
                     OutlinedButton(
                         onClick = { viewModel.showDeleteConfirm() },
@@ -273,12 +273,12 @@ fun OaiPresetSettingsScreen(
                     ) {
                         Icon(Icons.Default.Delete, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Delete")
+                        Text(stringResource(R.string.delete))
                     }
                 }
 
                 if (uiState.saveSuccess) {
-                    Text("Preset saved!", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.preset_saved), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
                 }
 
                 Spacer(Modifier.height(32.dp))
@@ -290,12 +290,12 @@ fun OaiPresetSettingsScreen(
     if (uiState.showSaveDialog) {
         AlertDialog(
             onDismissRequest = { viewModel.hideSaveDialog() },
-            title = { Text("Save Preset") },
+            title = { Text(stringResource(R.string.save_preset)) },
             text = {
                 OutlinedTextField(
                     value = uiState.newPresetName,
                     onValueChange = { viewModel.updateNewPresetName(it) },
-                    label = { Text("Preset Name") },
+                    label = { Text(stringResource(R.string.preset_name)) },
                     singleLine = true,
                     colors = oaiTextFieldColors()
                 )
@@ -304,10 +304,10 @@ fun OaiPresetSettingsScreen(
                 TextButton(
                     onClick = { viewModel.savePreset() },
                     enabled = uiState.newPresetName.isNotBlank() && !uiState.isSaving
-                ) { Text("Save") }
+                ) { Text(stringResource(R.string.save)) }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.hideSaveDialog() }) { Text("Cancel") }
+                TextButton(onClick = { viewModel.hideSaveDialog() }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -328,18 +328,17 @@ fun OaiPresetSettingsScreen(
     if (uiState.showImportNameDialog) {
         AlertDialog(
             onDismissRequest = { viewModel.hideImportNameDialog() },
-            title = { Text("Import ST Preset") },
+            title = { Text(stringResource(R.string.import_st_preset)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "Save imported preset as:",
+                    Text(stringResource(R.string.save_imported_preset_as),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = uiState.importPresetName,
                         onValueChange = { viewModel.updateImportPresetName(it) },
-                        label = { Text("Preset Name") },
+                        label = { Text(stringResource(R.string.preset_name)) },
                         singleLine = true,
                         colors = oaiTextFieldColors()
                     )
@@ -349,10 +348,10 @@ fun OaiPresetSettingsScreen(
                 TextButton(
                     onClick = { viewModel.confirmImport() },
                     enabled = uiState.importPresetName.isNotBlank() && !uiState.isSaving
-                ) { Text("Import") }
+                ) { Text(stringResource(R.string.action_import)) }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.hideImportNameDialog() }) { Text("Cancel") }
+                TextButton(onClick = { viewModel.hideImportNameDialog() }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -367,8 +366,8 @@ fun OaiPresetSettingsScreen(
                     OutlinedTextField(
                         value = uiState.customPromptLabel,
                         onValueChange = { viewModel.updateCustomPromptLabel(it) },
-                        label = { Text("Name") },
-                        placeholder = { Text("e.g. NSFW Policy, Jailbreak…") },
+                        label = { Text(stringResource(R.string.name)) },
+                        placeholder = { Text(stringResource(R.string.e_g_nsfw_policy_jailbreak)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = oaiTextFieldColors()
@@ -376,8 +375,8 @@ fun OaiPresetSettingsScreen(
                     OutlinedTextField(
                         value = uiState.customPromptContent,
                         onValueChange = { viewModel.updateCustomPromptContent(it) },
-                        label = { Text("Content") },
-                        placeholder = { Text("Prompt text. Use {{user}}, {{char}} macros.") },
+                        label = { Text(stringResource(R.string.content)) },
+                        placeholder = { Text(stringResource(R.string.prompt_text_use_user_char_macros)) },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
                         maxLines = 12,
                         colors = oaiTextFieldColors()
@@ -391,7 +390,7 @@ fun OaiPresetSettingsScreen(
                 ) { Text(if (uiState.editingCustomIndex >= 0) "Save" else "Add") }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.hideCustomPromptDialog() }) { Text("Cancel") }
+                TextButton(onClick = { viewModel.hideCustomPromptDialog() }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -627,7 +626,7 @@ private fun PromptOrderRow(
                 ) {
                     // --- Role row ---
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Role:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        Text(stringResource(R.string.role_2), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.width(60.dp))
                         listOf("system", "user", "assistant").forEach { role ->
                             val selected = item.role == role
@@ -647,13 +646,13 @@ private fun PromptOrderRow(
 
                     // --- Injection mode row ---
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Inject:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        Text(stringResource(R.string.inject), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.width(60.dp))
                         val inOrder = item.injectionPosition == 0
                         FilterChip(
                             selected = inOrder,
                             onClick = { onInjectionChange(0, item.injectionDepth) },
-                            label = { Text("In order", style = MaterialTheme.typography.labelSmall) },
+                            label = { Text(stringResource(R.string.in_order), style = MaterialTheme.typography.labelSmall) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
                                 selectedLabelColor = MaterialTheme.colorScheme.primary,
@@ -664,7 +663,7 @@ private fun PromptOrderRow(
                         FilterChip(
                             selected = !inOrder,
                             onClick = { onInjectionChange(1, item.injectionDepth) },
-                            label = { Text("In-chat depth", style = MaterialTheme.typography.labelSmall) },
+                            label = { Text(stringResource(R.string.in_chat_depth), style = MaterialTheme.typography.labelSmall) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
                                 selectedLabelColor = MaterialTheme.colorScheme.primary,
@@ -683,7 +682,7 @@ private fun PromptOrderRow(
                                 },
                                 modifier = Modifier.width(72.dp),
                                 singleLine = true,
-                                label = { Text("Depth", style = MaterialTheme.typography.labelSmall) },
+                                label = { Text(stringResource(R.string.depth), style = MaterialTheme.typography.labelSmall) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 colors = oaiTextFieldColors()
                             )
@@ -697,7 +696,7 @@ private fun PromptOrderRow(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 80.dp),
-                        placeholder = { Text("Enter prompt text. Use {{user}}, {{char}} macros.", color = MaterialTheme.colorScheme.outline) },
+                        placeholder = { Text(stringResource(R.string.enter_prompt_text_use_user_char_macros), color = MaterialTheme.colorScheme.outline) },
                         minLines = 3,
                         colors = oaiTextFieldColors()
                     )

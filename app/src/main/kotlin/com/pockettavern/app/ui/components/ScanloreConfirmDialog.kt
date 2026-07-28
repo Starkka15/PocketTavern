@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.components
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -24,7 +26,7 @@ fun ScanloreConfirmDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Scanlore Results") },
+        title = { Text(stringResource(R.string.scanlore_results)) },
         text = {
             Column {
                 when {
@@ -35,7 +37,7 @@ fun ScanloreConfirmDialog(
                         ) {
                             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(12.dp))
-                            Text("Scanning conversation...", style = MaterialTheme.typography.bodyMedium)
+                            Text(stringResource(R.string.scanning_conversation), style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                     error != null -> {
@@ -47,15 +49,13 @@ fun ScanloreConfirmDialog(
                         )
                     }
                     entries.isEmpty() -> {
-                        Text(
-                            "Nothing notable found in recent messages.",
+                        Text(stringResource(R.string.nothing_notable_found_in_recent_messages),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(vertical = 8.dp)
                         )
                     }
                     else -> {
-                        Text(
-                            "Uncheck or edit entries before adding to World Book.",
+                        Text(stringResource(R.string.uncheck_or_edit_entries_before_adding_to_worl),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(bottom = 8.dp)
@@ -104,11 +104,11 @@ fun ScanloreConfirmDialog(
                         .map { edited.getOrElse(it) { entries[it] }.trim() }
                         .filter { it.isNotBlank() }
                     onConfirm(selected)
-                }) { Text("Add to Book") }
+                }) { Text(stringResource(R.string.add_to_book)) }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }

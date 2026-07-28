@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.settings
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -47,7 +49,7 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = { Text(stringResource(R.string.settings)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -78,8 +80,7 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Forge Server Section
-                Text(
-                    text = "Stable Diffusion Forge (optional)",
+                Text(text = stringResource(R.string.stable_diffusion_forge_optional),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -87,16 +88,15 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = uiState.forgeUrl,
                     onValueChange = { viewModel.updateForgeUrl(it) },
-                    label = { Text("Forge URL") },
-                    placeholder = { Text("http://192.168.1.100:7860") },
+                    label = { Text(stringResource(R.string.forge_url)) },
+                    placeholder = { Text(stringResource(R.string.http_192_168_1_100_7860)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     colors = settingsTextFieldColors()
                 )
 
-                Text(
-                    text = "Used for generating character avatars",
+                Text(text = stringResource(R.string.used_for_generating_character_avatars),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -104,8 +104,7 @@ fun SettingsScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // CharaVault Server Section
-                Text(
-                    text = "Card Server (optional)",
+                Text(text = stringResource(R.string.card_server_optional),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -120,22 +119,20 @@ fun SettingsScreen(
                     OutlinedTextField(
                         value = uiState.charaVaultUrl,
                         onValueChange = { viewModel.updateCharaVaultUrl(it) },
-                        label = { Text("CharaVault URL") },
-                        placeholder = { Text("http://192.168.1.100:8787") },
+                        label = { Text(stringResource(R.string.charavault_url)) },
+                        placeholder = { Text(stringResource(R.string.http_192_168_1_100_8787)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                         colors = settingsTextFieldColors()
                     )
 
-                    Text(
-                        text = "Your local character card index server",
+                    Text(text = stringResource(R.string.your_local_character_card_index_server),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                    Text(
-                        text = "Configure login via the CharaVault screen",
+                    Text(text = stringResource(R.string.configure_login_via_the_charavault_screen),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -157,20 +154,18 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
-                    Text("Save Settings")
+                    Text(stringResource(R.string.save_settings))
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // Debug Section
-                Text(
-                    text = "Debugging",
+                Text(text = stringResource(R.string.debugging),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
 
-                Text(
-                    text = "Share debug logs to help diagnose issues with prompt building, World Info, and API requests.",
+                Text(text = stringResource(R.string.share_debug_logs_to_help_diagnose_issues_with),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -210,7 +205,7 @@ fun SettingsScreen(
                     ) {
                         Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Share Debug Log")
+                        Text(stringResource(R.string.share_debug_log))
                     }
 
                     OutlinedButton(
@@ -219,7 +214,7 @@ fun SettingsScreen(
                     ) {
                         Icon(Icons.Default.BugReport, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Clear Log")
+                        Text(stringResource(R.string.clear_log))
                     }
                 }
             }

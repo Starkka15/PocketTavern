@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.recentchats
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,7 +32,7 @@ fun RecentChatsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Recent Chats") },
+                title = { Text(stringResource(R.string.recent_chats)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -70,13 +72,11 @@ fun RecentChatsScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Text(
-                            text = "No recent chats",
+                        Text(text = stringResource(R.string.no_recent_chats),
                             style = MaterialTheme.typography.titleMedium
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Start chatting with a character to see them here",
+                        Text(text = stringResource(R.string.start_chatting_with_a_character_to_see_them_h),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

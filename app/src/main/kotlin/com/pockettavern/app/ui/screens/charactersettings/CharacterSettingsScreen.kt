@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.charactersettings
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,7 +43,7 @@ fun CharacterSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Character Settings") },
+                title = { Text(stringResource(R.string.character_settings)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -190,13 +192,11 @@ private fun NotesSection(
     onNotesChange: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "Personal Notes",
+        Text(text = stringResource(R.string.personal_notes),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary
         )
-        Text(
-            text = "Private notes about this character. Not sent to the AI.",
+        Text(text = stringResource(R.string.private_notes_about_this_character_not_sent_t),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -204,7 +204,7 @@ private fun NotesSection(
             value = notes,
             onValueChange = onNotesChange,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Add your notes here...") },
+            placeholder = { Text(stringResource(R.string.add_your_notes_here)) },
             minLines = 3,
             maxLines = 8,
             colors = OutlinedTextFieldDefaults.colors(
@@ -259,14 +259,12 @@ private fun WorldInfoSection(
     var expanded by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "World Info / Lorebook",
+        Text(text = stringResource(R.string.world_info_lorebook),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary
         )
 
-        Text(
-            text = "Attach a lorebook to this character. The lorebook entries will be injected into the context when their keywords are detected.",
+        Text(text = stringResource(R.string.attach_a_lorebook_to_this_character_the_loreb),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -282,7 +280,7 @@ private fun WorldInfoSection(
                 modifier = Modifier
                     .fillMaxWidth()
                     .menuAnchor(MenuAnchorType.PrimaryNotEditable),
-                label = { Text("Attached World Info") },
+                label = { Text(stringResource(R.string.attached_world_info)) },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -298,7 +296,7 @@ private fun WorldInfoSection(
             ) {
                 // None option - use empty string to explicitly clear the world info
                 DropdownMenuItem(
-                    text = { Text("None") },
+                    text = { Text(stringResource(R.string.none)) },
                     onClick = {
                         onWorldInfoChange("")
                         expanded = false
@@ -325,14 +323,12 @@ private fun SystemPromptSection(
     onSystemPromptChange: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "System Prompt",
+        Text(text = stringResource(R.string.system_prompt_2),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary
         )
 
-        Text(
-            text = "Character-specific system instructions. This overrides the global system prompt when chatting with this character.",
+        Text(text = stringResource(R.string.character_specific_system_instructions_this_o),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -343,8 +339,8 @@ private fun SystemPromptSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 120.dp),
-            label = { Text("System Prompt") },
-            placeholder = { Text("Enter character-specific system instructions...") },
+            label = { Text(stringResource(R.string.system_prompt_2)) },
+            placeholder = { Text(stringResource(R.string.enter_character_specific_system_instructions)) },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -372,14 +368,12 @@ private fun AuthorsNoteSection(
     val roles = listOf("system", "user", "assistant")
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "Author's Note",
+        Text(text = stringResource(R.string.author_s_note_2),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary
         )
 
-        Text(
-            text = "Instructions injected at a specific depth in the conversation. Use this to guide the AI's behavior mid-conversation.",
+        Text(text = stringResource(R.string.instructions_injected_at_a_specific_depth_in),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -390,8 +384,8 @@ private fun AuthorsNoteSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 100.dp),
-            label = { Text("Author's Note Content") },
-            placeholder = { Text("Enter author's note...") },
+            label = { Text(stringResource(R.string.author_s_note_content)) },
+            placeholder = { Text(stringResource(R.string.enter_author_s_note)) },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -412,8 +406,8 @@ private fun AuthorsNoteSection(
                     newValue.toIntOrNull()?.let { onDepthChange(it) }
                 },
                 modifier = Modifier.weight(1f),
-                label = { Text("Depth") },
-                supportingText = { Text("Messages from end") },
+                label = { Text(stringResource(R.string.depth)) },
+                supportingText = { Text(stringResource(R.string.messages_from_end)) },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -434,7 +428,7 @@ private fun AuthorsNoteSection(
                     onValueChange = { },
                     readOnly = true,
                     modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable),
-                    label = { Text("Role") },
+                    label = { Text(stringResource(R.string.role)) },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = roleExpanded) },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -465,8 +459,7 @@ private fun AuthorsNoteSection(
         Spacer(modifier = Modifier.height(8.dp))
 
         // Post-history instructions (legacy author's note)
-        Text(
-            text = "Post-History Instructions (Legacy)",
+        Text(text = stringResource(R.string.post_history_instructions_legacy),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -477,8 +470,8 @@ private fun AuthorsNoteSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 80.dp),
-            label = { Text("Post-History Instructions") },
-            placeholder = { Text("Legacy author's note format...") },
+            label = { Text(stringResource(R.string.post_history_instructions)) },
+            placeholder = { Text(stringResource(R.string.legacy_author_s_note_format)) },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -496,14 +489,12 @@ private fun TalkativenessSection(
     onTalkativenessChange: (Float) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "Talkativeness (Group Chats)",
+        Text(text = stringResource(R.string.talkativeness_group_chats),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary
         )
 
-        Text(
-            text = "How often this character speaks in group conversations. Higher values mean more frequent responses.",
+        Text(text = stringResource(R.string.how_often_this_character_speaks_in_group_conv),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -513,8 +504,7 @@ private fun TalkativenessSection(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Quiet",
+            Text(text = stringResource(R.string.quiet),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline
             )
@@ -530,8 +520,7 @@ private fun TalkativenessSection(
                 )
             )
 
-            Text(
-                text = "Talkative",
+            Text(text = stringResource(R.string.talkative),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline
             )
@@ -557,14 +546,12 @@ private fun TtsVoiceSection(
     var expanded by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "TTS Voice",
+        Text(text = stringResource(R.string.tts_voice),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary
         )
 
-        Text(
-            text = "Assign a specific voice to this character. Leave as 'Default' to use the global TTS voice.",
+        Text(text = stringResource(R.string.assign_a_specific_voice_to_this_character_lea),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -580,7 +567,7 @@ private fun TtsVoiceSection(
                 modifier = Modifier
                     .fillMaxWidth()
                     .menuAnchor(MenuAnchorType.PrimaryNotEditable),
-                label = { Text("Voice") },
+                label = { Text(stringResource(R.string.voice)) },
                 leadingIcon = { Icon(Icons.Default.RecordVoiceOver, contentDescription = null) },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                 colors = OutlinedTextFieldDefaults.colors(
@@ -596,7 +583,7 @@ private fun TtsVoiceSection(
                 onDismissRequest = { expanded = false }
             ) {
                 DropdownMenuItem(
-                    text = { Text("Default (global)") },
+                    text = { Text(stringResource(R.string.default_global)) },
                     onClick = {
                         onVoiceChange(null)
                         expanded = false
@@ -636,7 +623,7 @@ private fun TtsVoiceSection(
                 modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.width(4.dp))
-            Text("Test Voice")
+            Text(stringResource(R.string.test_voice))
         }
     }
 }
@@ -647,14 +634,12 @@ private fun ExtensionsSection(
     onToggle: (String, Boolean) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "Extensions",
+        Text(text = stringResource(R.string.extensions),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary
         )
 
-        Text(
-            text = "Enable or disable extensions for this character. Disabled extensions won't inject prompts or process messages.",
+        Text(text = stringResource(R.string.enable_or_disable_extensions_for_this_charact),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.theme
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.border
@@ -48,7 +50,7 @@ fun ThemeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Appearance") },
+                title = { Text(stringResource(R.string.appearance)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -65,8 +67,7 @@ fun ThemeScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
-                Text(
-                    "Themes",
+                Text(stringResource(R.string.themes),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 4.dp)
@@ -91,7 +92,7 @@ fun ThemeScreen(
                 ) {
                     Icon(Icons.Default.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Import Theme (.json or .zip)")
+                    Text(stringResource(R.string.import_theme_json_or_zip))
                 }
             }
 
@@ -102,7 +103,7 @@ fun ThemeScreen(
                 ) {
                     Icon(Icons.Default.ColorLens, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Create Theme")
+                    Text(stringResource(R.string.create_theme))
                 }
             }
 
@@ -117,8 +118,7 @@ fun ThemeScreen(
             }
 
             item {
-                Text(
-                    "Import a theme JSON or a ZIP bundle with images (background, logo). SillyTavern themes also supported.",
+                Text(stringResource(R.string.import_a_theme_json_or_a_zip_bundle_with_imag),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp)
@@ -157,8 +157,7 @@ private fun ThemeCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(entry.name, style = MaterialTheme.typography.titleMedium)
                 if (entry.isDefault) {
-                    Text(
-                        "Built-in default",
+                    Text(stringResource(R.string.built_in_default),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -172,18 +171,18 @@ private fun ThemeCard(
             if (isActive) {
                 Icon(
                     Icons.Default.CheckCircle,
-                    contentDescription = "Active",
+                    contentDescription = stringResource(R.string.active_2),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
             } else {
-                TextButton(onClick = onApply) { Text("Apply") }
+                TextButton(onClick = onApply) { Text(stringResource(R.string.apply)) }
             }
             if (onDelete != null) {
                 IconButton(onClick = { showDeleteDialog = true }) {
                     Icon(
                         Icons.Default.Delete,
-                        contentDescription = "Delete",
+                        contentDescription = stringResource(R.string.delete),
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(18.dp)
                     )
@@ -196,14 +195,14 @@ private fun ThemeCard(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("Delete ${entry.name}?") },
-            text  = { Text("This will permanently remove the theme file.") },
+            text  = { Text(stringResource(R.string.this_will_permanently_remove_the_theme_file)) },
             confirmButton = {
                 TextButton(onClick = { showDeleteDialog = false; onDelete!!() }) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }

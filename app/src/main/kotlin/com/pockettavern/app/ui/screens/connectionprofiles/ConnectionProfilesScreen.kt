@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.connectionprofiles
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -48,28 +50,27 @@ fun ConnectionProfilesScreen(
     if (uiState.showNameDialog) {
         AlertDialog(
             onDismissRequest = viewModel::hideDialog,
-            title = { Text("Save Current Settings") },
+            title = { Text(stringResource(R.string.save_current_settings)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "Snapshots the current API config, server URL, model, and preset selections.",
+                    Text(stringResource(R.string.snapshots_the_current_api_config_server_url_m),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = uiState.nameField,
                         onValueChange = viewModel::updateNameField,
-                        label = { Text("Profile name") },
+                        label = { Text(stringResource(R.string.profile_name)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
             },
             confirmButton = {
-                TextButton(onClick = viewModel::saveCurrentAsProfile) { Text("Save") }
+                TextButton(onClick = viewModel::saveCurrentAsProfile) { Text(stringResource(R.string.save)) }
             },
             dismissButton = {
-                TextButton(onClick = viewModel::hideDialog) { Text("Cancel") }
+                TextButton(onClick = viewModel::hideDialog) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -77,7 +78,7 @@ fun ConnectionProfilesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Connection Profiles") },
+                title = { Text(stringResource(R.string.connection_profiles)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -90,7 +91,7 @@ fun ConnectionProfilesScreen(
             ExtendedFloatingActionButton(
                 onClick = viewModel::showSaveDialog,
                 icon = { Icon(Icons.Default.Save, contentDescription = null) },
-                text = { Text("Save Current") },
+                text = { Text(stringResource(R.string.save_current)) },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.background
             )
@@ -114,13 +115,11 @@ fun ConnectionProfilesScreen(
                         modifier = Modifier.size(48.dp),
                         tint = MaterialTheme.colorScheme.outline
                     )
-                    Text(
-                        "No profiles saved yet",
+                    Text(stringResource(R.string.no_profiles_saved_yet),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Text(
-                        "Tap 'Save Current' to snapshot your API settings",
+                    Text(stringResource(R.string.tap_save_current_to_snapshot_your_api_setting),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -184,8 +183,7 @@ private fun ProfileCard(
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                             shape = MaterialTheme.shapes.extraSmall
                         ) {
-                            Text(
-                                text = "ACTIVE",
+                            Text(text = stringResource(R.string.active),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold,
@@ -225,19 +223,19 @@ private fun ProfileCard(
                     ),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                 ) {
-                    Text("Activate", style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(R.string.activate), style = MaterialTheme.typography.labelMedium)
                 }
             } else {
                 Icon(
                     Icons.Default.CheckCircle,
-                    contentDescription = "Active",
+                    contentDescription = stringResource(R.string.active_2),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp)
                 )
             }
             Spacer(modifier = Modifier.width(4.dp))
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error)
             }
         }
     }

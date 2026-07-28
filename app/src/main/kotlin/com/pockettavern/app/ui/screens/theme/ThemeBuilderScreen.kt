@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.theme
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -79,7 +81,7 @@ fun ThemeBuilderScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Create Theme") },
+                title = { Text(stringResource(R.string.create_theme)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -91,7 +93,7 @@ fun ThemeBuilderScreen(
             ExtendedFloatingActionButton(
                 onClick = { showNameDialog = true },
                 icon = { Icon(Icons.Default.Save, contentDescription = null) },
-                text = { Text("Save Theme") }
+                text = { Text(stringResource(R.string.save_theme)) }
             )
         }
     ) { padding ->
@@ -119,8 +121,7 @@ fun ThemeBuilderScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        "Avatars:",
+                    Text(stringResource(R.string.avatars),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -150,10 +151,9 @@ fun ThemeBuilderScreen(
             ) {
 
             // ── Background Image ──────────────────────────────────────────────
-            item { SectionHeader("Background Image") }
+            item { SectionHeader(stringResource(R.string.background_image)) }
             item {
-                Text(
-                    "Main menu only",
+                Text(stringResource(R.string.main_menu_only),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 4.dp)
@@ -170,7 +170,7 @@ fun ThemeBuilderScreen(
             }
 
             // ── Layout ───────────────────────────────────────────────────────
-            item { SectionHeader("Layout") }
+            item { SectionHeader(stringResource(R.string.layout)) }
             item {
                 ColorPickerRow("Background", state.colors.background) { c ->
                     viewModel.updateColors { it.copy(background = c) }
@@ -183,7 +183,7 @@ fun ThemeBuilderScreen(
             }
 
             // ── Accent ───────────────────────────────────────────────────────
-            item { SectionHeader("Accent") }
+            item { SectionHeader(stringResource(R.string.accent)) }
             item {
                 ColorPickerRow("Accent / Primary", state.colors.accentPrimary) { c ->
                     viewModel.updateColors { it.copy(accentPrimary = c) }
@@ -196,7 +196,7 @@ fun ThemeBuilderScreen(
             }
 
             // ── Text ─────────────────────────────────────────────────────────
-            item { SectionHeader("Text") }
+            item { SectionHeader(stringResource(R.string.text)) }
             item {
                 ColorPickerRow("Primary Text", state.colors.textPrimary) { c ->
                     viewModel.updateColors { it.copy(textPrimary = c) }
@@ -224,7 +224,7 @@ fun ThemeBuilderScreen(
             }
 
             // ── User Bubble ──────────────────────────────────────────────────
-            item { SectionHeader("User Bubble") }
+            item { SectionHeader(stringResource(R.string.user_bubble)) }
             item {
                 ColorPickerRow("Bubble Color", state.colors.userBubble) { c ->
                     viewModel.updateColors { it.copy(userBubble = c) }
@@ -237,7 +237,7 @@ fun ThemeBuilderScreen(
             }
 
             // ── Assistant Bubble ─────────────────────────────────────────────
-            item { SectionHeader("Assistant Bubble") }
+            item { SectionHeader(stringResource(R.string.assistant_bubble)) }
             item {
                 ColorPickerRow("Bubble Color", state.colors.assistantBubble) { c ->
                     viewModel.updateColors { it.copy(assistantBubble = c) }
@@ -286,7 +286,7 @@ private fun MainMenuPreview(state: ThemeBuilderUiState, modifier: Modifier = Mod
         }
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Main Menu", style = MaterialTheme.typography.labelSmall, color = c.textSecondary)
+            Text(stringResource(R.string.main_menu), style = MaterialTheme.typography.labelSmall, color = c.textSecondary)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -305,8 +305,8 @@ private fun MainMenuPreview(state: ThemeBuilderUiState, modifier: Modifier = Mod
                     }
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("Characters", style = MaterialTheme.typography.titleSmall, color = c.textPrimary)
-                        Text("Browse and chat with your characters",
+                        Text(stringResource(R.string.characters), style = MaterialTheme.typography.titleSmall, color = c.textPrimary)
+                        Text(stringResource(R.string.browse_and_chat_with_your_characters),
                             style = MaterialTheme.typography.bodySmall, color = c.textSecondary)
                     }
                 }
@@ -325,7 +325,7 @@ private fun ChatPreview(state: ThemeBuilderUiState, modifier: Modifier = Modifie
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Chat", style = MaterialTheme.typography.labelSmall, color = c.textSecondary)
+            Text(stringResource(R.string.chat), style = MaterialTheme.typography.labelSmall, color = c.textSecondary)
 
             // Character bubble — name label above text inside bubble, no avatar circle
             Column(
@@ -334,8 +334,7 @@ private fun ChatPreview(state: ThemeBuilderUiState, modifier: Modifier = Modifie
             ) {
                 PreviewBubbleBox(isUser = false, c) {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            "Aria",
+                        Text(stringResource(R.string.aria),
                             style = MaterialTheme.typography.labelSmall,
                             color = c.accentPrimary
                         )
@@ -359,7 +358,7 @@ private fun ChatPreview(state: ThemeBuilderUiState, modifier: Modifier = Modifie
             // User bubble — right-aligned, no avatar, no name
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 PreviewBubbleBox(isUser = true, c) {
-                    Text("Tell me more.", color = c.userBubbleText, style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.tell_me_more), color = c.userBubbleText, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -417,7 +416,7 @@ private fun BackgroundSection(
                     )
                 }
                 IconButton(onClick = onClearImage) {
-                    Icon(Icons.Default.Close, contentDescription = "Remove background",
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.remove_background),
                         tint = MaterialTheme.colorScheme.error)
                 }
             }
@@ -441,7 +440,7 @@ private fun BackgroundSection(
             ) {
                 Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Add Background Image")
+                Text(stringResource(R.string.add_background_image))
             }
         }
     }
@@ -489,8 +488,7 @@ private fun ColorPickerRow(
                 )
                 Spacer(Modifier.width(12.dp))
                 Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    "#%06X".format(color.toArgb() and 0xFFFFFF),
+                Text(stringResource(R.string.s_06x).format(color.toArgb() and 0xFFFFFF),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -611,7 +609,7 @@ private fun HsvColorPicker(color: Color, onColorChanged: (Color) -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Brightness", style = MaterialTheme.typography.labelSmall,
+            Text(stringResource(R.string.brightness), style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.width(70.dp))
             Slider(
                 value = value,
@@ -642,8 +640,7 @@ private fun HsvColorPicker(color: Color, onColorChanged: (Color) -> Unit) {
                     .background(color)
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp))
             )
-            Text(
-                "#%06X".format(color.toArgb() and 0xFFFFFF),
+            Text(stringResource(R.string.s_06x).format(color.toArgb() and 0xFFFFFF),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -676,23 +673,23 @@ private fun SaveThemeDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) 
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Name Your Theme") },
+        title = { Text(stringResource(R.string.name_your_theme)) },
         text = {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("Theme name") },
+                label = { Text(stringResource(R.string.theme_name)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(name) }, enabled = name.isNotBlank()) {
-                Text("Save")
+                Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }

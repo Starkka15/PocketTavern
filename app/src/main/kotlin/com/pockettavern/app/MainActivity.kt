@@ -1,5 +1,6 @@
 package com.pockettavern.app
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,6 +16,7 @@ import com.pockettavern.app.ui.audio.ThemeAudioManager
 import com.pockettavern.app.ui.navigation.SillyTavernNavGraph
 import com.pockettavern.app.ui.theme.SillyTavernTheme
 import com.pockettavern.app.ui.theme.ThemeManager
+import com.pockettavern.app.util.LocaleHelper
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -23,6 +25,10 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var themeManager: ThemeManager
     @Inject lateinit var themeAudioManager: ThemeAudioManager
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()

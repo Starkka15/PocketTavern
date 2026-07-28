@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.extensions
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import android.annotation.SuppressLint
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
@@ -51,7 +53,7 @@ fun ExtensionPanelScreen(
                 title = { Text(title) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )

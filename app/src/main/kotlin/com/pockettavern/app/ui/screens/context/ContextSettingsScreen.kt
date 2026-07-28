@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.context
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -38,7 +40,7 @@ fun ContextSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Context Settings") },
+                title = { Text(stringResource(R.string.context_settings)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -124,13 +126,12 @@ fun ContextSettingsScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
-                    Text("Save Settings")
+                    Text(stringResource(R.string.save_settings))
                 }
 
                 // Success message
                 if (uiState.saveSuccess) {
-                    Text(
-                        text = "Settings saved successfully!",
+                    Text(text = stringResource(R.string.settings_saved_successfully),
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -172,16 +173,14 @@ private fun AuthorsNoteSection(
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary
             )
-            Text(
-                text = "AUTHOR'S NOTE",
+            Text(text = stringResource(R.string.author_s_note),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
         }
 
-        Text(
-            text = "A note injected into the context to guide the AI's response style or focus.",
+        Text(text = stringResource(R.string.a_note_injected_into_the_context_to_guide_the),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -190,7 +189,7 @@ private fun AuthorsNoteSection(
         OutlinedTextField(
             value = content,
             onValueChange = onContentChange,
-            label = { Text("Author's Note") },
+            label = { Text(stringResource(R.string.author_s_note_2)) },
             placeholder = { Text("[Style: vivid, detailed]\n[Focus: character emotions]") },
             modifier = Modifier
                 .fillMaxWidth()
@@ -215,7 +214,7 @@ private fun AuthorsNoteSection(
                 value = positionOptions.find { it.second == position }?.first ?: "After Scenario",
                 onValueChange = {},
                 readOnly = true,
-                label = { Text("Position") },
+                label = { Text(stringResource(R.string.position)) },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = positionExpanded) },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -265,8 +264,7 @@ private fun AuthorsNoteSection(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Interval:",
+            Text(text = stringResource(R.string.interval),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -305,7 +303,7 @@ private fun AuthorsNoteSection(
                 value = roleOptions.find { it.second == role }?.first ?: "System",
                 onValueChange = {},
                 readOnly = true,
-                label = { Text("Role") },
+                label = { Text(stringResource(R.string.role)) },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = roleExpanded) },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -347,16 +345,14 @@ private fun AutoContinueSection(
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary
             )
-            Text(
-                text = "AUTO-CONTINUE",
+            Text(text = stringResource(R.string.auto_continue),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
         }
 
-        Text(
-            text = "Automatically request more when the AI stops before the minimum response length.",
+        Text(text = stringResource(R.string.automatically_request_more_when_the_ai_stops),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -365,8 +361,7 @@ private fun AutoContinueSection(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Enable Auto-Continue",
+            Text(text = stringResource(R.string.enable_auto_continue),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
@@ -380,8 +375,7 @@ private fun AutoContinueSection(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = "Min length:",
+                Text(text = stringResource(R.string.min_length),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -393,14 +387,12 @@ private fun AutoContinueSection(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     colors = textFieldColors()
                 )
-                Text(
-                    text = "tokens",
+                Text(text = stringResource(R.string.tokens),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Text(
-                text = "Max 3 auto-continues per message.",
+            Text(text = stringResource(R.string.max_3_auto_continues_per_message),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline
             )
@@ -414,14 +406,12 @@ private fun LongTermMemorySection(
     onEnabledChange: (Boolean) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "Long-Term Memory",
+        Text(text = stringResource(R.string.long_term_memory),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
         )
-        Text(
-            text = "Summarize old messages so the AI remembers past sessions. " +
+        Text(text = stringResource(R.string.summarize_old_messages_so_the_ai_remembers_pa) +
                 "When chat history exceeds ~3,000 tokens the oldest turns are " +
                 "compressed into a bullet-point memory block injected at the start of every prompt.",
             style = MaterialTheme.typography.bodySmall,
@@ -431,8 +421,7 @@ private fun LongTermMemorySection(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Enable Long-Term Memory",
+            Text(text = stringResource(R.string.enable_long_term_memory),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
@@ -448,8 +437,7 @@ private fun RoleplayBehaviorSection(
     onNoSpeakForUserChange: (Boolean) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "Roleplay Behavior",
+        Text(text = stringResource(R.string.roleplay_behavior),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
@@ -460,13 +448,11 @@ private fun RoleplayBehaviorSection(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Don't speak or act for user",
+                Text(text = stringResource(R.string.don_t_speak_or_act_for_user),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Text(
-                    text = "Instructs the AI to never write dialogue or actions on behalf of your character.",
+                Text(text = stringResource(R.string.instructs_the_ai_to_never_write_dialogue_or_a),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

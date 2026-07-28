@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.stories
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -49,11 +51,11 @@ fun StoriesScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = { TopAppBar(title = { Text("Stories") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.stories)) }) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { picker.launch("*/*") },
-                icon = { Icon(Icons.Default.Add, null) }, text = { Text("Import") }
+                icon = { Icon(Icons.Default.Add, null) }, text = { Text(stringResource(R.string.action_import)) }
             )
         }
     ) { pad ->
@@ -62,9 +64,9 @@ fun StoriesScreen(
                 Modifier.padding(pad).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Text("No Stories yet", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.no_stories_yet), style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(4.dp))
-                Text("Import a Story card (.png or .json) to begin.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.import_a_story_card_png_or_json_to_begin), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             LazyVerticalGrid(

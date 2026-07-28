@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.characters
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -83,7 +85,7 @@ fun CharactersScreen(
                             )
                             Icon(
                                 Icons.Default.ArrowDropDown,
-                                contentDescription = "Switch view",
+                                contentDescription = stringResource(R.string.switch_view),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -92,7 +94,7 @@ fun CharactersScreen(
                             onDismissRequest = { expanded = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Characters", color = MaterialTheme.colorScheme.onSurface) },
+                                text = { Text(stringResource(R.string.characters), color = MaterialTheme.colorScheme.onSurface) },
                                 onClick = {
                                     viewModel.setActiveTab(CharactersTab.CHARACTERS)
                                     expanded = false
@@ -102,7 +104,7 @@ fun CharactersScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Groups", color = MaterialTheme.colorScheme.onSurface) },
+                                text = { Text(stringResource(R.string.groups), color = MaterialTheme.colorScheme.onSurface) },
                                 onClick = {
                                     viewModel.setActiveTab(CharactersTab.GROUPS)
                                     expanded = false
@@ -150,7 +152,7 @@ fun CharactersScreen(
                     onClick = { groupsViewModel.showCreateDialog() },
                     containerColor = MaterialTheme.colorScheme.primary
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Create Group", tint = Color.White)
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.create_group), tint = Color.White)
                 }
             }
         }
@@ -196,7 +198,7 @@ fun CharactersScreen(
                         ) {
                             Icon(Icons.Default.Edit, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Edit Character")
+                            Text(stringResource(R.string.edit_character))
                         }
                         TextButton(
                             onClick = {
@@ -208,7 +210,7 @@ fun CharactersScreen(
                         ) {
                             Icon(Icons.Default.Tune, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Character Settings")
+                            Text(stringResource(R.string.character_settings))
                         }
                         TextButton(
                             onClick = {
@@ -218,7 +220,7 @@ fun CharactersScreen(
                         ) {
                             Icon(Icons.Default.Translate, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Translate to English")
+                            Text(stringResource(R.string.translate_to_english))
                         }
                         TextButton(
                             onClick = {
@@ -228,7 +230,7 @@ fun CharactersScreen(
                         ) {
                             Icon(Icons.Default.CloudUpload, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Upload to CharaVault")
+                            Text(stringResource(R.string.upload_to_charavault))
                         }
                         TextButton(
                             onClick = {
@@ -239,14 +241,14 @@ fun CharactersScreen(
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Delete Character")
+                            Text(stringResource(R.string.delete_character))
                         }
                     }
                 },
                 confirmButton = {},
                 dismissButton = {
                     TextButton(onClick = { viewModel.dismissActionMenu() }) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.cancel))
                     }
                 }
             )
@@ -312,14 +314,14 @@ fun CharactersScreen(
     if (uiState.isUploading) {
         AlertDialog(
             onDismissRequest = { },
-            title = { Text("Uploading to CharaVault") },
+            title = { Text(stringResource(R.string.uploading_to_charavault)) },
             text = {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                    Text("Please wait...")
+                    Text(stringResource(R.string.please_wait))
                 }
             },
             confirmButton = {}
@@ -330,11 +332,11 @@ fun CharactersScreen(
     uiState.uploadSuccess?.let { message ->
         AlertDialog(
             onDismissRequest = { viewModel.clearUploadSuccess() },
-            title = { Text("Success") },
+            title = { Text(stringResource(R.string.success)) },
             text = { Text(message) },
             confirmButton = {
                 TextButton(onClick = { viewModel.clearUploadSuccess() }) {
-                    Text("OK")
+                    Text(stringResource(R.string.ok))
                 }
             }
         )
@@ -344,7 +346,7 @@ fun CharactersScreen(
     if (uiState.isImportingLocal) {
         AlertDialog(
             onDismissRequest = {},
-            title = { Text("Importing...") },
+            title = { Text(stringResource(R.string.importing)) },
             text = { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) },
             confirmButton = {}
         )
@@ -366,9 +368,9 @@ fun CharactersScreen(
         LaunchedEffect(Unit) { viewModel.clearTranslateSuccess() }
         AlertDialog(
             onDismissRequest = { viewModel.clearTranslateSuccess() },
-            title = { Text("Translated") },
-            text = { Text("Card fields translated successfully.") },
-            confirmButton = { TextButton(onClick = { viewModel.clearTranslateSuccess() }) { Text("OK") } }
+            title = { Text(stringResource(R.string.translated)) },
+            text = { Text(stringResource(R.string.card_fields_translated_successfully)) },
+            confirmButton = { TextButton(onClick = { viewModel.clearTranslateSuccess() }) { Text(stringResource(R.string.ok)) } }
         )
     }
 }
@@ -388,10 +390,10 @@ private fun TranslationDialog(
 
     AlertDialog(
         onDismissRequest = { if (!isTranslating) onDismiss() },
-        title = { Text("Non-English Card Detected") },
+        title = { Text(stringResource(R.string.non_english_card_detected)) },
         text = {
             Column {
-                Text("Translate card fields using your configured AI connection?",
+                Text(stringResource(R.string.translate_card_fields_using_your_configured_a),
                     style = MaterialTheme.typography.bodyMedium)
                 Spacer(modifier = Modifier.height(12.dp))
                 allFields.forEach { field ->
@@ -422,10 +424,10 @@ private fun TranslationDialog(
             TextButton(
                 onClick = { onTranslate(allFields.filter { selected[it] == true }) },
                 enabled = !isTranslating && selected.values.any { it }
-            ) { Text("Translate") }
+            ) { Text(stringResource(R.string.translate)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isTranslating) { Text("Skip") }
+            TextButton(onClick = onDismiss, enabled = !isTranslating) { Text(stringResource(R.string.skip)) }
         }
     )
 }
@@ -456,8 +458,7 @@ private fun CharactersContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Text(
-                    text = "No characters found",
+                Text(text = stringResource(R.string.no_characters_found),
                     style = MaterialTheme.typography.titleMedium
                 )
             }
@@ -522,14 +523,12 @@ private fun GroupsContent(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    "No groups yet",
+                Text(stringResource(R.string.no_groups_yet),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "Create a group to chat with multiple characters at once",
+                Text(stringResource(R.string.create_a_group_to_chat_with_multiple_characte),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
@@ -624,7 +623,7 @@ private fun GroupCard(
             if (group.favorite) {
                 Icon(
                     Icons.Default.Groups,
-                    contentDescription = "Favorite",
+                    contentDescription = stringResource(R.string.favorite),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
@@ -649,13 +648,13 @@ private fun CreateGroupDialog(
     val avatarShape = LocalPocketTavernColors.current.avatarShape.toShape()
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Create Group") },
+        title = { Text(stringResource(R.string.create_group)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = groupName,
                     onValueChange = onGroupNameChange,
-                    label = { Text("Group Name") },
+                    label = { Text(stringResource(R.string.group_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -666,8 +665,7 @@ private fun CreateGroupDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text(
-                    "Select Members (at least 2)",
+                Text(stringResource(R.string.select_members_at_least_2),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -717,7 +715,7 @@ private fun CreateGroupDialog(
                                 if (isSelected) {
                                     Icon(
                                         Icons.Default.Check,
-                                        contentDescription = "Selected",
+                                        contentDescription = stringResource(R.string.selected),
                                         tint = MaterialTheme.colorScheme.primary
                                     )
                                 }
@@ -747,13 +745,13 @@ private fun CreateGroupDialog(
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("Create", color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.create), color = MaterialTheme.colorScheme.primary)
                 }
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
         containerColor = MaterialTheme.colorScheme.background,

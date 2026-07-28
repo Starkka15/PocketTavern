@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.settings
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -49,7 +51,7 @@ fun ApiConfigScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("API Configuration") },
+                title = { Text(stringResource(R.string.api_configuration)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -97,8 +99,7 @@ fun ApiConfigScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = "Current Configuration",
+                        Text(text = stringResource(R.string.current_configuration),
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
@@ -122,8 +123,7 @@ fun ApiConfigScreen(
                 HorizontalDivider()
 
                 // Main API Type Selection
-                Text(
-                    text = "API Type",
+                Text(text = stringResource(R.string.api_type),
                     style = MaterialTheme.typography.titleMedium
                 )
 
@@ -180,12 +180,10 @@ fun ApiConfigScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Show Reasoning Tokens",
+                                Text(text = stringResource(R.string.show_reasoning_tokens),
                                     style = MaterialTheme.typography.titleSmall
                                 )
-                                Text(
-                                    text = "Display thinking from reasoning models (DeepSeek R1, QwQ). Supports reasoning_content field and <think> tags.",
+                                Text(text = stringResource(R.string.display_thinking_from_reasoning_models_deepse),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -225,8 +223,7 @@ private fun TextCompletionSettings(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Text Completion Backend",
+            Text(text = stringResource(R.string.text_completion_backend),
                 style = MaterialTheme.typography.titleSmall
             )
 
@@ -240,14 +237,13 @@ private fun TextCompletionSettings(
             OutlinedTextField(
                 value = apiServer,
                 onValueChange = onApiServerChange,
-                label = { Text("Server URL") },
-                placeholder = { Text("http://127.0.0.1:5001") },
+                label = { Text(stringResource(R.string.server_url)) },
+                placeholder = { Text(stringResource(R.string.http_127_0_0_1_5001)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
 
-            Text(
-                text = "The model is auto-detected from the backend server.",
+            Text(text = stringResource(R.string.the_model_is_auto_detected_from_the_backend_s),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -283,8 +279,7 @@ private fun ChatCompletionSettings(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Chat Completion Provider",
+            Text(text = stringResource(R.string.chat_completion_provider),
                 style = MaterialTheme.typography.titleSmall
             )
 
@@ -314,8 +309,8 @@ private fun ChatCompletionSettings(
                     OutlinedTextField(
                         value = customUrl ?: "",
                         onValueChange = onCustomUrlChange,
-                        label = { Text("Custom API URL") },
-                        placeholder = { Text("https://api.example.com/v1") },
+                        label = { Text(stringResource(R.string.custom_api_url)) },
+                        placeholder = { Text(stringResource(R.string.https_api_example_com_v1)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -339,8 +334,8 @@ private fun ChatCompletionSettings(
                         OutlinedTextField(
                             value = currentModel,
                             onValueChange = onModelChange,
-                            label = { Text("Model") },
-                            placeholder = { Text("Enter model name") },
+                            label = { Text(stringResource(R.string.model)) },
+                            placeholder = { Text(stringResource(R.string.enter_model_name)) },
                             modifier = Modifier.weight(1f),
                             singleLine = true
                         )
@@ -391,8 +386,7 @@ private fun OnDeviceModelSection(
     val downloadedIds = remember(models) { models.map { it.id }.toSet() }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "Models run fully on your device. Nothing is sent to a server.",
+        Text(text = stringResource(R.string.models_run_fully_on_your_device_nothing_is_se),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -401,8 +395,7 @@ private fun OnDeviceModelSection(
             shape = MaterialTheme.shapes.small,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(
-                text = "⚠ Speed depends heavily on your device. Recent flagships (esp. Snapdragon/Adreno) " +
+            Text(text = stringResource(R.string.speed_depends_heavily_on_your_device_recent_f) +
                     "run smoothly; budget or older phones can be very slow or unusable, especially with " +
                     "larger models or long character prompts. Your device: $deviceSummary.",
                 style = MaterialTheme.typography.bodySmall,
@@ -414,14 +407,14 @@ private fun OnDeviceModelSection(
         OutlinedTextField(
             value = token,
             onValueChange = { token = it },
-            label = { Text("HuggingFace token (for 🔒 gated models)") },
+            label = { Text(stringResource(R.string.huggingface_token_for_gated_models)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             enabled = !isDownloading
         )
 
         // Recommended catalog (mirrors Google AI Edge Gallery's list)
-        Text("Recommended models", style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.recommended_models), style = MaterialTheme.typography.labelLarge)
         catalog.forEach { cm ->
             val isDownloaded = cm.modelId in downloadedIds
             val sizeMb = cm.sizeBytes / (1024 * 1024)
@@ -442,12 +435,12 @@ private fun OnDeviceModelSection(
                     )
                 }
                 if (isDownloaded) {
-                    Icon(Icons.Default.Check, contentDescription = "Downloaded", tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Default.Check, contentDescription = stringResource(R.string.downloaded), tint = MaterialTheme.colorScheme.primary)
                 } else {
                     TextButton(
                         onClick = { onDownload(cm.url, token) },
                         enabled = !isDownloading
-                    ) { Text("Download") }
+                    ) { Text(stringResource(R.string.download)) }
                 }
             }
         }
@@ -455,12 +448,11 @@ private fun OnDeviceModelSection(
         HorizontalDivider()
 
         if (models.isEmpty()) {
-            Text(
-                text = "No models downloaded yet.",
+            Text(text = stringResource(R.string.no_models_downloaded_yet),
                 style = MaterialTheme.typography.bodyMedium
             )
         } else {
-            Text("Downloaded models", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.downloaded_models), style = MaterialTheme.typography.labelLarge)
             models.forEach { model ->
                 Row(
                     modifier = Modifier
@@ -483,12 +475,12 @@ private fun OnDeviceModelSection(
 
         HorizontalDivider()
 
-        Text("Or download by URL (.task / .litertlm)", style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.or_download_by_url_task_litertlm), style = MaterialTheme.typography.labelLarge)
         OutlinedTextField(
             value = url,
             onValueChange = { url = it },
-            label = { Text("Model URL") },
-            placeholder = { Text("https://huggingface.co/.../model.task") },
+            label = { Text(stringResource(R.string.model_url)) },
+            placeholder = { Text(stringResource(R.string.https_huggingface_co_model_task)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             enabled = !isDownloading
@@ -530,16 +522,15 @@ private fun ApiKeySection(
 ) {
     var showKey by remember { mutableStateOf(false) }
 
-    Text(
-        text = "API Key",
+    Text(text = stringResource(R.string.api_key),
         style = MaterialTheme.typography.titleMedium
     )
 
     OutlinedTextField(
         value = apiKey,
         onValueChange = onApiKeyChange,
-        label = { Text("API Key") },
-        placeholder = { Text("sk-... (leave blank for local backends)") },
+        label = { Text(stringResource(R.string.api_key)) },
+        placeholder = { Text(stringResource(R.string.sk_leave_blank_for_local_backends)) },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
@@ -553,8 +544,7 @@ private fun ApiKeySection(
         }
     )
 
-    Text(
-        text = "Used for OpenAI, Claude, OpenRouter, TabbyAPI, and other authenticated backends. Sent as Authorization: Bearer <key>.",
+    Text(text = stringResource(R.string.used_for_openai_claude_openrouter_tabbyapi_an),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )

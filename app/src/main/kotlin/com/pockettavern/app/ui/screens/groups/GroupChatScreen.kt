@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.groups
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -143,7 +145,7 @@ fun GroupChatScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
@@ -174,7 +176,7 @@ fun GroupChatScreen(
                         IconButton(onClick = { showMenu = true }) {
                             Icon(
                                 Icons.Default.MoreVert,
-                                contentDescription = "Options",
+                                contentDescription = stringResource(R.string.options),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -183,7 +185,7 @@ fun GroupChatScreen(
                             onDismissRequest = { showMenu = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Edit Group") },
+                                text = { Text(stringResource(R.string.edit_group)) },
                                 leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = null) },
                                 onClick = {
                                     showMenu = false
@@ -191,7 +193,7 @@ fun GroupChatScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Generate Scene Image") },
+                                text = { Text(stringResource(R.string.generate_scene_image)) },
                                 leadingIcon = {
                                     if (uiState.isGeneratingImage)
                                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -205,7 +207,7 @@ fun GroupChatScreen(
                                 enabled = !uiState.isGeneratingImage && !uiState.isGenerating
                             )
                             DropdownMenuItem(
-                                text = { Text("Edit Prompt") },
+                                text = { Text(stringResource(R.string.edit_prompt)) },
                                 leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
                                 onClick = {
                                     showMenu = false
@@ -213,7 +215,7 @@ fun GroupChatScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("World Book") },
+                                text = { Text(stringResource(R.string.world_book)) },
                                 leadingIcon = { Icon(Icons.Default.MenuBook, contentDescription = null) },
                                 onClick = {
                                     showMenu = false
@@ -221,7 +223,7 @@ fun GroupChatScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Chat History") },
+                                text = { Text(stringResource(R.string.chat_history)) },
                                 leadingIcon = { Icon(Icons.Default.History, contentDescription = null) },
                                 onClick = {
                                     showMenu = false
@@ -229,7 +231,7 @@ fun GroupChatScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("New Chat") },
+                                text = { Text(stringResource(R.string.new_chat)) },
                                 leadingIcon = { Icon(Icons.Default.Add, contentDescription = null) },
                                 onClick = {
                                     showMenu = false
@@ -237,8 +239,7 @@ fun GroupChatScreen(
                                 }
                             )
                             HorizontalDivider()
-                            Text(
-                                "Chat Style",
+                            Text(stringResource(R.string.chat_style),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
@@ -270,8 +271,7 @@ fun GroupChatScreen(
                                 )
                             }
                             HorizontalDivider()
-                            Text(
-                                "Activation Strategy",
+                            Text(stringResource(R.string.activation_strategy),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
@@ -351,14 +351,12 @@ fun GroupChatScreen(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            "Start the conversation!",
+                        Text(stringResource(R.string.start_the_conversation),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "Send a message, or let the characters introduce themselves.",
+                        Text(stringResource(R.string.send_a_message_or_let_the_characters_introduc),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -371,7 +369,7 @@ fun GroupChatScreen(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Generate Opening Message")
+                            Text(stringResource(R.string.generate_opening_message))
                         }
                     }
                 }
@@ -736,7 +734,7 @@ private fun GroupMessageBubble(
                 val imageFile = File(context.filesDir, message.imagePath)
                 AsyncImage(
                     model = imageFile,
-                    contentDescription = "Scene image",
+                    contentDescription = stringResource(R.string.scene_image),
                     modifier = Modifier
                         .widthIn(max = 260.dp)
                         .clip(bubbleShape)
@@ -780,7 +778,7 @@ private fun GroupMessageBubble(
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text("You", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.you), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
         }
     }
@@ -808,7 +806,7 @@ private fun GroupChatInputBar(
             OutlinedTextField(
                 value = inputText,
                 onValueChange = onInputChange,
-                placeholder = { Text("Type a message...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                placeholder = { Text(stringResource(R.string.type_a_message), color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 modifier = Modifier.weight(1f),
                 maxLines = 4,
                 enabled = !isGenerating && !isSending,
@@ -837,7 +835,7 @@ private fun GroupChatInputBar(
                 ) {
                     Icon(
                         Icons.Default.Stop,
-                        contentDescription = "Stop generation",
+                        contentDescription = stringResource(R.string.stop_generation),
                         tint = Color.White
                     )
                 }
@@ -863,7 +861,7 @@ private fun GroupChatInputBar(
                     } else {
                         Icon(
                             Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Send",
+                            contentDescription = stringResource(R.string.send),
                             tint = Color.White
                         )
                     }
@@ -886,12 +884,11 @@ private fun GroupChatSelectorDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Chat History") },
+        title = { Text(stringResource(R.string.chat_history)) },
         text = {
             Column {
                 if (chats.isEmpty()) {
-                    Text(
-                        text = "No chat history",
+                    Text(text = stringResource(R.string.no_chat_history),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -943,7 +940,7 @@ private fun GroupChatSelectorDialog(
                                     IconButton(onClick = { pendingDelete = chat }) {
                                         Icon(
                                             Icons.Default.Delete,
-                                            contentDescription = "Delete chat",
+                                            contentDescription = stringResource(R.string.delete_chat_2),
                                             tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
                                             modifier = Modifier.size(20.dp)
                                         )
@@ -959,11 +956,11 @@ private fun GroupChatSelectorDialog(
             TextButton(onClick = onNewChat) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("New Chat")
+                Text(stringResource(R.string.new_chat))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
         }
     )
 
@@ -971,8 +968,8 @@ private fun GroupChatSelectorDialog(
     pendingDelete?.let { chat ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("Delete chat?") },
-            text = { Text("This will permanently delete \"${formatGroupChatFileName(chat.fileName)}\". This cannot be undone.") },
+            title = { Text(stringResource(R.string.delete_chat)) },
+            text = { Text(stringResource(R.string.delete_file_confirm, formatGroupChatFileName(chat.fileName))) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -980,11 +977,11 @@ private fun GroupChatSelectorDialog(
                         pendingDelete = null
                     }
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text("Cancel") }
+                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -999,11 +996,10 @@ private fun GroupPromptEditorDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Group Prompt") },
+        title = { Text(stringResource(R.string.group_prompt)) },
         text = {
             Column {
-                Text(
-                    text = "Injected into every generation for this group. Describe the scenario, rules, or tone.",
+                Text(text = stringResource(R.string.injected_into_every_generation_for_this_group),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -1015,8 +1011,7 @@ private fun GroupPromptEditorDialog(
                         .fillMaxWidth()
                         .heightIn(min = 160.dp, max = 320.dp),
                     placeholder = {
-                        Text(
-                            "e.g. This is a fantasy tavern setting. Characters should stay in a medieval tone...",
+                        Text(stringResource(R.string.e_g_this_is_a_fantasy_tavern_setting_characte),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
@@ -1030,10 +1025,10 @@ private fun GroupPromptEditorDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onSave) { Text("Save") }
+            TextButton(onClick = onSave) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }
@@ -1047,11 +1042,10 @@ private fun WorldBookEditorDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("World Book") },
+        title = { Text(stringResource(R.string.world_book)) },
         text = {
             Column {
-                Text(
-                    text = "Shared lore injected into every generation — group and solo chats. Use /addlore to append entries from any chat.",
+                Text(text = stringResource(R.string.shared_lore_injected_into_every_generation_gr),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -1063,8 +1057,7 @@ private fun WorldBookEditorDialog(
                         .fillMaxWidth()
                         .heightIn(min = 200.dp, max = 400.dp),
                     placeholder = {
-                        Text(
-                            "e.g. [2026-05-25] Gulara processed the Vashenko brothers. +30 lbs.",
+                        Text(stringResource(R.string.e_g_2026_05_25_gulara_processed_the_vashenko),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
@@ -1078,10 +1071,10 @@ private fun WorldBookEditorDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onSave) { Text("Save") }
+            TextButton(onClick = onSave) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }
@@ -1098,39 +1091,39 @@ private fun GroupMessageActionsDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Message Actions") },
+        title = { Text(stringResource(R.string.message_actions)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(onClick = { onEdit(); onDismiss() }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text("Edit Message")
+                    Text(stringResource(R.string.edit_message))
                     Spacer(Modifier.weight(1f))
                 }
                 TextButton(onClick = { onDelete(); onDismiss() }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text("Delete Message", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.delete_message), color = MaterialTheme.colorScheme.error)
                     Spacer(Modifier.weight(1f))
                 }
                 TextButton(onClick = { onDeleteFromHere(); onDismiss() }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text("Delete From Here", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.delete_from_here), color = MaterialTheme.colorScheme.error)
                     Spacer(Modifier.weight(1f))
                 }
                 if (!isUserMessage && isLastAiMessage) {
                     TextButton(onClick = onRegenerate, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(12.dp))
-                        Text("Regenerate", color = MaterialTheme.colorScheme.primary)
+                        Text(stringResource(R.string.regenerate), color = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.weight(1f))
                     }
                 }
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
         containerColor = MaterialTheme.colorScheme.background,
         titleContentColor = MaterialTheme.colorScheme.onSurface,
         textContentColor = MaterialTheme.colorScheme.onSurface
@@ -1146,7 +1139,7 @@ private fun GroupEditMessageDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit Message") },
+        title = { Text(stringResource(R.string.edit_message)) },
         text = {
             OutlinedTextField(
                 value = text,
@@ -1160,8 +1153,8 @@ private fun GroupEditMessageDialog(
                 )
             )
         },
-        confirmButton = { TextButton(onClick = onSave) { Text("Save") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = onSave) { Text(stringResource(R.string.save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
         containerColor = MaterialTheme.colorScheme.background,
         titleContentColor = MaterialTheme.colorScheme.onSurface,
         textContentColor = MaterialTheme.colorScheme.onSurface
@@ -1183,13 +1176,13 @@ private fun EditGroupDialog(
     val avatarShape = LocalPocketTavernColors.current.avatarShape.toShape()
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit Group") },
+        title = { Text(stringResource(R.string.edit_group)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = groupName,
                     onValueChange = onGroupNameChange,
-                    label = { Text("Group Name") },
+                    label = { Text(stringResource(R.string.group_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -1198,7 +1191,7 @@ private fun EditGroupDialog(
                     )
                 )
                 Spacer(Modifier.height(16.dp))
-                Text("Members (at least 2)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.members_at_least_2), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(8.dp))
                 LazyColumn(modifier = Modifier.heightIn(max = 300.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(availableCharacters) { character ->
@@ -1218,23 +1211,23 @@ private fun EditGroupDialog(
                                 )
                                 Spacer(Modifier.width(12.dp))
                                 Text(text = character.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-                                if (isSelected) Icon(Icons.Default.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
+                                if (isSelected) Icon(Icons.Default.Check, contentDescription = stringResource(R.string.selected), tint = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
                 }
                 if (selectedMembers.size < 2) {
                     Spacer(Modifier.height(8.dp))
-                    Text("Select at least ${2 - selectedMembers.size} more", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.select_at_least_more, 2 - selectedMembers.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onConfirm, enabled = groupName.isNotBlank() && selectedMembers.size >= 2) {
-                Text("Save", color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.save), color = MaterialTheme.colorScheme.primary)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel), color = MaterialTheme.colorScheme.onSurfaceVariant) } },
         containerColor = MaterialTheme.colorScheme.background,
         titleContentColor = MaterialTheme.colorScheme.onSurface,
         textContentColor = MaterialTheme.colorScheme.onSurface

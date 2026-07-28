@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.settings
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
@@ -32,7 +34,7 @@ fun TtsSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Text-to-Speech") },
+                title = { Text(stringResource(R.string.text_to_speech)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -60,9 +62,8 @@ fun TtsSettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text("Enable TTS", style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                "Speak chat messages aloud",
+                            Text(stringResource(R.string.enable_tts), style = MaterialTheme.typography.titleMedium)
+                            Text(stringResource(R.string.speak_chat_messages_aloud),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -79,8 +80,7 @@ fun TtsSettingsScreen(
                 // ── Provider ────────────────────────────────────────────
                 item {
                     SectionCard {
-                        Text(
-                            "Provider",
+                        Text(stringResource(R.string.provider),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -92,13 +92,13 @@ fun TtsSettingsScreen(
                             FilterChip(
                                 selected = config.provider == "system",
                                 onClick = { viewModel.updateProvider("system") },
-                                label = { Text("System TTS") },
+                                label = { Text(stringResource(R.string.system_tts)) },
                                 modifier = Modifier.weight(1f)
                             )
                             FilterChip(
                                 selected = config.provider == "openai",
                                 onClick = { viewModel.updateProvider("openai") },
-                                label = { Text("OpenAI-Compatible") },
+                                label = { Text(stringResource(R.string.openai_compatible)) },
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -109,14 +109,12 @@ fun TtsSettingsScreen(
                 if (config.provider == "system") {
                     item {
                         SectionCard {
-                            Text(
-                                "System TTS Engine",
+                            Text(stringResource(R.string.system_tts_engine),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                "Choose which installed TTS engine to use",
+                            Text(stringResource(R.string.choose_which_installed_tts_engine_to_use),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -148,14 +146,12 @@ fun TtsSettingsScreen(
                 if (config.provider == "openai") {
                     item {
                         SectionCard {
-                            Text(
-                                "OpenAI-Compatible API",
+                            Text(stringResource(R.string.openai_compatible_api),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                "Works with OpenAI, AllTalk, XTTS, Kokoro, and other compatible endpoints",
+                            Text(stringResource(R.string.works_with_openai_alltalk_xtts_kokoro_and_oth),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -164,8 +160,8 @@ fun TtsSettingsScreen(
                             OutlinedTextField(
                                 value = config.openAiUrl,
                                 onValueChange = { viewModel.updateOpenAiUrl(it) },
-                                label = { Text("API URL") },
-                                placeholder = { Text("http://192.168.1.100:8000") },
+                                label = { Text(stringResource(R.string.api_url)) },
+                                placeholder = { Text(stringResource(R.string.http_192_168_1_100_8000)) },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
@@ -174,7 +170,7 @@ fun TtsSettingsScreen(
                             OutlinedTextField(
                                 value = config.openAiKey,
                                 onValueChange = { viewModel.updateOpenAiKey(it) },
-                                label = { Text("API Key (optional)") },
+                                label = { Text(stringResource(R.string.api_key_optional)) },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
                                 visualTransformation = PasswordVisualTransformation()
@@ -184,8 +180,8 @@ fun TtsSettingsScreen(
                             OutlinedTextField(
                                 value = config.openAiModel,
                                 onValueChange = { viewModel.updateOpenAiModel(it) },
-                                label = { Text("Model") },
-                                placeholder = { Text("tts-1") },
+                                label = { Text(stringResource(R.string.model)) },
+                                placeholder = { Text(stringResource(R.string.tts_1)) },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
@@ -206,8 +202,7 @@ fun TtsSettingsScreen(
                 // ── Playback Settings ───────────────────────────────────
                 item {
                     SectionCard {
-                        Text(
-                            "Playback",
+                        Text(stringResource(R.string.playback),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -220,9 +215,8 @@ fun TtsSettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text("Auto-play", style = MaterialTheme.typography.bodyMedium)
-                                Text(
-                                    "Automatically speak new AI messages",
+                                Text(stringResource(R.string.auto_play), style = MaterialTheme.typography.bodyMedium)
+                                Text(stringResource(R.string.automatically_speak_new_ai_messages),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -236,7 +230,7 @@ fun TtsSettingsScreen(
                         Spacer(modifier = Modifier.height(16.dp))
 
                         // Speed slider
-                        Text("Speed: ${"%.1f".format(config.speed)}x", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.speed_x, "%.1f".format(config.speed)), style = MaterialTheme.typography.bodyMedium)
                         Slider(
                             value = config.speed,
                             onValueChange = { viewModel.updateSpeed(it) },
@@ -249,14 +243,12 @@ fun TtsSettingsScreen(
                 // ── Text Filter ─────────────────────────────────────────
                 item {
                     SectionCard {
-                        Text(
-                            "Text Filter",
+                        Text(stringResource(R.string.text_filter),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            "Choose what text to speak",
+                        Text(stringResource(R.string.choose_what_text_to_speak),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -286,8 +278,7 @@ fun TtsSettingsScreen(
                 // ── Test ────────────────────────────────────────────────
                 item {
                     SectionCard {
-                        Text(
-                            "Test",
+                        Text(stringResource(R.string.test),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -305,7 +296,7 @@ fun TtsSettingsScreen(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Test Voice")
+                                Text(stringResource(R.string.test_voice))
                             }
                             if (uiState.isTesting) {
                                 OutlinedButton(
@@ -317,7 +308,7 @@ fun TtsSettingsScreen(
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Stop")
+                                    Text(stringResource(R.string.stop))
                                 }
                             }
                         }
@@ -360,7 +351,7 @@ private fun VoiceSelector(
                 modifier = Modifier
                     .fillMaxWidth()
                     .menuAnchor(MenuAnchorType.PrimaryNotEditable),
-                label = { Text("Voice") },
+                label = { Text(stringResource(R.string.voice)) },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                 singleLine = true
             )
@@ -372,8 +363,7 @@ private fun VoiceSelector(
                 if (voices.isEmpty()) {
                     DropdownMenuItem(
                         text = {
-                            Text(
-                                "No voices available — check API URL",
+                            Text(stringResource(R.string.no_voices_available_check_api_url),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
@@ -381,7 +371,7 @@ private fun VoiceSelector(
                     )
                 }
                 DropdownMenuItem(
-                    text = { Text("Default (engine default)") },
+                    text = { Text(stringResource(R.string.default_engine_default)) },
                     onClick = {
                         onVoiceSelected("")
                         expanded = false
@@ -416,7 +406,7 @@ private fun VoiceSelector(
         IconButton(onClick = onRefresh) {
             Icon(
                 Icons.Default.Refresh,
-                contentDescription = "Refresh voices",
+                contentDescription = stringResource(R.string.refresh_voices),
                 tint = MaterialTheme.colorScheme.primary
             )
         }
@@ -449,7 +439,7 @@ private fun EngineSelector(
             modifier = Modifier
                 .fillMaxWidth()
                 .menuAnchor(MenuAnchorType.PrimaryNotEditable),
-            label = { Text("Engine") },
+            label = { Text(stringResource(R.string.engine)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             singleLine = true
         )
@@ -459,7 +449,7 @@ private fun EngineSelector(
             onDismissRequest = { expanded = false }
         ) {
             DropdownMenuItem(
-                text = { Text("System default") },
+                text = { Text(stringResource(R.string.system_default)) },
                 onClick = {
                     onEngineSelected("")
                     expanded = false

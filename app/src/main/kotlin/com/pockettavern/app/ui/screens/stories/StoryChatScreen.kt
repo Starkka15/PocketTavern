@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.stories
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -53,7 +55,7 @@ fun StoryChatScreen(
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") } },
                 actions = {
                     if (state.missions.isNotEmpty()) {
-                        TextButton(onClick = { viewModel.toggleMissionPicker(true) }) { Text("Mission") }
+                        TextButton(onClick = { viewModel.toggleMissionPicker(true) }) { Text(stringResource(R.string.mission)) }
                     }
                     IconButton(onClick = { viewModel.newPlaythrough() }) { Icon(Icons.Default.Add, "New playthrough") }
                     IconButton(onClick = { viewModel.toggleChatPicker(true) }) { Icon(Icons.Default.List, "Playthroughs") }
@@ -64,7 +66,7 @@ fun StoryChatScreen(
             Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.Bottom) {
                 OutlinedTextField(
                     value = input, onValueChange = { input = it },
-                    modifier = Modifier.weight(1f), placeholder = { Text("Your move…") }, maxLines = 5
+                    modifier = Modifier.weight(1f), placeholder = { Text(stringResource(R.string.your_move)) }, maxLines = 5
                 )
                 Spacer(Modifier.width(8.dp))
                 if (state.isGenerating) {
@@ -88,7 +90,7 @@ fun StoryChatScreen(
                     Column(Modifier.padding(8.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("⊕ ${m.name}", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                            TextButton(onClick = { viewModel.clearMission() }) { Text("End") }
+                            TextButton(onClick = { viewModel.clearMission() }) { Text(stringResource(R.string.end)) }
                         }
                         Text(m.briefing, style = MaterialTheme.typography.bodySmall, maxLines = 3)
                         Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 4.dp)) {
@@ -146,7 +148,7 @@ private fun MissionPicker(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Missions") },
+        title = { Text(stringResource(R.string.missions)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 missions.forEach { m ->
@@ -166,7 +168,7 @@ private fun MissionPicker(
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } }
     )
 }
 
@@ -182,10 +184,10 @@ private fun PlaythroughPicker(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Playthroughs") },
+        title = { Text(stringResource(R.string.playthroughs)) },
         text = {
             Column {
-                if (chats.isEmpty()) Text("No playthroughs yet.")
+                if (chats.isEmpty()) Text(stringResource(R.string.no_playthroughs_yet))
                 chats.forEach { c ->
                     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f).clickable { onSelect(c.fileName) }) {
@@ -203,15 +205,15 @@ private fun PlaythroughPicker(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onNew) { Text("+ New playthrough") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+        confirmButton = { TextButton(onClick = onNew) { Text(stringResource(R.string.new_playthrough)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } }
     )
 }
 
 @Composable
 private fun OpeningPicker(openings: List<StoryOpening>, selected: StoryOpening?, onPick: (StoryOpening) -> Unit) {
     Column(Modifier.padding(12.dp)) {
-        Text("Opening", style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.opening), style = MaterialTheme.typography.labelLarge)
         Row(Modifier.horizontalScroll(rememberScrollState())) {
             openings.forEach { o ->
                 FilterChip(

@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.settings
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
@@ -44,7 +46,7 @@ fun ImageGenSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Image Generation") },
+                title = { Text(stringResource(R.string.image_generation)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -66,8 +68,7 @@ fun ImageGenSettingsScreen(
             // ── Backend Selector ─────────────────────────────────────
             item {
                 ImageGenSectionCard {
-                    Text(
-                        "Backend",
+                    Text(stringResource(R.string.backend),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -110,8 +111,7 @@ fun ImageGenSettingsScreen(
             if (caps.requiresUrl || caps.requiresApiKey) {
                 item {
                     ImageGenSectionCard {
-                        Text(
-                            "Connection",
+                        Text(stringResource(R.string.connection),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -122,8 +122,8 @@ fun ImageGenSettingsScreen(
                                 OutlinedTextField(
                                     value = config.sdWebuiUrl,
                                     onValueChange = { viewModel.updateSdWebuiUrl(it) },
-                                    label = { Text("SD WebUI / Forge URL") },
-                                    placeholder = { Text("http://192.168.1.100:7860") },
+                                    label = { Text(stringResource(R.string.sd_webui_forge_url)) },
+                                    placeholder = { Text(stringResource(R.string.http_192_168_1_100_7860)) },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
@@ -134,8 +134,8 @@ fun ImageGenSettingsScreen(
                                 OutlinedTextField(
                                     value = config.comfyuiUrl,
                                     onValueChange = { viewModel.updateComfyUiUrl(it) },
-                                    label = { Text("ComfyUI URL") },
-                                    placeholder = { Text("http://192.168.1.100:8188") },
+                                    label = { Text(stringResource(R.string.comfyui_url)) },
+                                    placeholder = { Text(stringResource(R.string.http_192_168_1_100_8188)) },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
@@ -146,8 +146,8 @@ fun ImageGenSettingsScreen(
                                 OutlinedTextField(
                                     value = config.dalleApiKey,
                                     onValueChange = { viewModel.updateDalleApiKey(it) },
-                                    label = { Text("OpenAI API Key") },
-                                    placeholder = { Text("sk-...") },
+                                    label = { Text(stringResource(R.string.openai_api_key)) },
+                                    placeholder = { Text(stringResource(R.string.sk)) },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true,
                                     visualTransformation = PasswordVisualTransformation(),
@@ -166,7 +166,7 @@ fun ImageGenSettingsScreen(
                                         value = config.dalleModel,
                                         onValueChange = {},
                                         readOnly = true,
-                                        label = { Text("Model") },
+                                        label = { Text(stringResource(R.string.model)) },
                                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(dalleExpanded) },
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -193,8 +193,8 @@ fun ImageGenSettingsScreen(
                                 OutlinedTextField(
                                     value = config.stabilityApiKey,
                                     onValueChange = { viewModel.updateStabilityApiKey(it) },
-                                    label = { Text("Stability AI API Key") },
-                                    placeholder = { Text("sk-...") },
+                                    label = { Text(stringResource(R.string.stability_ai_api_key)) },
+                                    placeholder = { Text(stringResource(R.string.sk)) },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true,
                                     visualTransformation = PasswordVisualTransformation(),
@@ -206,8 +206,8 @@ fun ImageGenSettingsScreen(
                                 OutlinedTextField(
                                     value = config.huggingfaceApiKey,
                                     onValueChange = { viewModel.updateHuggingFaceApiKey(it) },
-                                    label = { Text("HuggingFace API Key") },
-                                    placeholder = { Text("hf_...") },
+                                    label = { Text(stringResource(R.string.huggingface_api_key)) },
+                                    placeholder = { Text(stringResource(R.string.hf)) },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true,
                                     visualTransformation = PasswordVisualTransformation(),
@@ -218,8 +218,8 @@ fun ImageGenSettingsScreen(
                                 OutlinedTextField(
                                     value = config.huggingfaceModel,
                                     onValueChange = { viewModel.updateHuggingFaceModel(it) },
-                                    label = { Text("Model ID") },
-                                    placeholder = { Text("stabilityai/stable-diffusion-xl-base-1.0") },
+                                    label = { Text(stringResource(R.string.model_id)) },
+                                    placeholder = { Text(stringResource(R.string.stabilityai_stable_diffusion_xl_base_1_0)) },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true,
                                     colors = imageGenTextFieldColors()
@@ -229,16 +229,15 @@ fun ImageGenSettingsScreen(
                                 OutlinedTextField(
                                     value = config.pollinationsApiKey,
                                     onValueChange = { viewModel.updatePollinationsApiKey(it) },
-                                    label = { Text("Pollinations API Key") },
-                                    placeholder = { Text("pollen-...") },
+                                    label = { Text(stringResource(R.string.pollinations_api_key)) },
+                                    placeholder = { Text(stringResource(R.string.pollen)) },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true,
                                     visualTransformation = PasswordVisualTransformation(),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                                     colors = imageGenTextFieldColors()
                                 )
-                                Text(
-                                    "Get a key at pollinations.ai — required for image generation.",
+                                Text(stringResource(R.string.get_a_key_at_pollinations_ai_required_for_ima),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(top = 4.dp)
@@ -255,7 +254,7 @@ fun ImageGenSettingsScreen(
                                         value = config.pollinationsModel.ifBlank { "flux" },
                                         onValueChange = {},
                                         readOnly = true,
-                                        label = { Text("Model") },
+                                        label = { Text(stringResource(R.string.model)) },
                                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(pollinationsExpanded) },
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -282,8 +281,8 @@ fun ImageGenSettingsScreen(
                                 OutlinedTextField(
                                     value = config.nanoGptApiKey,
                                     onValueChange = { viewModel.updateNanoGptApiKey(it) },
-                                    label = { Text("nano-gpt API Key") },
-                                    placeholder = { Text("sk-nano-...") },
+                                    label = { Text(stringResource(R.string.nano_gpt_api_key)) },
+                                    placeholder = { Text(stringResource(R.string.sk_nano)) },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true,
                                     visualTransformation = PasswordVisualTransformation(),
@@ -303,7 +302,7 @@ fun ImageGenSettingsScreen(
                                             value = config.nanoGptModel.ifBlank { nanoModels.first() },
                                             onValueChange = {},
                                             readOnly = true,
-                                            label = { Text("Model") },
+                                            label = { Text(stringResource(R.string.model)) },
                                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(nanoExpanded) },
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -338,7 +337,7 @@ fun ImageGenSettingsScreen(
                                             Icon(Icons.Default.Refresh, null, Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                         }
-                                        Text("Load Models")
+                                        Text(stringResource(R.string.load_models))
                                     }
                                 }
                             }
@@ -363,7 +362,7 @@ fun ImageGenSettingsScreen(
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                     }
-                                    Text("Test Connection")
+                                    Text(stringResource(R.string.test_connection))
                                 }
 
                                 OutlinedButton(
@@ -375,7 +374,7 @@ fun ImageGenSettingsScreen(
                                 ) {
                                     Icon(Icons.Default.Refresh, null, Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Fetch Options")
+                                    Text(stringResource(R.string.fetch_options))
                                 }
                             }
 
@@ -398,8 +397,7 @@ fun ImageGenSettingsScreen(
             if (caps.supportsSamplers || caps.supportsModels) {
                 item {
                     ImageGenSectionCard {
-                        Text(
-                            "Generation Options",
+                        Text(stringResource(R.string.generation_options),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -418,7 +416,7 @@ fun ImageGenSettingsScreen(
                                     value = config.sampler,
                                     onValueChange = {},
                                     readOnly = true,
-                                    label = { Text("Sampler") },
+                                    label = { Text(stringResource(R.string.sampler)) },
                                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(samplerExpanded) },
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -454,7 +452,7 @@ fun ImageGenSettingsScreen(
                                     value = config.sdModel.ifBlank { uiState.models.firstOrNull() ?: "Default" },
                                     onValueChange = {},
                                     readOnly = true,
-                                    label = { Text("Model") },
+                                    label = { Text(stringResource(R.string.model)) },
                                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(modelExpanded) },
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -485,8 +483,7 @@ fun ImageGenSettingsScreen(
             if (caps.supportsSteps || caps.supportsCfgScale || caps.supportsSeed) {
                 item {
                     ImageGenSectionCard {
-                        Text(
-                            "Parameters",
+                        Text(stringResource(R.string.parameters),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -532,7 +529,7 @@ fun ImageGenSettingsScreen(
                                     val seed = it.toIntOrNull() ?: -1
                                     viewModel.updateSeed(seed)
                                 },
-                                label = { Text("Seed (-1 = random)") },
+                                label = { Text(stringResource(R.string.seed_1_random)) },
                                 placeholder = { Text("-1") },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
@@ -548,8 +545,7 @@ fun ImageGenSettingsScreen(
             if (caps.supportsResolutionPresets) {
                 item {
                     ImageGenSectionCard {
-                        Text(
-                            "Resolution",
+                        Text(stringResource(R.string.resolution),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -588,8 +584,7 @@ fun ImageGenSettingsScreen(
             if (caps.supportsNegativePrompt) {
                 item {
                     ImageGenSectionCard {
-                        Text(
-                            "Negative Prompt",
+                        Text(stringResource(R.string.negative_prompt),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -597,7 +592,7 @@ fun ImageGenSettingsScreen(
                         OutlinedTextField(
                             value = config.negativePrompt,
                             onValueChange = { viewModel.updateNegativePrompt(it) },
-                            label = { Text("Negative prompt") },
+                            label = { Text(stringResource(R.string.negative_prompt_2)) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = 80.dp),
@@ -612,8 +607,7 @@ fun ImageGenSettingsScreen(
             if (caps.supportsClipSkip) {
                 item {
                     ImageGenSectionCard {
-                        Text(
-                            "Advanced",
+                        Text(stringResource(R.string.advanced),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )

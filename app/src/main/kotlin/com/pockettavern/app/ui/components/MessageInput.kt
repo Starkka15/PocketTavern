@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.components
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,7 +44,7 @@ fun MessageInput(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Mic,
-                        contentDescription = "Voice input",
+                        contentDescription = stringResource(R.string.voice_input),
                         tint = if (enabled) MaterialTheme.colorScheme.primary
                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                     )
@@ -86,7 +88,7 @@ fun MessageInput(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Send"
+                    contentDescription = stringResource(R.string.send)
                 )
             }
         }

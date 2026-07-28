@@ -1,5 +1,6 @@
 package com.pockettavern.app.ui.screens.main
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -136,7 +137,7 @@ fun MainScreen(
                     if (assets.logoImagePath != null) {
                         AsyncImage(
                             model = File(assets.logoImagePath),
-                            contentDescription = "PocketTavern",
+                            contentDescription = stringResource(R.string.app_name),
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
@@ -146,7 +147,7 @@ fun MainScreen(
                     } else {
                         Image(
                             painter = painterResource(id = R.drawable.logo_pockettavern),
-                            contentDescription = "PocketTavern",
+                            contentDescription = stringResource(R.string.app_name),
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
@@ -270,12 +271,11 @@ fun MainScreen(
                 )
             },
             title = {
-                Text("Update Available")
+                Text(stringResource(R.string.update_available))
             },
             text = {
                 Column {
-                    Text(
-                        "A new version of PocketTavern is available!",
+                    Text(stringResource(R.string.a_new_version_of_pockettavern_is_available),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -299,12 +299,12 @@ fun MainScreen(
                         viewModel.dismissUpdateDialog()
                     }
                 ) {
-                    Text("Download", color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.download), color = MaterialTheme.colorScheme.primary)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissUpdateDialog() }) {
-                    Text("Later", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.later), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
             containerColor = Color.Black.copy(alpha = 0.95f),
@@ -379,8 +379,7 @@ private fun SearchCardsCard(
             Spacer(modifier = Modifier.width(18.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Search cards",
+                Text(text = stringResource(R.string.search_cards_2),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )

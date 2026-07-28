@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.settings
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -44,7 +46,7 @@ fun StorageBrowserScreen(
         val file = uiState.fileToDelete
         AlertDialog(
             onDismissRequest = { viewModel.dismissDeleteDialog() },
-            title = { Text("Delete character?") },
+            title = { Text(stringResource(R.string.delete_character_2)) },
             text = {
                 Text(
                     if (file != null)
@@ -57,10 +59,10 @@ fun StorageBrowserScreen(
                 TextButton(
                     onClick = { viewModel.confirmDelete() },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) { Text("Delete") }
+                ) { Text(stringResource(R.string.delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.dismissDeleteDialog() }) { Text("Cancel") }
+                TextButton(onClick = { viewModel.dismissDeleteDialog() }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -69,7 +71,7 @@ fun StorageBrowserScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Character Storage") },
+                title = { Text(stringResource(R.string.character_storage)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -85,7 +87,7 @@ fun StorageBrowserScreen(
                         )
                     } else {
                         IconButton(onClick = { viewModel.rescan() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Rescan")
+                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.rescan))
                         }
                     }
                 },
@@ -122,8 +124,7 @@ fun StorageBrowserScreen(
                         tint = MaterialTheme.colorScheme.outline
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "No character files found",
+                    Text(stringResource(R.string.no_character_files_found),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.outline
                     )

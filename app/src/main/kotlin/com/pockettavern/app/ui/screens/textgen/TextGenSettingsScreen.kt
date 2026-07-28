@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.textgen
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -40,7 +42,7 @@ fun TextGenSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Text Generation") },
+                title = { Text(stringResource(R.string.text_generation)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -67,7 +69,7 @@ fun TextGenSettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Preset Selector
-                SectionHeader("Preset")
+                SectionHeader(stringResource(R.string.preset))
                 PresetDropdown(
                     presets = uiState.presets.map { it.name },
                     selectedIndex = uiState.selectedPresetIndex,
@@ -77,7 +79,7 @@ fun TextGenSettingsScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // Basic Settings
-                SectionHeader("Basic Settings")
+                SectionHeader(stringResource(R.string.basic_settings))
 
                 SliderSetting("Temperature", uiState.temperature, 0f..2f, "%.2f") { viewModel.updateTemperature(it) }
                 SliderSetting("Top P", uiState.topP, 0f..1f, "%.2f") { viewModel.updateTopP(it) }
@@ -105,14 +107,14 @@ fun TextGenSettingsScreen(
                 AnimatedVisibility(visible = uiState.showAdvanced) {
                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         // Token Limits
-                        SectionHeader("Token Limits")
+                        SectionHeader(stringResource(R.string.token_limits))
                         IntInputField("Min Tokens", uiState.minTokens) { viewModel.updateMinTokens(it) }
                         IntInputField("Context Length", uiState.truncationLength) { viewModel.updateTruncationLength(it) }
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                         // Sampling
-                        SectionHeader("Sampling")
+                        SectionHeader(stringResource(R.string.sampling))
                         IntInputField("Top K", uiState.topK) { viewModel.updateTopK(it) }
                         SliderSetting("Top A", uiState.topA, 0f..1f, "%.2f") { viewModel.updateTopA(it) }
                         SliderSetting("Typical P", uiState.typicalP, 0f..1f, "%.2f") { viewModel.updateTypicalP(it) }
@@ -121,7 +123,7 @@ fun TextGenSettingsScreen(
                         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                         // Repetition
-                        SectionHeader("Repetition Penalty")
+                        SectionHeader(stringResource(R.string.repetition_penalty))
                         IntInputField("Rep Pen Range", uiState.repPenRange) { viewModel.updateRepPenRange(it) }
                         SliderSetting("Rep Pen Slope", uiState.repPenSlope, 0f..10f, "%.1f") { viewModel.updateRepPenSlope(it) }
                         SliderSetting("Frequency Penalty", uiState.frequencyPenalty, 0f..2f, "%.2f") { viewModel.updateFrequencyPenalty(it) }
@@ -130,7 +132,7 @@ fun TextGenSettingsScreen(
                         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                         // DRY Sampler
-                        SectionHeader("DRY Sampler")
+                        SectionHeader(stringResource(R.string.dry_sampler))
                         SliderSetting("DRY Multiplier", uiState.dryMultiplier, 0f..2f, "%.2f") { viewModel.updateDryMultiplier(it) }
                         SliderSetting("DRY Base", uiState.dryBase, 1f..4f, "%.2f") { viewModel.updateDryBase(it) }
                         IntInputField("DRY Allowed Length", uiState.dryAllowedLength) { viewModel.updateDryAllowedLength(it) }
@@ -139,7 +141,7 @@ fun TextGenSettingsScreen(
                         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                         // Mirostat
-                        SectionHeader("Mirostat")
+                        SectionHeader(stringResource(R.string.mirostat))
                         IntInputField("Mirostat Mode (0-2)", uiState.mirostatMode) { viewModel.updateMirostatMode(it) }
                         SliderSetting("Mirostat Tau", uiState.mirostatTau, 0f..10f, "%.1f") { viewModel.updateMirostatTau(it) }
                         SliderSetting("Mirostat Eta", uiState.mirostatEta, 0f..1f, "%.2f") { viewModel.updateMirostatEta(it) }
@@ -147,14 +149,14 @@ fun TextGenSettingsScreen(
                         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                         // XTC
-                        SectionHeader("XTC")
+                        SectionHeader(stringResource(R.string.xtc))
                         SliderSetting("XTC Threshold", uiState.xtcThreshold, 0f..1f, "%.2f") { viewModel.updateXtcThreshold(it) }
                         SliderSetting("XTC Probability", uiState.xtcProbability, 0f..1f, "%.2f") { viewModel.updateXtcProbability(it) }
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                         // Other
-                        SectionHeader("Other")
+                        SectionHeader(stringResource(R.string.other))
                         SliderSetting("Skew", uiState.skew, -5f..5f, "%.2f") { viewModel.updateSkew(it) }
                         SliderSetting("Smoothing Factor", uiState.smoothingFactor, 0f..10f, "%.2f") { viewModel.updateSmoothingFactor(it) }
                         SliderSetting("Smoothing Curve", uiState.smoothingCurve, 0f..10f, "%.2f") { viewModel.updateSmoothingCurve(it) }
@@ -163,7 +165,7 @@ fun TextGenSettingsScreen(
                         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                         // Token Handling
-                        SectionHeader("Token Handling")
+                        SectionHeader(stringResource(R.string.token_handling))
                         SwitchSetting("Add BOS Token", uiState.addBosToken) { viewModel.updateAddBosToken(it) }
                         SwitchSetting("Ban EOS Token", uiState.banEosToken) { viewModel.updateBanEosToken(it) }
                         SwitchSetting("Skip Special Tokens", uiState.skipSpecialTokens) { viewModel.updateSkipSpecialTokens(it) }
@@ -184,7 +186,7 @@ fun TextGenSettingsScreen(
                     ) {
                         Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Save Preset")
+                        Text(stringResource(R.string.save_preset))
                     }
 
                     OutlinedButton(
@@ -195,7 +197,7 @@ fun TextGenSettingsScreen(
                     ) {
                         Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Delete")
+                        Text(stringResource(R.string.delete))
                     }
                 }
 
@@ -212,12 +214,11 @@ fun TextGenSettingsScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
-                    Text("Apply Settings")
+                    Text(stringResource(R.string.apply_settings))
                 }
 
                 if (uiState.saveSuccess) {
-                    Text(
-                        text = "Settings applied successfully!",
+                    Text(text = stringResource(R.string.settings_applied_successfully),
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -232,12 +233,12 @@ fun TextGenSettingsScreen(
     if (uiState.showSavePresetDialog) {
         AlertDialog(
             onDismissRequest = { viewModel.hideSavePresetDialog() },
-            title = { Text("Save Preset") },
+            title = { Text(stringResource(R.string.save_preset)) },
             text = {
                 OutlinedTextField(
                     value = uiState.newPresetName,
                     onValueChange = { viewModel.updateNewPresetName(it) },
-                    label = { Text("Preset Name") },
+                    label = { Text(stringResource(R.string.preset_name)) },
                     singleLine = true,
                     colors = textFieldColors()
                 )
@@ -247,12 +248,12 @@ fun TextGenSettingsScreen(
                     onClick = { viewModel.savePreset() },
                     enabled = uiState.newPresetName.isNotBlank() && !uiState.isSaving
                 ) {
-                    Text("Save")
+                    Text(stringResource(R.string.save))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.hideSavePresetDialog() }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )

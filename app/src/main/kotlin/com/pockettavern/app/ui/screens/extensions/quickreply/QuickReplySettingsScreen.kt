@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.extensions.quickreply
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -61,15 +63,15 @@ fun QuickReplySettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Quick Reply") },
+                title = { Text(stringResource(R.string.quick_reply)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
                     IconButton(onClick = viewModel::showAddPresetDialog) {
-                        Icon(Icons.Default.Add, contentDescription = "Add preset")
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_preset_2))
                     }
                 }
             )
@@ -83,9 +85,9 @@ fun QuickReplySettingsScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("No presets yet", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.no_presets_yet), style = MaterialTheme.typography.bodyLarge)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = viewModel::showAddPresetDialog) { Text("Add Preset") }
+                    Button(onClick = viewModel::showAddPresetDialog) { Text(stringResource(R.string.add_preset)) }
                 }
             }
         } else {
@@ -142,10 +144,10 @@ private fun PresetCard(
                     )
                 }
                 IconButton(onClick = onEdit) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit preset", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.edit_preset), modifier = Modifier.size(18.dp))
                 }
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete preset", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_preset), modifier = Modifier.size(18.dp))
                 }
                 Switch(checked = preset.enabled, onCheckedChange = { onToggle() })
             }
@@ -169,7 +171,7 @@ private fun PresetCard(
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Add Button")
+                Text(stringResource(R.string.add_button))
             }
         }
     }
@@ -197,10 +199,10 @@ private fun ButtonRow(
             )
         }
         IconButton(onClick = onEdit) {
-            Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(16.dp))
+            Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.edit), modifier = Modifier.size(16.dp))
         }
         IconButton(onClick = onDelete) {
-            Icon(Icons.Default.Delete, contentDescription = "Delete", modifier = Modifier.size(16.dp))
+            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete), modifier = Modifier.size(16.dp))
         }
     }
 }
@@ -220,16 +222,16 @@ private fun PresetDialog(
             OutlinedTextField(
                 value = nameValue,
                 onValueChange = onNameChange,
-                label = { Text("Preset name") },
+                label = { Text(stringResource(R.string.preset_name_2)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
         },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text("Save") }
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }
@@ -261,26 +263,24 @@ private fun ButtonDialog(
                 OutlinedTextField(
                     value = labelValue,
                     onValueChange = onLabelChange,
-                    label = { Text("Button label") },
+                    label = { Text(stringResource(R.string.button_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = messageValue,
                     onValueChange = onMessageChange,
-                    label = { Text("Message to send") },
+                    label = { Text(stringResource(R.string.message_to_send)) },
                     minLines = 2,
                     maxLines = 5,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Text(
-                    "Supports {{user}} and {{char}} macros.",
+                Text(stringResource(R.string.supports_user_and_char_macros),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 HorizontalDivider()
-                Text(
-                    "Auto-triggers",
+                Text(stringResource(R.string.auto_triggers),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -302,10 +302,10 @@ private fun ButtonDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text("Save") }
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }
