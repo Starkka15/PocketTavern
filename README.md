@@ -5,7 +5,6 @@
 > **The goal: the best source-available AI chat app on Android.**
 > Simple enough to pick up in minutes. Deep enough for power users who want full control over every token.
 
-[![Discord](https://img.shields.io/badge/Discord-Join%20Server-ff247f?style=for-the-badge&logoColor=white)](https://stt.gg/49Bfn8bA)
 [![Release](https://img.shields.io/github/v/release/Starkka15/PocketTavern?style=for-the-badge&color=7c3aed)](https://github.com/Starkka15/PocketTavern/releases/latest)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3ddc84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Starkka15/PocketTavern/releases/latest)
 
@@ -16,7 +15,7 @@
 >
 > **To contribute a translation:** copy the English source file — [`app/src/main/res/values/strings.xml`](https://github.com/Starkka15/PocketTavern/blob/testing/app/src/main/res/values/strings.xml) — into a locale folder (e.g. `values-fr` for French, `values-de` for German, `values-zh-rCN` for Simplified Chinese) and translate the text between the `>...<` tags. Keep the `name="..."` keys, `%1$s`/`%1$d` markers, and `{{user}}`/`{{char}}` macros unchanged, then open a pull request.
 >
-> A ready-to-edit Simplified Chinese starter file is already in place at [`values-zh-rCN/strings.xml`](https://github.com/Starkka15/PocketTavern/blob/testing/app/src/main/res/values-zh-rCN/strings.xml). Questions? Open an issue or ask on [Discord](https://stt.gg/49Bfn8bA).
+> A ready-to-edit Simplified Chinese starter file is already in place at [`values-zh-rCN/strings.xml`](https://github.com/Starkka15/PocketTavern/blob/testing/app/src/main/res/values-zh-rCN/strings.xml). Questions? [Open an issue](https://github.com/Starkka15/PocketTavern/issues/new).
 
 ---
 
