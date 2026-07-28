@@ -1,14 +1,18 @@
 package com.pockettavern.app.domain.usecase
 
+import android.content.Context
 import com.pockettavern.app.data.repository.LlmRepository
 import com.pockettavern.app.domain.model.ApiConfiguration
 import com.pockettavern.app.domain.model.PromptMessage
 import com.pockettavern.app.domain.model.StreamEvent
 import com.pockettavern.app.util.CharacterCardData
+import com.pockettavern.app.util.LocaleHelper
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 
 class TranslateCardUseCase @Inject constructor(
-    private val llmRepository: LlmRepository
+    private val llmRepository: LlmRepository,
+    @ApplicationContext private val context: Context
 ) {
     enum class Field(val label: String) {
         DESCRIPTION("Description"),
@@ -34,7 +38,7 @@ class TranslateCardUseCase @Inject constructor(
         for (field in fields) {
             if (field == Field.ALTERNATE_GREETINGS) continue  // handled below
             val text = getField(data, field)
-            if (text.isNotBlank() && isNonEnglish(text)) {
+            if (text.isNotBlank() && needsTranslation(text)) {
                 results[field] = translateText(text, config)
             }
         }
@@ -43,7 +47,7 @@ class TranslateCardUseCase @Inject constructor(
         var translatedGreetings: List<String>? = null
         if (Field.ALTERNATE_GREETINGS in fields && data.alternateGreetings.isNotEmpty()) {
             translatedGreetings = data.alternateGreetings.map { greeting ->
-                if (greeting.isNotBlank() && isNonEnglish(greeting))
+                if (greeting.isNotBlank() && needsTranslation(greeting))
                     translateText(greeting, config)
                 else greeting
             }
@@ -52,22 +56,48 @@ class TranslateCardUseCase @Inject constructor(
         return applyAll(data, results, translatedGreetings)
     }
 
-    fun isNonEnglish(text: String): Boolean {
+    /**
+     * True when [text] doesn't look like it's already in the app's effective
+     * language (LocaleHelper) and should be offered for translation.
+     */
+    fun needsTranslation(text: String): Boolean {
         if (text.length < 20) return false
         val sample = text.take(400)
-        val nonAscii = sample.count { it.code > 127 }
-        return nonAscii.toFloat() / sample.length > 0.15f
+        val target = LocaleHelper.effectiveLocale(context)
+        return when {
+            // Target English: translate visibly foreign (non-ASCII heavy) text
+            target.language == "en" || target.language.isEmpty() ->
+                nonAsciiRatio(sample) > 0.15f
+            // CJK targets: translate anything not already mostly CJK
+            target.language in setOf("zh", "ja", "ko") ->
+                cjkRatio(sample) < 0.10f
+            // Other targets: no cheap script check — offer translation
+            else -> true
+        }
     }
 
-    fun hasNonEnglishGreeting(greetings: List<String>): Boolean =
-        greetings.any { isNonEnglish(it) }
+    fun hasTranslatableGreeting(greetings: List<String>): Boolean =
+        greetings.any { needsTranslation(it) }
+
+    private fun nonAsciiRatio(sample: String): Float =
+        sample.count { it.code > 127 }.toFloat() / sample.length
+
+    private fun cjkRatio(sample: String): Float {
+        val cjk = sample.count {
+            val b = Character.UnicodeScript.of(it.code)
+            b == Character.UnicodeScript.HAN || b == Character.UnicodeScript.HIRAGANA ||
+                b == Character.UnicodeScript.KATAKANA || b == Character.UnicodeScript.HANGUL
+        }
+        return cjk.toFloat() / sample.length
+    }
 
     private suspend fun translateText(text: String, config: ApiConfiguration): String {
+        val systemPrompt = systemPrompt()
         val messages = listOf(
-            PromptMessage("system", SYSTEM_PROMPT),
+            PromptMessage("system", systemPrompt),
             PromptMessage("user", text)
         )
-        val flatPrompt = "$SYSTEM_PROMPT\n\n$text"
+        val flatPrompt = "$systemPrompt\n\n$text"
 
         var result = ""
         llmRepository.generate(
@@ -107,8 +137,11 @@ class TranslateCardUseCase @Inject constructor(
         alternateGreetings = translatedGreetings ?: data.alternateGreetings
     )
 
+    private fun systemPrompt(): String =
+        SYSTEM_PROMPT_TEMPLATE.replace("%LANG%", LocaleHelper.targetLanguageName(context))
+
     companion object {
-        private const val SYSTEM_PROMPT = """Translate the following text to English.
+        private const val SYSTEM_PROMPT_TEMPLATE = """Translate the following text to %LANG%.
 Rules (follow exactly):
 - Preserve {{user}}, {{char}}, {{original}} template variables verbatim
 - Preserve <img src=(...)> tags verbatim

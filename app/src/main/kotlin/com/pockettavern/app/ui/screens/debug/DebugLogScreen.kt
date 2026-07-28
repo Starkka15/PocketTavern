@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.debug
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -38,7 +40,7 @@ fun DebugLogScreen(onBack: () -> Unit) {
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Debug Log") },
+                title = { Text(stringResource(R.string.debug_log)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -49,14 +51,14 @@ fun DebugLogScreen(onBack: () -> Unit) {
                     IconButton(onClick = {
                         clipboard.setText(AnnotatedString(logContent))
                     }) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy log")
+                        Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.copy_log))
                     }
                     // Clear log
                     IconButton(onClick = {
                         DebugLogger.clearLog()
                         logContent = DebugLogger.getLogContents()
                     }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Clear log", tint = MaterialTheme.colorScheme.error)
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.clear_log_2), tint = MaterialTheme.colorScheme.error)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -76,13 +78,12 @@ fun DebugLogScreen(onBack: () -> Unit) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    "Tap Refresh after generating to see the latest prompt.",
+                Text(stringResource(R.string.tap_refresh_after_generating_to_see_the_lates),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 TextButton(onClick = { logContent = DebugLogger.getLogContents() }) {
-                    Text("Refresh")
+                    Text(stringResource(R.string.refresh))
                 }
             }
 

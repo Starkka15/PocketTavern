@@ -1,6 +1,10 @@
 package com.pockettavern.app.data.repository
 
 import com.pockettavern.app.data.local.SettingsDataStore
+import com.pockettavern.app.data.local.inference.DeviceCapabilities
+import com.pockettavern.app.data.local.inference.GgufEngine
+import com.pockettavern.app.data.local.inference.OnDeviceEngine
+import com.pockettavern.app.data.local.inference.OnDeviceModelManager
 import com.pockettavern.app.data.remote.api.*
 import com.pockettavern.app.domain.model.*
 import com.pockettavern.app.domain.model.OaiPreset
@@ -31,7 +35,10 @@ import javax.inject.Singleton
 @Singleton
 class LlmRepository @Inject constructor(
     private val settingsDataStore: SettingsDataStore,
-    @Named("LLM") private val okHttpClient: OkHttpClient
+    @Named("LLM") private val okHttpClient: OkHttpClient,
+    private val onDeviceEngine: OnDeviceEngine,
+    private val ggufEngine: GgufEngine,
+    private val onDeviceModels: OnDeviceModelManager
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -96,6 +103,8 @@ class LlmRepository @Inject constructor(
     suspend fun getAvailableModels(config: ApiConfiguration): List<AvailableModel> {
         return try {
             when {
+                config.isOnDevice -> onDeviceModels.listModels(OnDeviceModelManager.LITERTLM_EXTS)
+                config.isOnDeviceGguf -> onDeviceModels.listModels(OnDeviceModelManager.GGUF_EXTS)
                 config.usesChatCompletions || config.textGenType in setOf("ooba", "vllm", "aphrodite", "tabby") ->
                     fetchOaiModels(config)
                 config.textGenType == "ollama" -> fetchOllamaModels(config)
@@ -112,6 +121,8 @@ class LlmRepository @Inject constructor(
     suspend fun testConnection(config: ApiConfiguration): Boolean {
         return try {
             when {
+                config.isOnDevice -> onDeviceModels.pathFor(config.currentModel, OnDeviceModelManager.LITERTLM_EXTS) != null
+                config.isOnDeviceGguf -> onDeviceModels.pathFor(config.currentModel, OnDeviceModelManager.GGUF_EXTS) != null
                 config.textGenType == "koboldcpp" -> {
                     val url = "${config.apiServer.trimEnd('/')}/api/v1/model"
                     val resp = okHttpClient.newCall(Request.Builder().url(url).build()).execute()
@@ -373,6 +384,95 @@ class LlmRepository @Inject constructor(
 
     // ── OpenAI Chat Completions (shared by many backends) ────────────────────
 
+    /**
+     * On-device generation via LiteRT-LM. System messages become the systemInstruction, prior
+     * turns become conversation history, and the final message is the turn to respond to.
+     * Sampler params come from the Chat Completion Preset (the only knobs LiteRT-LM exposes).
+     */
+    private fun streamOnDevice(
+        messages: List<PromptMessage>?,
+        prompt: String,
+        config: ApiConfiguration,
+        oaiPreset: OaiPreset?,
+        stopSequences: List<String>
+    ): Flow<StreamEvent> = flow {
+        val modelPath = onDeviceModels.pathFor(config.currentModel, OnDeviceModelManager.LITERTLM_EXTS)
+        if (modelPath == null) {
+            emit(StreamEvent.Error("On-device model \"${config.currentModel}\" is not downloaded."))
+            return@flow
+        }
+
+        val msgs = messages ?: listOf(PromptMessage("user", prompt))
+        val system = msgs.filter { it.role.equals("system", true) }
+            .joinToString("\n\n") { it.content }.ifBlank { null }
+        val convo = msgs.filterNot { it.role.equals("system", true) }
+        val userMessage = convo.lastOrNull()?.content ?: prompt
+        val history = convo.dropLast(1).map {
+            OnDeviceEngine.Turn(isUser = !it.role.equals("assistant", true), content = it.content)
+        }
+
+        val maxTokens = if (oaiPreset != null && oaiPreset.maxTokensEnabled) oaiPreset.maxTokens else 512
+        val params = OnDeviceEngine.Params(
+            maxTokens = maxTokens,
+            topK = if (oaiPreset != null && oaiPreset.topKEnabled) oaiPreset.topK else 40,
+            topP = if (oaiPreset != null && oaiPreset.topPEnabled) oaiPreset.topP else 0.95f,
+            temperature = if (oaiPreset != null && oaiPreset.temperatureEnabled) oaiPreset.temperature else 0.8f,
+        )
+
+        emitOnDeviceStream(
+            // Only attempt GPU on NPU-capable (flagship) SoCs. Budget chips' GPU delegates can
+            // NATIVE-crash during init (uncatchable → app dies instead of falling back), so route
+            // them straight to CPU. Fixes on-device crash on 4GB/older phones (e.g. Moto G Stylus).
+            onDeviceEngine.generate(system, history, userMessage, modelPath, useGpu = DeviceCapabilities.isNpuCapableSoc(), params),
+            showThoughts = config.showThoughts,
+            primeThink = isReasoningModel(config.currentModel),
+            maxOutputTokens = maxTokens,
+            stopSequences = stopSequences,
+        ) { emit(it) }
+    }
+
+    /**
+     * On-device GGUF generation via llama.cpp (Llamatik). Chat-completion path: messages are
+     * fed through the GGUF's embedded chat template. Samplers from the Chat Completion Preset.
+     */
+    private fun streamOnDeviceGguf(
+        messages: List<PromptMessage>?,
+        prompt: String,
+        config: ApiConfiguration,
+        oaiPreset: OaiPreset?,
+        stopSequences: List<String>
+    ): Flow<StreamEvent> = flow {
+        val modelPath = onDeviceModels.pathFor(config.currentModel, OnDeviceModelManager.GGUF_EXTS)
+        if (modelPath == null) {
+            emit(StreamEvent.Error("GGUF model \"${config.currentModel}\" is not downloaded."))
+            return@flow
+        }
+        val msgs = messages ?: listOf(PromptMessage("user", prompt))
+        val pairs = msgs.map { it.role to it.content }
+        val maxTokens = if (oaiPreset != null && oaiPreset.maxTokensEnabled) oaiPreset.maxTokens else 512
+        val params = GgufEngine.Params(
+            maxTokens = maxTokens,
+            topK = if (oaiPreset != null && oaiPreset.topKEnabled) oaiPreset.topK else 40,
+            topP = if (oaiPreset != null && oaiPreset.topPEnabled) oaiPreset.topP else 0.95f,
+            temperature = if (oaiPreset != null && oaiPreset.temperatureEnabled) oaiPreset.temperature else 0.8f,
+            repeatPenalty = if (oaiPreset != null && oaiPreset.repetitionPenaltyEnabled) oaiPreset.repetitionPenalty else 1.1f,
+        )
+        emitOnDeviceStream(
+            ggufEngine.generate(pairs, modelPath, params),
+            showThoughts = config.showThoughts,
+            primeThink = isReasoningModel(config.currentModel),
+            maxOutputTokens = maxTokens,
+            stopSequences = stopSequences,
+        ) { emit(it) }
+    }
+
+    /** Reasoning models embed <think>…</think> in their output (often only the closing tag). */
+    private fun isReasoningModel(modelId: String): Boolean {
+        val m = modelId.lowercase()
+        return listOf("r1", "qwq", "distill", "deepseek-r", "reasoning", "-think", "thinking")
+            .any { m.contains(it) }
+    }
+
     private fun streamChatCompletions(
         prompt: String,
         messages: List<PromptMessage>?,
@@ -383,6 +483,16 @@ class LlmRepository @Inject constructor(
         apiKey: String,
         showThoughts: Boolean = false
     ): Flow<StreamEvent> = flow {
+        // On-device: run locally instead of an HTTP chat-completion call.
+        if (config.isOnDevice) {
+            streamOnDevice(messages, prompt, config, oaiPreset, stopSequences).collect { emit(it) }
+            return@flow
+        }
+        if (config.isOnDeviceGguf) {
+            streamOnDeviceGguf(messages, prompt, config, oaiPreset, stopSequences).collect { emit(it) }
+            return@flow
+        }
+
         val baseUrl = config.effectiveBaseUrl.trimEnd('/').removeSuffix("/v1")
 
         // Use structured messages from PromptBuilder when available,
@@ -471,7 +581,9 @@ class LlmRepository @Inject constructor(
                                 accumulatedThinking.append(reasoningToken)
                                 emit(StreamEvent.ThinkingToken(reasoningToken, accumulatedThinking.toString()))
                             }
-                            continue
+                            // NB: do NOT `continue` — the same delta may also carry the first
+                            // content token(s) (transition chunk). Skipping it dropped the opening
+                            // words of the response on reasoning models (R1). Fall through.
                         }
 
                         val rawToken = delta.content ?: continue
@@ -650,6 +762,73 @@ private suspend fun emitTokenWithThinkHandling(
             setInThinkBlock(false)
         }
     }
+}
+
+/** Thrown to stop an on-device generation early (stop sequence / max tokens / loop). */
+private class OnDeviceStop : RuntimeException()
+
+/**
+ * Degeneration guard for engines without a repetition penalty (LiteRT-LM): if the trailing
+ * window has already appeared 3+ times, the model is looping — bail. Conservative (48-char
+ * exact repeats are vanishingly rare in good prose).
+ */
+private fun isDegenerateLoop(s: CharSequence): Boolean {
+    if (s.length < 300) return false
+    val w = s.substring(s.length - 48)
+    var idx = s.indexOf(w); var count = 0
+    while (idx >= 0) { count++; if (count >= 3) return true; idx = s.indexOf(w, idx + 1) }
+    return false
+}
+
+/** Trim a looping tail back to the second occurrence of the repeating window. */
+private fun trimLoop(s: CharSequence): String {
+    val str = s.toString()
+    val w = str.substring(str.length - 48)
+    val first = str.indexOf(w)
+    val second = if (first >= 0) str.indexOf(w, first + w.length) else -1
+    return if (second > 0) str.substring(0, second).trimEnd() else str
+}
+
+/**
+ * Drives an on-device engine [chunks] flow into [StreamEvent]s, applying the Chat-Completion
+ * settings the engines don't enforce natively: <think> splitting, stop sequences, a max-token
+ * (approx via chars) cap, and a repetition/loop guard. Stops the engine early when any fires.
+ */
+private suspend fun emitOnDeviceStream(
+    chunks: Flow<OnDeviceEngine.Chunk>,
+    showThoughts: Boolean,
+    primeThink: Boolean,
+    maxOutputTokens: Int,
+    stopSequences: List<String>,
+    emit: suspend (StreamEvent) -> Unit
+) {
+    val acc = StringBuilder()
+    val think = StringBuilder()
+    var inThink = primeThink
+    val maxChars = maxOutputTokens.coerceAtLeast(16) * 4   // rough tokens→chars
+    val stops = stopSequences.filter { it.isNotBlank() }
+    try {
+        chunks.collect { chunk ->
+            when (chunk) {
+                is OnDeviceEngine.Chunk.Token -> {
+                    val before = acc.length
+                    emitTokenWithThinkHandling(chunk.text, showThoughts, acc, think, { inThink }, { inThink = it }) { emit(it) }
+                    if (!inThink && acc.length > before) {
+                        val cut = stops.mapNotNull { s -> acc.indexOf(s).takeIf { it >= 0 } }.minOrNull()
+                        when {
+                            cut != null -> { emit(StreamEvent.Complete(acc.substring(0, cut).trimEnd(), think.toString())); throw OnDeviceStop() }
+                            acc.length >= maxChars -> { emit(StreamEvent.Complete(acc.toString().trimEnd(), think.toString())); throw OnDeviceStop() }
+                            isDegenerateLoop(acc) -> { emit(StreamEvent.Complete(trimLoop(acc), think.toString())); throw OnDeviceStop() }
+                        }
+                    }
+                }
+                is OnDeviceEngine.Chunk.Thinking ->
+                    if (showThoughts) { think.append(chunk.text); emit(StreamEvent.ThinkingToken(chunk.text, think.toString())) }
+                is OnDeviceEngine.Chunk.Done -> emit(StreamEvent.Complete(acc.toString().trimEnd(), think.toString()))
+                is OnDeviceEngine.Chunk.Error -> emit(StreamEvent.Error(chunk.message))
+            }
+        }
+    } catch (e: OnDeviceStop) { /* early stop — engine cancelled via the flow's awaitClose */ }
 }
 
 /**

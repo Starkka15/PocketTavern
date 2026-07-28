@@ -16,16 +16,23 @@ val localProps = Properties().apply {
 
 android {
     namespace = "com.pockettavern.app"
-    compileSdk = 35
+    compileSdk = 36  // required by Llamatik (llama.cpp GGUF); targetSdk stays 35
 
     defaultConfig {
         applicationId = "com.pockettavern.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 19
-        versionName = "2.2.6"
+        versionCode = 23
+        versionName = "2.3.2"
+
+        // Stories (native ensemble) = private/dev feature for now. Visible in debug builds,
+        // hidden in the public release (overridden false below). Keeps PocketTavern simple.
+        buildConfigField("boolean", "STORIES_ENABLED", "true")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Phones are arm64; dropping x86_64 ~halves the APK (large on-device native libs).
+        ndk { abiFilters += "arm64-v8a" }
     }
 
     signingConfigs {
@@ -41,6 +48,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            buildConfigField("boolean", "STORIES_ENABLED", "false")  // hide Stories in the public release
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -56,6 +64,9 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+        // litertlm-android ships newer Kotlin metadata (2.3.x) than our compiler (2.1.x).
+        // Safe to consume — it's a JNI-wrapper lib with simple public types.
+        freeCompilerArgs += "-Xskip-metadata-version-check"
     }
 
     buildFeatures {
@@ -99,6 +110,11 @@ dependencies {
     implementation(libs.okhttp.logging)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.retrofit.kotlinx.serialization)
+
+    // On-device inference (LiteRT-LM, Apache-2.0). minSdk 23, arm64-v8a/x86_64.
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.13.1")
+    // On-device GGUF inference via llama.cpp (Llamatik, MIT). Unlocks the GGUF ecosystem.
+    implementation("com.llamatik:library:1.8.0")
 
     // DataStore
     implementation(libs.androidx.datastore.preferences)

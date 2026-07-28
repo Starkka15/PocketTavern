@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.persona
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -67,15 +69,15 @@ fun PersonaScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Personas") },
+                title = { Text(stringResource(R.string.personas)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.loadPersonas() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
                     }
                 }
             )
@@ -84,7 +86,7 @@ fun PersonaScreen(
             FloatingActionButton(
                 onClick = { viewModel.showCreateDialog() }
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Create Persona")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.create_persona))
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -113,13 +115,11 @@ fun PersonaScreen(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
                     Spacer(Modifier.height(16.dp))
-                    Text(
-                        "No personas found",
+                    Text(stringResource(R.string.no_personas_found),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Text(
-                        "Tap + to create a new persona",
+                    Text(stringResource(R.string.tap_to_create_a_new_persona),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
@@ -141,8 +141,7 @@ fun PersonaScreen(
 
                         item {
                             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                            Text(
-                                "All Personas",
+                            Text(stringResource(R.string.all_personas),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(vertical = 8.dp)
@@ -198,8 +197,8 @@ fun PersonaScreen(
         if (uiState.showDeleteConfirm) {
             AlertDialog(
                 onDismissRequest = { viewModel.hideDeleteConfirm() },
-                title = { Text("Delete Persona?") },
-                text = { Text("Are you sure you want to delete \"${uiState.editingPersona?.name}\"? This cannot be undone.") },
+                title = { Text(stringResource(R.string.delete_persona)) },
+                text = { Text(stringResource(R.string.delete_persona_confirm, uiState.editingPersona?.name ?: "")) },
                 confirmButton = {
                     TextButton(
                         onClick = { viewModel.deletePersona() },
@@ -207,12 +206,12 @@ fun PersonaScreen(
                             contentColor = MaterialTheme.colorScheme.error
                         )
                     ) {
-                        Text("Delete")
+                        Text(stringResource(R.string.delete))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { viewModel.hideDeleteConfirm() }) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.cancel))
                     }
                 }
             )
@@ -265,7 +264,7 @@ private fun SelectedPersonaCard(
             if (persona.avatarId.isNotEmpty()) {
                 AsyncImage(
                     model = File(persona.avatarId),
-                    contentDescription = "Avatar",
+                    contentDescription = stringResource(R.string.avatar),
                     modifier = Modifier
                         .size(72.dp)
                         .clip(avatarShape)
@@ -283,7 +282,7 @@ private fun SelectedPersonaCard(
                 ) {
                     Icon(
                         Icons.Default.Person,
-                        contentDescription = "Avatar",
+                        contentDescription = stringResource(R.string.avatar),
                         modifier = Modifier.size(40.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -293,8 +292,7 @@ private fun SelectedPersonaCard(
             Spacer(Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "Current Persona",
+                Text(stringResource(R.string.current_persona),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                 )
@@ -318,7 +316,7 @@ private fun SelectedPersonaCard(
             IconButton(onClick = onEdit) {
                 Icon(
                     Icons.Default.Edit,
-                    contentDescription = "Edit",
+                    contentDescription = stringResource(R.string.edit),
                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
@@ -356,7 +354,7 @@ private fun PersonaListItem(
             if (persona.avatarId.isNotEmpty()) {
                 AsyncImage(
                     model = File(persona.avatarId),
-                    contentDescription = "Avatar",
+                    contentDescription = stringResource(R.string.avatar),
                     modifier = Modifier
                         .size(48.dp)
                         .clip(avatarShape)
@@ -386,7 +384,7 @@ private fun PersonaListItem(
                 ) {
                     Icon(
                         Icons.Default.Person,
-                        contentDescription = "Avatar",
+                        contentDescription = stringResource(R.string.avatar),
                         modifier = Modifier.size(28.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -406,7 +404,7 @@ private fun PersonaListItem(
                         Spacer(Modifier.width(8.dp))
                         Icon(
                             Icons.Default.Check,
-                            contentDescription = "Selected",
+                            contentDescription = stringResource(R.string.selected),
                             modifier = Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.primary
                         )
@@ -426,7 +424,7 @@ private fun PersonaListItem(
             IconButton(onClick = onEdit) {
                 Icon(
                     Icons.Default.Edit,
-                    contentDescription = "Edit",
+                    contentDescription = stringResource(R.string.edit),
                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
@@ -453,7 +451,7 @@ private fun EditPersonaDialog(
 ) {
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
-        title = { Text("Edit ${persona.name}") },
+        title = { Text(stringResource(R.string.edit_named, persona.name)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -462,8 +460,8 @@ private fun EditPersonaDialog(
                 OutlinedTextField(
                     value = description,
                     onValueChange = onDescriptionChange,
-                    label = { Text("Description") },
-                    placeholder = { Text("Describe how {{user}} speaks, behaves, or should be portrayed in the story...") },
+                    label = { Text(stringResource(R.string.description)) },
+                    placeholder = { Text(stringResource(R.string.describe_how_user_speaks_behaves_or_should_be)) },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3,
                     maxLines = 5
@@ -484,7 +482,7 @@ private fun EditPersonaDialog(
                         },
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Position") },
+                        label = { Text(stringResource(R.string.position)) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = positionExpanded) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -518,7 +516,7 @@ private fun EditPersonaDialog(
                     OutlinedTextField(
                         value = depth.toString(),
                         onValueChange = { it.toIntOrNull()?.let(onDepthChange) },
-                        label = { Text("Depth") },
+                        label = { Text(stringResource(R.string.depth)) },
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
@@ -538,7 +536,7 @@ private fun EditPersonaDialog(
                         },
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Role") },
+                        label = { Text(stringResource(R.string.role)) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = roleExpanded) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -576,7 +574,7 @@ private fun EditPersonaDialog(
                         contentColor = MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text("Delete")
+                    Text(stringResource(R.string.delete))
                 }
                 Spacer(Modifier.width(8.dp))
                 Button(
@@ -589,7 +587,7 @@ private fun EditPersonaDialog(
                             strokeWidth = 2.dp
                         )
                     } else {
-                        Text("Save")
+                        Text(stringResource(R.string.save))
                     }
                 }
             }
@@ -599,7 +597,7 @@ private fun EditPersonaDialog(
                 onClick = onDismiss,
                 enabled = !isSaving
             ) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -650,7 +648,7 @@ private fun CreatePersonaDialog(
 
     AlertDialog(
         onDismissRequest = { if (!isSaving && !isGenerating) onDismiss() },
-        title = { Text("Create Persona") },
+        title = { Text(stringResource(R.string.create_persona)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -663,12 +661,12 @@ private fun CreatePersonaDialog(
                         Tab(
                             selected = selectedTab == 0,
                             onClick = { selectedTab = 0 },
-                            text = { Text("Select") }
+                            text = { Text(stringResource(R.string.select)) }
                         )
                         Tab(
                             selected = selectedTab == 1,
                             onClick = { selectedTab = 1 },
-                            text = { Text("Generate") }
+                            text = { Text(stringResource(R.string.generate)) }
                         )
                     }
                 }
@@ -712,7 +710,7 @@ private fun CreatePersonaDialog(
                             bitmap?.let {
                                 Image(
                                     bitmap = it.asImageBitmap(),
-                                    contentDescription = "Avatar",
+                                    contentDescription = stringResource(R.string.avatar),
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .clip(avatarShape),
@@ -726,12 +724,11 @@ private fun CreatePersonaDialog(
                             ) {
                                 Icon(
                                     Icons.Default.AddAPhoto,
-                                    contentDescription = "Select image",
+                                    contentDescription = stringResource(R.string.select_image),
                                     modifier = Modifier.size(32.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Text(
-                                    "Tap to select",
+                                Text(stringResource(R.string.tap_to_select),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -743,12 +740,11 @@ private fun CreatePersonaDialog(
                             ) {
                                 Icon(
                                     Icons.Default.AutoAwesome,
-                                    contentDescription = "Generate",
+                                    contentDescription = stringResource(R.string.generate),
                                     modifier = Modifier.size(32.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Text(
-                                    "Enter prompt below",
+                                Text(stringResource(R.string.enter_prompt_below),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -762,8 +758,8 @@ private fun CreatePersonaDialog(
                     OutlinedTextField(
                         value = generationPrompt,
                         onValueChange = onGenerationPromptChange,
-                        label = { Text("Generation Prompt") },
-                        placeholder = { Text("portrait of a person, detailed, high quality") },
+                        label = { Text(stringResource(R.string.generation_prompt)) },
+                        placeholder = { Text(stringResource(R.string.portrait_of_a_person_detailed_high_quality)) },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 2,
                         maxLines = 3,
@@ -779,7 +775,7 @@ private fun CreatePersonaDialog(
                                 onClick = onCancelGeneration,
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text("Cancel")
+                                Text(stringResource(R.string.cancel))
                             }
                         } else {
                             Button(
@@ -793,7 +789,7 @@ private fun CreatePersonaDialog(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(Modifier.width(8.dp))
-                                Text("Generate")
+                                Text(stringResource(R.string.generate))
                             }
                         }
                     }
@@ -802,7 +798,7 @@ private fun CreatePersonaDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = onNameChange,
-                    label = { Text("Name") },
+                    label = { Text(stringResource(R.string.name)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     enabled = !isGenerating
@@ -811,8 +807,8 @@ private fun CreatePersonaDialog(
                 OutlinedTextField(
                     value = description,
                     onValueChange = onDescriptionChange,
-                    label = { Text("Description (optional)") },
-                    placeholder = { Text("Describe how {{user}} speaks, behaves, or should be portrayed in the story...") },
+                    label = { Text(stringResource(R.string.description_optional)) },
+                    placeholder = { Text(stringResource(R.string.describe_how_user_speaks_behaves_or_should_be)) },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2,
                     maxLines = 3,
@@ -831,7 +827,7 @@ private fun CreatePersonaDialog(
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("Create")
+                    Text(stringResource(R.string.create))
                 }
             }
         },
@@ -840,7 +836,7 @@ private fun CreatePersonaDialog(
                 onClick = onDismiss,
                 enabled = !isSaving && !isGenerating
             ) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )

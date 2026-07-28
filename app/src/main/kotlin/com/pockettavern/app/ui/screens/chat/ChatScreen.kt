@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.chat
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
@@ -215,7 +217,7 @@ fun ChatScreen(
                                     )
                                 }
                             }
-                        } ?: Text("Loading...")
+                        } ?: Text(stringResource(R.string.loading))
                     }
                 },
                 navigationIcon = {
@@ -239,7 +241,7 @@ fun ChatScreen(
                             onDismissRequest = { showSettingsMenu = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Chat History") },
+                                text = { Text(stringResource(R.string.chat_history)) },
                                 onClick = {
                                     showSettingsMenu = false
                                     viewModel.showChatSelector()
@@ -247,7 +249,7 @@ fun ChatScreen(
                                 leadingIcon = { Icon(Icons.Default.History, null) }
                             )
                             DropdownMenuItem(
-                                text = { Text("New Chat") },
+                                text = { Text(stringResource(R.string.new_chat)) },
                                 onClick = {
                                     showSettingsMenu = false
                                     viewModel.createNewChat()
@@ -255,7 +257,7 @@ fun ChatScreen(
                                 leadingIcon = { Icon(Icons.Default.Add, null) }
                             )
                             DropdownMenuItem(
-                                text = { Text("Export Chat") },
+                                text = { Text(stringResource(R.string.export_chat)) },
                                 onClick = {
                                     showSettingsMenu = false
                                     val charName = uiState.character?.name ?: "chat"
@@ -266,7 +268,7 @@ fun ChatScreen(
                             )
                             HorizontalDivider()
                             DropdownMenuItem(
-                                text = { Text("Character Settings") },
+                                text = { Text(stringResource(R.string.character_settings)) },
                                 onClick = {
                                     showSettingsMenu = false
                                     onNavigateToCharacterSettings(characterAvatar)
@@ -274,7 +276,7 @@ fun ChatScreen(
                                 leadingIcon = { Icon(Icons.Default.Tune, null) }
                             )
                             DropdownMenuItem(
-                                text = { Text("Edit Character") },
+                                text = { Text(stringResource(R.string.edit_character)) },
                                 onClick = {
                                     showSettingsMenu = false
                                     onNavigateToEditCharacter(characterAvatar)
@@ -283,7 +285,7 @@ fun ChatScreen(
                             )
                             HorizontalDivider()
                             DropdownMenuItem(
-                                text = { Text("Upload Background") },
+                                text = { Text(stringResource(R.string.upload_background)) },
                                 onClick = {
                                     showSettingsMenu = false
                                     backgroundPickerLauncher.launch("image/*")
@@ -292,7 +294,7 @@ fun ChatScreen(
                             )
                             if (uiState.backgroundPath != null) {
                                 DropdownMenuItem(
-                                    text = { Text("Clear Background") },
+                                    text = { Text(stringResource(R.string.clear_background)) },
                                     onClick = {
                                         showSettingsMenu = false
                                         viewModel.clearBackground()
@@ -301,7 +303,7 @@ fun ChatScreen(
                                 )
                             }
                             DropdownMenuItem(
-                                text = { Text("Change Model") },
+                                text = { Text(stringResource(R.string.change_model)) },
                                 onClick = {
                                     showSettingsMenu = false
                                     viewModel.showModelPicker()
@@ -309,7 +311,7 @@ fun ChatScreen(
                                 leadingIcon = { Icon(Icons.Default.AutoAwesome, null) }
                             )
                             DropdownMenuItem(
-                                text = { Text("Image Gallery") },
+                                text = { Text(stringResource(R.string.image_gallery)) },
                                 onClick = {
                                     showSettingsMenu = false
                                     viewModel.showGallery()
@@ -328,7 +330,7 @@ fun ChatScreen(
                                 )
                             }
                             DropdownMenuItem(
-                                text = { Text("Debug Log") },
+                                text = { Text(stringResource(R.string.debug_log)) },
                                 onClick = {
                                     showSettingsMenu = false
                                     onNavigateToDebugLog()
@@ -337,7 +339,7 @@ fun ChatScreen(
                             )
                             HorizontalDivider()
                             DropdownMenuItem(
-                                text = { Text("Delete Chat") },
+                                text = { Text(stringResource(R.string.delete_chat_3)) },
                                 onClick = {
                                     showSettingsMenu = false
                                     viewModel.showDeleteDialog()
@@ -345,7 +347,7 @@ fun ChatScreen(
                                 leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }
                             )
                             DropdownMenuItem(
-                                text = { Text("Delete Character") },
+                                text = { Text(stringResource(R.string.delete_character)) },
                                 onClick = {
                                     showSettingsMenu = false
                                     showDeleteCharacterDialog = true
@@ -378,7 +380,7 @@ fun ChatScreen(
                                 value = uiState.searchQuery,
                                 onValueChange = { viewModel.updateSearchQuery(it) },
                                 modifier = Modifier.weight(1f),
-                                placeholder = { Text("Search messages...") },
+                                placeholder = { Text(stringResource(R.string.search_messages)) },
                                 singleLine = true,
                                 colors = TextFieldDefaults.colors(
                                     focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -472,7 +474,7 @@ fun ChatScreen(
                         ) {
                             Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Stop")
+                            Text(stringResource(R.string.stop))
                         }
                     }
                 } else if (uiState.messages.isNotEmpty() && uiState.messages.last().isUser.not() && !uiState.messages.last().isNarrator) {
@@ -488,14 +490,14 @@ fun ChatScreen(
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Regenerate")
+                            Text(stringResource(R.string.regenerate))
                         }
                         OutlinedButton(
                             onClick = { viewModel.continueGeneration() }
                         ) {
                             Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Continue")
+                            Text(stringResource(R.string.action_continue))
                         }
                     }
                 }
@@ -543,7 +545,7 @@ fun ChatScreen(
             uiState.backgroundPath?.let { path ->
                 AsyncImage(
                     model = File(path),
-                    contentDescription = "Chat background",
+                    contentDescription = stringResource(R.string.chat_background),
                     modifier = Modifier
                         .fillMaxSize()
                         .alpha(0.3f),
@@ -566,8 +568,7 @@ fun ChatScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "Start a conversation",
+                        Text(text = stringResource(R.string.start_a_conversation),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -855,12 +856,11 @@ private fun ChatSelectorDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Chat History") },
+        title = { Text(stringResource(R.string.chat_history)) },
         text = {
             Column {
                 if (chats.isEmpty()) {
-                    Text(
-                        text = "No chat history",
+                    Text(text = stringResource(R.string.no_chat_history),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -918,12 +918,12 @@ private fun ChatSelectorDialog(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("New Chat")
+                Text(stringResource(R.string.new_chat))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -1095,7 +1095,7 @@ private fun MessageActionsDialog(
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text("Save Image")
+                        Text(stringResource(R.string.save_image))
                         Spacer(modifier = Modifier.weight(1f))
                     }
 
@@ -1111,7 +1111,7 @@ private fun MessageActionsDialog(
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text("Delete Image", color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.delete_image), color = MaterialTheme.colorScheme.error)
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 } else {
@@ -1126,7 +1126,7 @@ private fun MessageActionsDialog(
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text("Edit Message")
+                    Text(stringResource(R.string.edit_message))
                     Spacer(modifier = Modifier.weight(1f))
                 }
 
@@ -1142,7 +1142,7 @@ private fun MessageActionsDialog(
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text("Delete Message", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.delete_message), color = MaterialTheme.colorScheme.error)
                     Spacer(modifier = Modifier.weight(1f))
                 }
 
@@ -1158,7 +1158,7 @@ private fun MessageActionsDialog(
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text("Delete From Here", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.delete_from_here), color = MaterialTheme.colorScheme.error)
                     Spacer(modifier = Modifier.weight(1f))
                 }
 
@@ -1173,7 +1173,7 @@ private fun MessageActionsDialog(
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text("Fork From Here")
+                    Text(stringResource(R.string.fork_from_here))
                     Spacer(modifier = Modifier.weight(1f))
                 }
 
@@ -1190,7 +1190,7 @@ private fun MessageActionsDialog(
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text("Regenerate", color = MaterialTheme.colorScheme.primary)
+                        Text(stringResource(R.string.regenerate), color = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
@@ -1209,7 +1209,7 @@ private fun MessageActionsDialog(
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text("Stop TTS", color = MaterialTheme.colorScheme.error)
+                            Text(stringResource(R.string.stop_tts), color = MaterialTheme.colorScheme.error)
                             Spacer(modifier = Modifier.weight(1f))
                         }
                     } else {
@@ -1223,7 +1223,7 @@ private fun MessageActionsDialog(
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text("Play TTS")
+                            Text(stringResource(R.string.play_tts))
                             Spacer(modifier = Modifier.weight(1f))
                         }
                     }
@@ -1255,7 +1255,7 @@ private fun MessageActionsDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -1270,7 +1270,7 @@ private fun EditMessageDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit Message") },
+        title = { Text(stringResource(R.string.edit_message)) },
         text = {
             OutlinedTextField(
                 value = messageText,
@@ -1289,12 +1289,12 @@ private fun EditMessageDialog(
             ) {
                 Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Save")
+                Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -1319,7 +1319,7 @@ private fun SwipeIndicator(
         ) {
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                contentDescription = "Previous",
+                contentDescription = stringResource(R.string.previous),
                 modifier = Modifier.size(18.dp),
                 tint = if (currentSwipe > 1) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
             )
@@ -1353,7 +1353,7 @@ private fun GreetingPickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Select Greeting") },
+        title = { Text(stringResource(R.string.select_greeting)) },
         text = {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -1391,7 +1391,7 @@ private fun GreetingPickerDialog(
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -1409,7 +1409,7 @@ private fun GenerateFirstMessageDialog(
 ) {
     AlertDialog(
         onDismissRequest = onSkip,
-        title = { Text("No Opening Message") },
+        title = { Text(stringResource(R.string.no_opening_message)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
@@ -1454,18 +1454,18 @@ private fun GenerateFirstMessageDialog(
         confirmButton = {
             when {
                 generatedText.isNotBlank() && !isGenerating -> {
-                    TextButton(onClick = onConfirm) { Text("Use This") }
+                    TextButton(onClick = onConfirm) { Text(stringResource(R.string.use_this)) }
                 }
                 !isGenerating -> {
-                    TextButton(onClick = onGenerate) { Text("Generate") }
+                    TextButton(onClick = onGenerate) { Text(stringResource(R.string.generate)) }
                 }
                 else -> {
-                    TextButton(onClick = {}, enabled = false) { Text("Generating…") }
+                    TextButton(onClick = {}, enabled = false) { Text(stringResource(R.string.generating)) }
                 }
             }
         },
         dismissButton = {
-            TextButton(onClick = onSkip) { Text("Skip") }
+            TextButton(onClick = onSkip) { Text(stringResource(R.string.skip)) }
         }
     )
 }
@@ -1479,23 +1479,23 @@ private fun RenameChatDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Rename Chat") },
+        title = { Text(stringResource(R.string.rename_chat)) },
         text = {
             OutlinedTextField(
                 value = currentInput,
                 onValueChange = onInputChange,
-                label = { Text("New name") },
+                label = { Text(stringResource(R.string.new_name)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
         },
         confirmButton = {
             TextButton(onClick = onConfirm, enabled = currentInput.isNotBlank()) {
-                Text("Rename")
+                Text(stringResource(R.string.rename))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }
@@ -1596,11 +1596,11 @@ private fun ExtensionEditDialog(
         },
         confirmButton = {
             TextButton(onClick = { onSave(fieldValues.toMap()) }) {
-                Text("Save")
+                Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }
@@ -1615,14 +1615,14 @@ private fun ModelPickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Change Model") },
+        title = { Text(stringResource(R.string.change_model)) },
         text = {
             if (isLoading) {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             } else if (models.isEmpty()) {
-                Text("No models available. Check API URL, API key, and Debug Log.")
+                Text(stringResource(R.string.no_models_available_check_api_url_api_key_and))
             } else {
                 LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
                     items(models) { model ->
@@ -1652,7 +1652,7 @@ private fun ModelPickerDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }
@@ -1667,10 +1667,10 @@ private fun ImageGalleryDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Image Gallery") },
+        title = { Text(stringResource(R.string.image_gallery)) },
         text = {
             if (images.isEmpty()) {
-                Text("No images yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.no_images_yet), color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
@@ -1689,7 +1689,7 @@ private fun ImageGalleryDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
         }
     )
 }
@@ -1745,7 +1745,7 @@ private fun GalleryThumbnail(
         // Context menu
         DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
             DropdownMenuItem(
-                text = { Text("Save to Device") },
+                text = { Text(stringResource(R.string.save_to_device)) },
                 onClick = {
                     showMenu = false
                     onSave()
@@ -1753,7 +1753,7 @@ private fun GalleryThumbnail(
                 leadingIcon = { Icon(Icons.Default.Save, null) }
             )
             DropdownMenuItem(
-                text = { Text("Delete") },
+                text = { Text(stringResource(R.string.delete)) },
                 onClick = {
                     showMenu = false
                     onDelete()

@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.components
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -100,7 +102,7 @@ fun ChatBubble(
                                 ) {
                                     Icon(
                                         Icons.Default.MoreVert,
-                                        contentDescription = "Image actions",
+                                        contentDescription = stringResource(R.string.image_actions),
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -303,8 +305,7 @@ fun ChatBubble(
                             color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Reasoning",
+                        Text(text = stringResource(R.string.reasoning),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -476,8 +477,7 @@ fun StreamingThinkingBubble(
                     color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "Reasoning...",
+                Text(text = stringResource(R.string.reasoning_2),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -602,7 +602,7 @@ private data class MarkdownSegment(
 )
 
 @Composable
-private fun formatMessage(text: String): AnnotatedString {
+internal fun formatMessage(text: String): AnnotatedString {
     val segments = parseMarkdown(text)
     val ptColors = LocalPocketTavernColors.current
 

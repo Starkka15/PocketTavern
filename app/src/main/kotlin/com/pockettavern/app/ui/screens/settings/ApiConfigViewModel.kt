@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.pockettavern.app.data.remote.dto.st.ChatCompletionSources
 import com.pockettavern.app.data.remote.dto.st.MainApiTypes
 import com.pockettavern.app.data.remote.dto.st.TextGenTypes
+import com.pockettavern.app.data.local.inference.OnDeviceModelManager
 import com.pockettavern.app.data.repository.LocalRepository
 import com.pockettavern.app.data.repository.LlmRepository
 import com.pockettavern.app.domain.model.ApiConfiguration
@@ -28,13 +29,18 @@ data class ApiConfigUiState(
     val isLoadingModels: Boolean = false,
     val isSaving: Boolean = false,
     val error: String? = null,
-    val saveSuccess: Boolean = false
+    val saveSuccess: Boolean = false,
+    // On-device model download
+    val isDownloading: Boolean = false,
+    val downloadProgress: Float? = null,   // 0f..1f, or null when size unknown
+    val downloadStatus: String? = null
 )
 
 @HiltViewModel
 class ApiConfigViewModel @Inject constructor(
     private val localRepository: LocalRepository,
-    private val llmRepository: LlmRepository
+    private val llmRepository: LlmRepository,
+    private val onDeviceModels: OnDeviceModelManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ApiConfigUiState())
@@ -156,6 +162,66 @@ class ApiConfigViewModel @Inject constructor(
         }
     }
 
+    // ── On-device (LiteRT-LM) model management ───────────────────────────────
+
+    /** Derive a model id (filename minus extension) from a download URL. */
+    private fun modelIdFromUrl(url: String): String =
+        url.substringAfterLast('/').substringBefore('?')
+            .removeSuffix(".litertlm").removeSuffix(".task").removeSuffix(".gguf").ifBlank { "model" }
+
+    fun downloadOnDeviceModel(url: String, token: String?) {
+        val trimmed = url.trim()
+        if (trimmed.isBlank()) {
+            _uiState.update { it.copy(downloadStatus = "Enter a model URL") }
+            return
+        }
+        val modelId = modelIdFromUrl(trimmed)
+        viewModelScope.launch {
+            _uiState.update { it.copy(isDownloading = true, downloadProgress = null, downloadStatus = "Starting…", error = null) }
+            onDeviceModels.download(trimmed, token?.ifBlank { null }).collect { p ->
+                when (p) {
+                    is OnDeviceModelManager.Progress.Downloading -> {
+                        val frac = if (p.totalBytes > 0) p.bytesDownloaded.toFloat() / p.totalBytes else null
+                        val mb = p.bytesDownloaded / (1024 * 1024)
+                        val totalMb = if (p.totalBytes > 0) "/${p.totalBytes / (1024 * 1024)}MB" else ""
+                        _uiState.update { it.copy(downloadProgress = frac, downloadStatus = "Downloading ${mb}MB$totalMb") }
+                    }
+                    is OnDeviceModelManager.Progress.Done -> {
+                        _uiState.update {
+                            it.copy(
+                                isDownloading = false, downloadProgress = null,
+                                downloadStatus = "Downloaded: $modelId",
+                                config = it.config.copy(currentModel = modelId)
+                            )
+                        }
+                        fetchModels()
+                    }
+                    is OnDeviceModelManager.Progress.Error -> {
+                        _uiState.update { it.copy(isDownloading = false, downloadProgress = null, downloadStatus = "Failed: ${p.message}") }
+                    }
+                }
+            }
+        }
+    }
+
+    fun deleteOnDeviceModel(modelId: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { onDeviceModels.delete(modelId) }
+            val current = _uiState.value.config.currentModel
+            _uiState.update {
+                it.copy(
+                    downloadStatus = "Deleted: $modelId",
+                    config = if (current == modelId) it.config.copy(currentModel = "") else it.config
+                )
+            }
+            fetchModels()
+        }
+    }
+
+    fun clearDownloadStatus() {
+        _uiState.update { it.copy(downloadStatus = null) }
+    }
+
     fun clearError() {
         _uiState.update { it.copy(error = null) }
     }
@@ -168,4 +234,13 @@ class ApiConfigViewModel @Inject constructor(
     val mainApiOptions: List<Pair<String, String>> = MainApiTypes.all
     val textGenTypeOptions: List<Pair<String, String>> = TextGenTypes.all
     val chatCompletionSourceOptions: List<Pair<String, String>> = ChatCompletionSources.all
+    /** Device summary (RAM · cores) for the on-device expectations notice. */
+    val deviceSummary: String get() = onDeviceModels.deviceSummary
+
+    /** Catalog for the selected on-device source: GGUF list for llama.cpp, else the LiteRT-LM list. */
+    fun catalogFor(source: String): List<com.pockettavern.app.data.local.inference.CatalogModel> =
+        if (source.equals("ondevice-gguf", ignoreCase = true))
+            com.pockettavern.app.data.local.inference.OnDeviceModelCatalog.ggufModels
+        else
+            com.pockettavern.app.data.local.inference.OnDeviceModelCatalog.models
 }

@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.groups
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -45,18 +47,18 @@ fun GroupsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Groups") },
+                title = { Text(stringResource(R.string.groups)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.loadGroups() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
                     }
                     IconButton(onClick = { viewModel.showCreateDialog() }) {
-                        Icon(Icons.Default.Add, contentDescription = "Create Group")
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.create_group))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -70,7 +72,7 @@ fun GroupsScreen(
                 onClick = { viewModel.showCreateDialog() },
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Create Group", tint = Color.White)
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.create_group), tint = Color.White)
             }
         }
     ) { padding ->
@@ -101,14 +103,12 @@ fun GroupsScreen(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            "No groups yet",
+                        Text(stringResource(R.string.no_groups_yet),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "Create a group to chat with multiple characters at once",
+                        Text(stringResource(R.string.create_a_group_to_chat_with_multiple_characte),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
@@ -224,7 +224,7 @@ private fun GroupCard(
             if (group.favorite) {
                 Icon(
                     Icons.Default.Groups,
-                    contentDescription = "Favorite",
+                    contentDescription = stringResource(R.string.favorite),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
@@ -249,13 +249,13 @@ private fun CreateGroupDialog(
     val avatarShape = LocalPocketTavernColors.current.avatarShape.toShape()
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Create Group") },
+        title = { Text(stringResource(R.string.create_group)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = groupName,
                     onValueChange = onGroupNameChange,
-                    label = { Text("Group Name") },
+                    label = { Text(stringResource(R.string.group_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -266,8 +266,7 @@ private fun CreateGroupDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text(
-                    "Select Members (at least 2)",
+                Text(stringResource(R.string.select_members_at_least_2),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -317,7 +316,7 @@ private fun CreateGroupDialog(
                                 if (isSelected) {
                                     Icon(
                                         Icons.Default.Check,
-                                        contentDescription = "Selected",
+                                        contentDescription = stringResource(R.string.selected),
                                         tint = MaterialTheme.colorScheme.primary
                                     )
                                 }
@@ -347,13 +346,13 @@ private fun CreateGroupDialog(
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("Create", color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.create), color = MaterialTheme.colorScheme.primary)
                 }
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
         containerColor = MaterialTheme.colorScheme.background,

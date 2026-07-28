@@ -277,6 +277,11 @@ class GroupChatViewModel @Inject constructor(
 
     // ── Generation ────────────────────────────────────────────────────────────
 
+
+    /** Response-language directive from the app language setting (null = English). */
+    private val langDirective: String?
+        get() = com.pockettavern.app.util.LocaleHelper.responseLanguageDirective(context)
+
     private suspend fun generateResponses(group: Group, history: List<GroupChatMessage>) {
         val enabled = group.enabledMembers
         if (enabled.isEmpty()) return
@@ -477,6 +482,7 @@ class GroupChatViewModel @Inject constructor(
         append("### RULE: You are ${character.name}. You ONLY write ${character.name}'s words and actions. ")
         append("$personaName is the human user — NEVER write their dialogue, thoughts, feelings, or reactions. ")
         append("Stop writing the moment ${character.name}'s turn ends. ###\n\n")
+        langDirective?.let { append("$it\n\n") }
         append("[character(\"${character.name}\")\n")
         if (character.description.isNotBlank()) append("description: ${character.description.take(3000)}\n")
         if (character.personality.isNotBlank()) append("personality: ${character.personality.take(1200)}\n")
@@ -644,6 +650,7 @@ class GroupChatViewModel @Inject constructor(
         hint: String? = null
     ): String = buildString {
         append("You are a neutral narrator describing a scene.\n\n")
+        langDirective?.let { append("$it\n\n") }
         append("Characters present:\n")
         for (char in characters) {
             append("- ${char.name}")
@@ -750,6 +757,7 @@ class GroupChatViewModel @Inject constructor(
         others: List<Character>,
         priorMessages: List<GroupChatMessage>
     ): String = buildString {
+        langDirective?.let { append("$it\n\n") }
         append("[character(\"${character.name}\")\n")
         if (character.description.isNotBlank()) append("description: ${character.description.take(3000)}\n")
         if (character.personality.isNotBlank()) append("personality: ${character.personality.take(1200)}\n")
@@ -1005,6 +1013,7 @@ No preamble, no explanation. Just the numbered list."""
             append("You are ${character.name}. You ONLY write ${character.name}'s words and actions. ")
             append("$personaName is the human user — NEVER write their dialogue, thoughts, feelings, or reactions. ")
             append("Stop writing the moment ${character.name}'s turn ends.\n\n")
+            langDirective?.let { append("$it\n\n") }
 
             append("[Character: ${character.name}]\n")
             if (character.description.isNotBlank()) append("description: ${character.description.take(3000)}\n")

@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.worldinfo
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -72,11 +74,11 @@ fun WorldInfoScreen(
         floatingActionButton = {
             if (uiState.selectedLorebook == null) {
                 FloatingActionButton(onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) }) {
-                    Icon(Icons.Default.FileOpen, contentDescription = "Import lorebook")
+                    Icon(Icons.Default.FileOpen, contentDescription = stringResource(R.string.import_lorebook))
                 }
             } else {
                 FloatingActionButton(onClick = { viewModel.addNewEntry() }) {
-                    Icon(Icons.Default.Add, contentDescription = "Add entry")
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_entry))
                 }
             }
         },
@@ -139,15 +141,15 @@ fun WorldInfoScreen(
     uiState.deleteLorebookConfirm?.let { name ->
         AlertDialog(
             onDismissRequest = { viewModel.dismissDeleteLorebook() },
-            title = { Text("Delete Lorebook") },
-            text = { Text("Delete \"$name\"? This cannot be undone.") },
+            title = { Text(stringResource(R.string.delete_lorebook)) },
+            text = { Text(stringResource(R.string.delete_named_confirm, name)) },
             confirmButton = {
                 TextButton(onClick = { viewModel.confirmDeleteLorebook() }) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.dismissDeleteLorebook() }) { Text("Cancel") }
+                TextButton(onClick = { viewModel.dismissDeleteLorebook() }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -186,13 +188,11 @@ private fun LorebookList(
                     modifier = Modifier.size(64.dp),
                     tint = MaterialTheme.colorScheme.outline
                 )
-                Text(
-                    "No lorebooks found",
+                Text(stringResource(R.string.no_lorebooks_found),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Text(
-                    "Import a JSON lorebook or create one in SillyTavern",
+                Text(stringResource(R.string.import_a_json_lorebook_or_create_one_in_silly),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -242,8 +242,7 @@ private fun LorebookCard(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Text(
-                    text = "Tap to view entries",
+                Text(text = stringResource(R.string.tap_to_view_entries),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -251,7 +250,7 @@ private fun LorebookCard(
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Default.Delete,
-                    contentDescription = "Delete lorebook",
+                    contentDescription = stringResource(R.string.delete_lorebook_2),
                     tint = MaterialTheme.colorScheme.error
                 )
             }
@@ -289,13 +288,11 @@ private fun WorldInfoEntriesList(
                     modifier = Modifier.size(64.dp),
                     tint = MaterialTheme.colorScheme.outline
                 )
-                Text(
-                    "No entries yet",
+                Text(stringResource(R.string.no_entries_yet),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Text(
-                    "Tap + to add an entry",
+                Text(stringResource(R.string.tap_to_add_an_entry),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -477,7 +474,7 @@ private fun WorldInfoEntryCard(
                         ) {
                             Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Edit", style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(R.string.edit), style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
@@ -517,27 +514,27 @@ private fun WorldInfoEntryEditDialog(
                 OutlinedTextField(
                     value = comment,
                     onValueChange = { comment = it },
-                    label = { Text("Name / Comment") },
+                    label = { Text(stringResource(R.string.name_comment)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
                 OutlinedTextField(
                     value = primaryKeys,
                     onValueChange = { primaryKeys = it },
-                    label = { Text("Primary Keys (comma-separated)") },
+                    label = { Text(stringResource(R.string.primary_keys_comma_separated)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = selective, onCheckedChange = { selective = it })
                     Spacer(Modifier.width(8.dp))
-                    Text("Selective (AND with secondary keys)", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.selective_and_with_secondary_keys), style = MaterialTheme.typography.bodyMedium)
                 }
                 if (selective) {
                     OutlinedTextField(
                         value = secondaryKeys,
                         onValueChange = { secondaryKeys = it },
-                        label = { Text("Secondary Keys (comma-separated)") },
+                        label = { Text(stringResource(R.string.secondary_keys_comma_separated)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -545,24 +542,24 @@ private fun WorldInfoEntryEditDialog(
                 OutlinedTextField(
                     value = content,
                     onValueChange = { content = it },
-                    label = { Text("Content") },
+                    label = { Text(stringResource(R.string.content)) },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
                     minLines = 4
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = constant, onCheckedChange = { constant = it })
                     Spacer(Modifier.width(8.dp))
-                    Text("Constant (always inject)", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.constant_always_inject), style = MaterialTheme.typography.bodyMedium)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = enabled, onCheckedChange = { enabled = it })
                     Spacer(Modifier.width(8.dp))
-                    Text("Enabled", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.enabled), style = MaterialTheme.typography.bodyMedium)
                 }
                 OutlinedTextField(
                     value = orderText,
                     onValueChange = { orderText = it.filter { c -> c.isDigit() } },
-                    label = { Text("Order") },
+                    label = { Text(stringResource(R.string.order)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -574,7 +571,7 @@ private fun WorldInfoEntryEditDialog(
                 ) {
                     Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Delete Entry")
+                    Text(stringResource(R.string.delete_entry))
                 }
             }
         },
@@ -592,25 +589,25 @@ private fun WorldInfoEntryEditDialog(
                         order = orderText.toIntOrNull() ?: entry.order
                     )
                 )
-            }) { Text("Save") }
+            }) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete Entry") },
-            text = { Text("Delete \"${entry.comment.ifBlank { "this entry" }}\"? This cannot be undone.") },
+            title = { Text(stringResource(R.string.delete_entry)) },
+            text = { Text(stringResource(R.string.delete_named_confirm, entry.comment.ifBlank { stringResource(R.string.this_entry) })) },
             confirmButton = {
                 TextButton(onClick = { onDelete() }) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }

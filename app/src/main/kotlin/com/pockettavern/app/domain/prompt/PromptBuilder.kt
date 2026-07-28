@@ -27,7 +27,16 @@ class PromptBuilder(
     private val mainPromptOverride: String = "",  // OAI preset's main_prompt, takes priority over sysprompt preset
     private val extensionInjections: List<String> = emptyList(),
     private val memoryBlock: String = "",
-    private val worldBook: String = ""
+    private val worldBook: String = "",
+    // LEAN MODE: only for PocketTavern's own fine-tuned models (name starts with "pockettavern").
+    // Those models have the format/rules/jailbreak baked into the weights, so we send a minimal
+    // system prompt (matching the training format) and SKIP the Chat Completion preset's prose
+    // blocks (main jailbreak, NSFW, utility, post-history). Card definition + lorebook + persona +
+    // memory + history are all still sent. Defaults false → every other model is unaffected.
+    private val leanMode: Boolean = false,
+    // Non-null when the app language isn't English: directive telling the model
+    // to respond in that language (see LocaleHelper.responseLanguageDirective).
+    private val languageDirective: String? = null
 ) {
     private val instructTemplate = chatContext.instructTemplate
     // Combine global system prompt with character's custom system prompt.
@@ -45,6 +54,16 @@ class PromptBuilder(
     private var _buildHistory: List<ChatMessage> = emptyList()
     private var _buildNewMessage: String = ""
 
+    companion object {
+        // MUST stay byte-identical to PT_RULES in pockettavern-models/gen_dataset.py — the lean
+        // prompt at inference has to match what the PocketTavern models were trained on, or the
+        // baked-in behavior gets shaky. Update both together.
+        const val PT_LEAN_RULES =
+            "Stay fully in character. Write in third-person narrative prose. Never speak, act, or " +
+            "decide for {{user}}. Keep each reply focused (about 2-4 paragraphs) — never ramble or repeat. " +
+            "Explicit/NSFW content is allowed when the scene calls for it; never refuse or break character."
+    }
+
     init {
         // Strip ST comment macros before blank-testing the override so that
         // {{// Empty for the purposes of card override }} falls through correctly.
@@ -61,7 +80,13 @@ class PromptBuilder(
         DebugLogger.logKeyValue("Global system prompt", globalPrompt.take(120).ifBlank { "(empty)" })
         DebugLogger.logKeyValue("Character system prompt", characterPrompt.take(120).ifBlank { "(empty)" })
 
-        systemPrompt = buildString {
+        val basePrompt = if (leanMode) {
+            // PocketTavern model: minimal system matching the training format (gen_dataset.build_system).
+            // Character description/personality/scenario still arrive via their marker blocks below;
+            // here we only set identity + the baked rule line. Macros resolve at emit time.
+            DebugLogger.log("  [LEAN] using minimal PocketTavern system prompt")
+            "You are {{char}}.\n\n$PT_LEAN_RULES"
+        } else buildString {
             if (globalPrompt.isNotBlank()) {
                 append(globalPrompt)
             }
@@ -74,6 +99,11 @@ class PromptBuilder(
                 append(it)
             }
         }
+
+        // Language directive applies in both modes — appended last so it wins.
+        systemPrompt = if (languageDirective != null) {
+            if (basePrompt.isBlank()) languageDirective else "$basePrompt\n\n$languageDirective"
+        } else basePrompt
 
         DebugLogger.logKeyValue("Combined system prompt length", systemPrompt.length)
     }
@@ -197,6 +227,13 @@ class PromptBuilder(
                 DebugLogger.log("  [DEFER depth=${item.injectionDepth}] ${item.id} (${item.customLabel ?: ""})")
                 continue
             }
+            // LEAN MODE: drop the preset's prose injections (main jailbreak/NSFW/utility/etc.) —
+            // they're baked into the PocketTavern weights. Keep main_prompt (our minimal system)
+            // and all marker blocks (card desc/personality/scenario, world info, persona).
+            if (leanMode && !item.isMarker && item.id != "main_prompt") {
+                DebugLogger.log("  [LEAN skip preset] ${item.id} (${item.customLabel ?: ""})")
+                continue
+            }
             // Inject memory block immediately before char_description (T13)
             if (item.id == "char_description" && memoryBlock.isNotBlank()) {
                 messages.add(PromptMessage("system", "[Memory]\n$memoryBlock"))
@@ -274,6 +311,11 @@ class PromptBuilder(
             }
             if (item.injectionPosition == 1) {
                 DebugLogger.log("  [DEFER depth=${item.injectionDepth}] ${item.id} (${item.customLabel ?: ""})")
+                continue
+            }
+            // LEAN MODE: drop post-history preset prose (post_history_instructions etc.) — baked in.
+            if (leanMode && !item.isMarker && item.id != "main_prompt") {
+                DebugLogger.log("  [LEAN skip preset] ${item.id} (${item.customLabel ?: ""})")
                 continue
             }
             val content = blockContent(item)

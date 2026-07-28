@@ -67,6 +67,13 @@ sealed class Route {
     @Serializable
     data object CreateGroup : Route()
 
+    // Stories (native ensemble) — own 3rd category (V10)
+    @Serializable
+    data object Stories : Route()
+
+    @Serializable
+    data class StoryChat(val storyId: String) : Route()
+
     @Serializable
     data object StImport : Route()
 

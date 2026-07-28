@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.profile
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -57,7 +59,7 @@ fun ProfileScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Profile") },
+                title = { Text(stringResource(R.string.profile)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -98,7 +100,7 @@ fun ProfileScreen(
                 ) {
                     Icon(
                         Icons.Default.Person,
-                        contentDescription = "Avatar",
+                        contentDescription = stringResource(R.string.avatar),
                         modifier = Modifier.size(60.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -125,8 +127,7 @@ fun ProfileScreen(
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
                             shape = MaterialTheme.shapes.small
                         ) {
-                            Text(
-                                text = "Admin",
+                            Text(text = stringResource(R.string.admin),
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary
@@ -147,7 +148,7 @@ fun ProfileScreen(
                 ) {
                     Icon(Icons.Default.Lock, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Change Password")
+                    Text(stringResource(R.string.change_password))
                 }
 
                 // Logout Button
@@ -160,13 +161,12 @@ fun ProfileScreen(
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Logout")
+                    Text(stringResource(R.string.logout))
                 }
 
                 // Success message for password change
                 if (uiState.passwordChangeSuccess) {
-                    Text(
-                        text = "Password changed successfully!",
+                    Text(text = stringResource(R.string.password_changed_successfully),
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -236,7 +236,7 @@ private fun PasswordChangeDialog(
 
     AlertDialog(
         onDismissRequest = { if (!isLoading) onDismiss() },
-        title = { Text("Change Password") },
+        title = { Text(stringResource(R.string.change_password)) },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -244,7 +244,7 @@ private fun PasswordChangeDialog(
                 OutlinedTextField(
                     value = oldPassword,
                     onValueChange = onOldPasswordChange,
-                    label = { Text("Current Password (optional)") },
+                    label = { Text(stringResource(R.string.current_password_optional)) },
                     singleLine = true,
                     visualTransformation = if (showOldPassword) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
@@ -263,7 +263,7 @@ private fun PasswordChangeDialog(
                 OutlinedTextField(
                     value = newPassword,
                     onValueChange = onNewPasswordChange,
-                    label = { Text("New Password") },
+                    label = { Text(stringResource(R.string.new_password)) },
                     singleLine = true,
                     visualTransformation = if (showNewPassword) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
@@ -282,7 +282,7 @@ private fun PasswordChangeDialog(
                 OutlinedTextField(
                     value = confirmPassword,
                     onValueChange = onConfirmPasswordChange,
-                    label = { Text("Confirm Password") },
+                    label = { Text(stringResource(R.string.confirm_password)) },
                     singleLine = true,
                     visualTransformation = if (showConfirmPassword) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
@@ -318,7 +318,7 @@ private fun PasswordChangeDialog(
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("Change")
+                    Text(stringResource(R.string.change))
                 }
             }
         },
@@ -327,7 +327,7 @@ private fun PasswordChangeDialog(
                 onClick = onDismiss,
                 enabled = !isLoading
             ) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )

@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.extensions
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -58,10 +60,10 @@ fun ExtensionsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Extensions") },
+                title = { Text(stringResource(R.string.extensions)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
@@ -76,8 +78,7 @@ fun ExtensionsScreen(
         ) {
             // ── Native Extensions ─────────────────────────────────────────────
             item {
-                Text(
-                    text = "Native Extensions",
+                Text(text = stringResource(R.string.native_extensions),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 4.dp)
@@ -121,14 +122,13 @@ fun ExtensionsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "JavaScript Extensions",
+                    Text(text = stringResource(R.string.javascript_extensions),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.weight(1f)
                     )
                     FilledTonalIconButton(onClick = { showInstallDialog = true }) {
-                        Icon(Icons.Default.Add, contentDescription = "Install extension")
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.install_extension_2))
                     }
                 }
             }
@@ -169,8 +169,7 @@ fun ExtensionsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Card Extensions",
+                    Text(text = stringResource(R.string.card_extensions),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.weight(1f)
@@ -187,8 +186,7 @@ fun ExtensionsScreen(
                             modifier = Modifier.fillMaxWidth().padding(24.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = "No character cards with embedded scripts found.",
+                            Text(text = stringResource(R.string.no_character_cards_with_embedded_scripts_foun),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -270,7 +268,7 @@ private fun ExtensionCard(
                     onClick = onSettingsClick,
                     modifier = Modifier.align(Alignment.End)
                 ) {
-                    Text("Settings")
+                    Text(stringResource(R.string.settings))
                     Spacer(modifier = Modifier.width(4.dp))
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowForward,
@@ -455,7 +453,7 @@ private fun JsExtensionCard(
                 ) {
                     Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Uninstall")
+                    Text(stringResource(R.string.uninstall))
                 }
             }
         }
@@ -464,15 +462,15 @@ private fun JsExtensionCard(
     if (showUninstallDialog) {
         AlertDialog(
             onDismissRequest = { showUninstallDialog = false },
-            title = { Text("Uninstall ${ext.name}?") },
-            text = { Text("This will permanently delete the extension files.") },
+            title = { Text(stringResource(R.string.uninstall_named, ext.name)) },
+            text = { Text(stringResource(R.string.this_will_permanently_delete_the_extension_fi)) },
             confirmButton = {
                 TextButton(onClick = { showUninstallDialog = false; onUninstall() }) {
-                    Text("Uninstall", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.uninstall), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showUninstallDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showUninstallDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -511,8 +509,7 @@ private fun CardExtensionCard(
                             color = MaterialTheme.colorScheme.primaryContainer,
                             shape = MaterialTheme.shapes.small
                         ) {
-                            Text(
-                                "Active",
+                            Text(stringResource(R.string.active_2),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -556,20 +553,19 @@ private fun InstallExtensionDialog(
 
     AlertDialog(
         onDismissRequest = { if (!isInstalling) onDismiss() },
-        title = { Text("Install Extension") },
+        title = { Text(stringResource(R.string.install_extension)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 // URL install
-                Text(
-                    "From URL",
+                Text(stringResource(R.string.from_url),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text("URL") },
-                    placeholder = { Text("https://example.com/extension/index.js") },
+                    label = { Text(stringResource(R.string.url)) },
+                    placeholder = { Text(stringResource(R.string.https_example_com_extension_index_js)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isInstalling
@@ -581,19 +577,17 @@ private fun InstallExtensionDialog(
                 ) {
                     Icon(Icons.Default.Link, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Install from URL")
+                    Text(stringResource(R.string.install_from_url))
                 }
 
                 HorizontalDivider()
 
                 // File import
-                Text(
-                    "From Device",
+                Text(stringResource(R.string.from_device),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Text(
-                    "Import a .js file or a .zip containing index.js and manifest.json.",
+                Text(stringResource(R.string.import_a_js_file_or_a_zip_containing_index_js),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -604,7 +598,7 @@ private fun InstallExtensionDialog(
                 ) {
                     Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Browse Files")
+                    Text(stringResource(R.string.browse_files))
                 }
 
                 if (error != null) {
@@ -617,7 +611,7 @@ private fun InstallExtensionDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isInstalling) { Text("Cancel") }
+            TextButton(onClick = onDismiss, enabled = !isInstalling) { Text(stringResource(R.string.cancel)) }
         }
     )
 }

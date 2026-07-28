@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.charavault
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -96,8 +98,7 @@ fun CharaVaultScreen(
                             modifier = Modifier.clickable { showContentTypeMenu = true }
                         ) {
                             Column {
-                                Text(
-                                    "Browse CharaVault",
+                                Text(stringResource(R.string.browse_charavault),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -120,7 +121,7 @@ fun CharaVaultScreen(
                             }
                             Icon(
                                 Icons.Default.ArrowDropDown,
-                                contentDescription = "Switch content type",
+                                contentDescription = stringResource(R.string.switch_content_type),
                                 modifier = Modifier.padding(start = 4.dp)
                             )
                         }
@@ -152,7 +153,7 @@ fun CharaVaultScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
@@ -160,19 +161,19 @@ fun CharaVaultScreen(
                     if (uiState.charavaultMode == "charavault") {
                         if (uiState.isLoggedIn) {
                             IconButton(onClick = { showSettingsDialog = true }) {
-                                Icon(Icons.Default.AccountCircle, contentDescription = "Account", tint = MaterialTheme.colorScheme.primary)
+                                Icon(Icons.Default.AccountCircle, contentDescription = stringResource(R.string.account), tint = MaterialTheme.colorScheme.primary)
                             }
                         } else {
                             TextButton(onClick = { viewModel.showLogin() }) {
-                                Text("Login", color = MaterialTheme.colorScheme.primary)
+                                Text(stringResource(R.string.login), color = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
                     IconButton(onClick = { showFilterMenu = true }) {
-                        Icon(Icons.Default.FilterList, contentDescription = "Filter")
+                        Icon(Icons.Default.FilterList, contentDescription = stringResource(R.string.filter))
                     }
                     IconButton(onClick = { showSettingsDialog = true }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings))
                     }
 
                     // Filter dropdown
@@ -180,8 +181,7 @@ fun CharaVaultScreen(
                         expanded = showFilterMenu,
                         onDismissRequest = { showFilterMenu = false }
                     ) {
-                        Text(
-                            "Content Filter",
+                        Text(stringResource(R.string.content_filter),
                             style = MaterialTheme.typography.labelMedium,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                         )
@@ -225,19 +225,17 @@ fun CharaVaultScreen(
                         modifier = Modifier.size(64.dp),
                         tint = MaterialTheme.colorScheme.primary
                     )
-                    Text(
-                        "CharaVault Server Not Configured",
+                    Text(stringResource(R.string.charavault_server_not_configured),
                         style = MaterialTheme.typography.titleMedium
                     )
-                    Text(
-                        "Enter your CharaVault server URL to browse cards",
+                    Text(stringResource(R.string.enter_your_charavault_server_url_to_browse_ca),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Button(onClick = { showSettingsDialog = true }) {
                         Icon(Icons.Default.Settings, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Configure Server")
+                        Text(stringResource(R.string.configure_server))
                     }
                 }
             }
@@ -288,12 +286,12 @@ fun CharaVaultScreen(
                                 onClick = { viewModel.toggleTag(tag) },
                                 label = { Text(tag) },
                                 trailingIcon = {
-                                    Icon(Icons.Default.Close, contentDescription = "Remove")
+                                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.remove))
                                 }
                             )
                         }
                         TextButton(onClick = { viewModel.clearTags() }) {
-                            Text("Clear all")
+                            Text(stringResource(R.string.clear_all))
                         }
                     }
                     Spacer(Modifier.height(8.dp))
@@ -514,7 +512,7 @@ private fun SearchBar(
         value = text,
         onValueChange = { text = it },
         modifier = modifier,
-        placeholder = { Text("Search cards...") },
+        placeholder = { Text(stringResource(R.string.search_cards)) },
         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
         trailingIcon = {
             if (text.isNotEmpty()) {
@@ -522,7 +520,7 @@ private fun SearchBar(
                     text = ""
                     onQueryChange("")
                 }) {
-                    Icon(Icons.Default.Clear, contentDescription = "Clear")
+                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.clear))
                 }
             }
         },
@@ -536,7 +534,7 @@ private fun SearchBar(
         ),
         supportingText = {
             if (totalCount > 0) {
-                Text("$totalCount results")
+                Text(stringResource(R.string.n_results, totalCount))
             }
         }
     )
@@ -573,7 +571,7 @@ private fun PaginationBar(
             ) {
                 Icon(
                     Icons.Default.ChevronLeft,
-                    contentDescription = "Previous page"
+                    contentDescription = stringResource(R.string.previous_page)
                 )
             }
 
@@ -602,7 +600,7 @@ private fun PaginationBar(
             ) {
                 Icon(
                     Icons.Default.ChevronRight,
-                    contentDescription = "Next page"
+                    contentDescription = stringResource(R.string.next_page)
                 )
             }
         }
@@ -634,13 +632,13 @@ private fun PageJumpDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Go to Page") },
+        title = { Text(stringResource(R.string.go_to_page)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = pageText,
                     onValueChange = { pageText = it.filter { c -> c.isDigit() } },
-                    label = { Text("Page number (1-$totalPages)") },
+                    label = { Text(stringResource(R.string.page_number_range, totalPages)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
                     keyboardActions = KeyboardActions(
@@ -659,12 +657,12 @@ private fun PageJumpDialog(
                 onClick = { onGoToPage(pageText.toInt()) },
                 enabled = isValid
             ) {
-                Text("Go")
+                Text(stringResource(R.string.go))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -706,8 +704,7 @@ private fun CharaVaultCharacterCard(
                         shape = RoundedCornerShape(4.dp),
                         modifier = Modifier.padding(bottom = 4.dp)
                     ) {
-                        Text(
-                            "NSFW",
+                        Text(stringResource(R.string.nsfw),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onErrorContainer,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -794,8 +791,7 @@ private fun CharacterPreviewSheet(
                                 shape = RoundedCornerShape(4.dp),
                                 modifier = Modifier.padding(bottom = 4.dp)
                             ) {
-                                Text(
-                                    "NSFW",
+                                Text(stringResource(R.string.nsfw),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onErrorContainer,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -827,8 +823,7 @@ private fun CharacterPreviewSheet(
 
                 // Tags
                 if (character.tags.isNotEmpty()) {
-                    Text(
-                        "Tags",
+                    Text(stringResource(R.string.tags),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -857,8 +852,7 @@ private fun CharacterPreviewSheet(
                 // Description
                 val description = character.fullDescription ?: character.descriptionPreview
                 if (description.isNotBlank()) {
-                    Text(
-                        "Description",
+                    Text(stringResource(R.string.description),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -873,8 +867,7 @@ private fun CharacterPreviewSheet(
                 // First message
                 val firstMes = character.fullFirstMes ?: character.firstMesPreview
                 if (firstMes.isNotBlank()) {
-                    Text(
-                        "First Message",
+                    Text(stringResource(R.string.first_message),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -910,7 +903,7 @@ private fun CharacterPreviewSheet(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
 
                 Button(
@@ -924,15 +917,15 @@ private fun CharacterPreviewSheet(
                             strokeWidth = 2.dp
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text("Importing...")
+                        Text(stringResource(R.string.importing))
                     } else if (importSuccess) {
                         Icon(Icons.Default.Check, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Imported!")
+                        Text(stringResource(R.string.imported))
                     } else {
                         Icon(Icons.Default.Download, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Import to PocketTavern")
+                        Text(stringResource(R.string.import_to_pockettavern))
                     }
                 }
             }
@@ -961,11 +954,11 @@ private fun ServerSettingsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Card Server") },
+        title = { Text(stringResource(R.string.card_server)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 // Mode selector
-                Text("Source", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.source), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -975,7 +968,7 @@ private fun ServerSettingsDialog(
                     FilterChip(
                         selected = selectedMode == "local",
                         onClick = { selectedMode = "local" },
-                        label = { Text("CharaVault (Local)") },
+                        label = { Text(stringResource(R.string.charavault_local)) },
                         leadingIcon = {
                             if (selectedMode == "local") Icon(Icons.Default.Check, null, Modifier.size(16.dp))
                             else Icon(Icons.Default.Storage, null, Modifier.size(16.dp))
@@ -986,7 +979,7 @@ private fun ServerSettingsDialog(
                     FilterChip(
                         selected = selectedMode == "charavault",
                         onClick = { selectedMode = "charavault" },
-                        label = { Text("CharaVault.net") },
+                        label = { Text(stringResource(R.string.charavault_net)) },
                         leadingIcon = {
                             if (selectedMode == "charavault") Icon(Icons.Default.Check, null, Modifier.size(16.dp))
                             else Icon(Icons.Default.Cloud, null, Modifier.size(16.dp))
@@ -998,16 +991,15 @@ private fun ServerSettingsDialog(
 
                 if (selectedMode == "local") {
                     // Local server URL input
-                    Text(
-                        "Enter your local CharaVault server URL",
+                    Text(stringResource(R.string.enter_your_local_charavault_server_url),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = url,
                         onValueChange = { url = it },
-                        label = { Text("Server URL") },
-                        placeholder = { Text("http://192.168.1.100:8787") },
+                        label = { Text(stringResource(R.string.server_url)) },
+                        placeholder = { Text(stringResource(R.string.http_192_168_1_100_8787)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -1040,7 +1032,7 @@ private fun ServerSettingsDialog(
                                 onClick = onVerifyAge,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Verify Age (18+) for NSFW")
+                                Text(stringResource(R.string.verify_age_18_for_nsfw))
                             }
                         }
 
@@ -1050,12 +1042,11 @@ private fun ServerSettingsDialog(
                         ) {
                             Icon(Icons.AutoMirrored.Filled.Logout, null, Modifier.size(16.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Logout")
+                            Text(stringResource(R.string.logout))
                         }
                     } else {
                         // Not logged in
-                        Text(
-                            "Login to CharaVault.net to access the full card library including NSFW content.",
+                        Text(stringResource(R.string.login_to_charavault_net_to_access_the_full_ca),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1065,10 +1056,9 @@ private fun ServerSettingsDialog(
                         ) {
                             Icon(Icons.AutoMirrored.Filled.Login, null, Modifier.size(16.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Login to CharaVault.net")
+                            Text(stringResource(R.string.login_to_charavault_net))
                         }
-                        Text(
-                            "Browsing without login shows SFW cards only.",
+                        Text(stringResource(R.string.browsing_without_login_shows_sfw_cards_only),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1088,12 +1078,12 @@ private fun ServerSettingsDialog(
                 },
                 enabled = selectedMode == "charavault" || url.isNotBlank()
             ) {
-                Text("Save")
+                Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -1119,14 +1109,13 @@ private fun CharaVaultLoginDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (requires2fa) {
-                    Text(
-                        "Enter the 6-digit code from your authenticator app.",
+                    Text(stringResource(R.string.enter_the_6_digit_code_from_your_authenticato),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     OutlinedTextField(
                         value = tfaCode,
                         onValueChange = { tfaCode = it.filter { c -> c.isDigit() }.take(6) },
-                        label = { Text("2FA Code") },
+                        label = { Text(stringResource(R.string.s_2fa_code)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -1138,7 +1127,7 @@ private fun CharaVaultLoginDialog(
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },
-                        label = { Text("Email") },
+                        label = { Text(stringResource(R.string.email)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
@@ -1146,7 +1135,7 @@ private fun CharaVaultLoginDialog(
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
-                        label = { Text("Password") },
+                        label = { Text(stringResource(R.string.password)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
@@ -1194,7 +1183,7 @@ private fun CharaVaultLoginDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss, enabled = !isLoggingIn) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -1241,7 +1230,7 @@ private fun TagSelectorDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Select Tags") },
+        title = { Text(stringResource(R.string.select_tags)) },
         text = {
             Column(
                 modifier = Modifier
@@ -1252,7 +1241,7 @@ private fun TagSelectorDialog(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    label = { Text("Search tags") },
+                    label = { Text(stringResource(R.string.search_tags)) },
                     leadingIcon = { Icon(Icons.Default.Search, null) },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
@@ -1275,8 +1264,7 @@ private fun TagSelectorDialog(
                         CircularProgressIndicator()
                     }
                 } else if (filteredTags.isEmpty()) {
-                    Text(
-                        "No tags found",
+                    Text(stringResource(R.string.no_tags_found),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(16.dp)
                     )
@@ -1319,7 +1307,7 @@ private fun TagSelectorDialog(
         },
         confirmButton = {
             Button(onClick = onDismiss) {
-                Text("Done")
+                Text(stringResource(R.string.done))
             }
         },
         dismissButton = {
@@ -1327,7 +1315,7 @@ private fun TagSelectorDialog(
                 TextButton(onClick = {
                     selectedTags.forEach { onTagToggle(it) }
                 }) {
-                    Text("Clear All")
+                    Text(stringResource(R.string.clear_all_2))
                 }
             }
         }
@@ -1356,8 +1344,7 @@ private fun CharaVaultLorebookCard(
                     shape = RoundedCornerShape(4.dp),
                     modifier = Modifier.padding(bottom = 4.dp)
                 ) {
-                    Text(
-                        "NSFW",
+                    Text(stringResource(R.string.nsfw),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -1511,8 +1498,7 @@ private fun LorebookPreviewSheet(
                             shape = RoundedCornerShape(4.dp),
                             modifier = Modifier.padding(bottom = 4.dp)
                         ) {
-                            Text(
-                                "NSFW",
+                            Text(stringResource(R.string.nsfw),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -1592,8 +1578,7 @@ private fun LorebookPreviewSheet(
 
             // Description
             if (lorebook.description.isNotBlank()) {
-                Text(
-                    "Description",
+                Text(stringResource(R.string.description),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1607,8 +1592,7 @@ private fun LorebookPreviewSheet(
 
             // Topics
             if (lorebook.topics.isNotEmpty()) {
-                Text(
-                    "Topics",
+                Text(stringResource(R.string.topics),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1629,8 +1613,7 @@ private fun LorebookPreviewSheet(
 
             // Keywords
             if (lorebook.keywords.isNotBlank()) {
-                Text(
-                    "Keywords",
+                Text(stringResource(R.string.keywords),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1715,7 +1698,7 @@ private fun LorebookPreviewSheet(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
 
                 Button(
@@ -1729,15 +1712,15 @@ private fun LorebookPreviewSheet(
                             strokeWidth = 2.dp
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text("Importing...")
+                        Text(stringResource(R.string.importing))
                     } else if (importSuccess) {
                         Icon(Icons.Default.Check, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Imported!")
+                        Text(stringResource(R.string.imported))
                     } else {
                         Icon(Icons.Default.Download, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Import to PocketTavern")
+                        Text(stringResource(R.string.import_to_pockettavern))
                     }
                 }
             }

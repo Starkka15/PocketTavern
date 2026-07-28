@@ -974,8 +974,13 @@ No preamble, no explanation. Just the numbered list."""
                         _uiState.update { it.copy(streamingThinking = event.accumulatedThinking) }
                     }
                     is StreamEvent.Complete -> {
-                        // Step 1: apply regex rules + multi-turn trim (keeps extension tags intact)
+                        // Step 1: apply regex rules + multi-turn trim (keeps extension tags intact),
+                        // then resolve {{user}}/{{char}} macros — PocketTavern's RP-tuned models emit
+                        // them literally (trained that way); harmless for models that never emit them.
+                        val charName = _uiState.value.character?.name ?: ""
                         val processed = trimMultiTurn(extensionManager.processOutput(event.fullText))
+                            .replace("{{user}}", _currentUserName, ignoreCase = true)
+                            .let { if (charName.isNotBlank()) it.replace("{{char}}", charName, ignoreCase = true) else it }
                         val reasoning = event.thinkingText.ifBlank { null }
                         // Step 2: add message with raw text so we can emit MESSAGE_RECEIVED first
                         val rawMessage = ChatMessage(content = processed, isUser = false, reasoning = reasoning)
@@ -1084,7 +1089,13 @@ No preamble, no explanation. Just the numbered list."""
         val mainPromptOverride = if (config.usesChatCompletions && mainPromptItem?.enabled == true)
             mainPromptItem.content ?: "" else ""
         val extensionInjections = extensionManager.getPromptInjections()
-        val builder = PromptBuilder(character, chatContext, userName, mainPromptOverride, extensionInjections, _currentMemoryBlock, _currentWorldBook)
+        // PocketTavern's own models (name starts with "pockettavern" — on-device GGUF/litertlm OR
+        // a remote endpoint serving them, e.g. llama-server with --alias) have the format/rules
+        // baked into the weights, so use the lean prompt (skip preset prose). All other models
+        // are unaffected.
+        val leanMode = config.currentModel.startsWith("pockettavern", ignoreCase = true)
+        val builder = PromptBuilder(character, chatContext, userName, mainPromptOverride, extensionInjections, _currentMemoryBlock, _currentWorldBook, leanMode,
+            languageDirective = com.pockettavern.app.util.LocaleHelper.responseLanguageDirective(context))
         val prompt = builder.buildPrompt(history, userMessage)
 
         // For chat completion APIs, also build structured messages for proper role formatting.
@@ -2021,7 +2032,10 @@ No preamble, no explanation. Just the numbered list."""
                         _uiState.update { it.copy(streamingContent = event.accumulated) }
                     }
                     is StreamEvent.Complete -> {
+                        val charName = _uiState.value.character?.name ?: ""
                         val processed = trimMultiTurn(extensionManager.processOutput(event.fullText))
+                            .replace("{{user}}", _currentUserName, ignoreCase = true)
+                            .let { if (charName.isNotBlank()) it.replace("{{char}}", charName, ignoreCase = true) else it }
                         val newMessage = ChatMessage(content = processed, isUser = false)
                         _uiState.update {
                             it.copy(
@@ -2080,7 +2094,10 @@ No preamble, no explanation. Just the numbered list."""
                         _uiState.update { it.copy(streamingContent = event.accumulated) }
                     }
                     is StreamEvent.Complete -> {
+                        val charName = _uiState.value.character?.name ?: ""
                         val processed = trimMultiTurn(extensionManager.processOutput(event.fullText))
+                            .replace("{{user}}", _currentUserName, ignoreCase = true)
+                            .let { if (charName.isNotBlank()) it.replace("{{char}}", charName, ignoreCase = true) else it }
                         val newMessage = ChatMessage(content = processed, isUser = false)
                         _uiState.update {
                             it.copy(
@@ -2177,7 +2194,10 @@ No preamble, no explanation. Just the numbered list."""
                         _uiState.update { it.copy(streamingContent = event.accumulated) }
                     }
                     is StreamEvent.Complete -> {
+                        val charName = _uiState.value.character?.name ?: ""
                         val newContent = trimMultiTurn(extensionManager.processOutput(event.fullText))
+                            .replace("{{user}}", _currentUserName, ignoreCase = true)
+                            .let { if (charName.isNotBlank()) it.replace("{{char}}", charName, ignoreCase = true) else it }
                         val assistantMessage = ChatMessage(content = newContent, isUser = false)
                         existingSwipes.add(newContent)
 

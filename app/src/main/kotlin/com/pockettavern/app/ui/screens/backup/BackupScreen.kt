@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.backup
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -38,7 +40,7 @@ fun BackupScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Backup & Restore") },
+                title = { Text(stringResource(R.string.backup_restore)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -57,8 +59,7 @@ fun BackupScreen(
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            Text(
-                text = "Backup includes characters, chats, lorebooks, backgrounds, and extensions.",
+            Text(text = stringResource(R.string.backup_includes_characters_chats_lorebooks_ba),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -76,10 +77,9 @@ fun BackupScreen(
                             tint = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text("Export Backup", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.export_backup), style = MaterialTheme.typography.titleMedium)
                     }
-                    Text(
-                        text = "Save all your data as a ZIP file.",
+                    Text(text = stringResource(R.string.save_all_your_data_as_a_zip_file),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -114,10 +114,9 @@ fun BackupScreen(
                             tint = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text("Restore Backup", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.restore_backup), style = MaterialTheme.typography.titleMedium)
                     }
-                    Text(
-                        text = "Restore from a previously exported ZIP. Existing data will be overwritten.",
+                    Text(text = stringResource(R.string.restore_from_a_previously_exported_zip_existi),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -151,7 +150,7 @@ fun BackupScreen(
                     ) {
                         Text(msg, color = MaterialTheme.colorScheme.onPrimaryContainer)
                         TextButton(onClick = { viewModel.clearMessage() }) {
-                            Text("OK")
+                            Text(stringResource(R.string.ok))
                         }
                     }
                 }
@@ -172,7 +171,7 @@ fun BackupScreen(
                     ) {
                         Text(err, color = MaterialTheme.colorScheme.onErrorContainer)
                         TextButton(onClick = { viewModel.clearMessage() }) {
-                            Text("Dismiss")
+                            Text(stringResource(R.string.dismiss))
                         }
                     }
                 }

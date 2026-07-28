@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.components
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
@@ -56,7 +58,7 @@ fun ErrorDialog(
         text = { Text(message) },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("OK")
+                Text(stringResource(R.string.ok))
             }
         }
     )

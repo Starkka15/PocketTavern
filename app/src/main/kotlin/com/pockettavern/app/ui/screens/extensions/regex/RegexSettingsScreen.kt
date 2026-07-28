@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.extensions.regex
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -33,15 +35,15 @@ fun RegexSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Regex Rules") },
+                title = { Text(stringResource(R.string.regex_rules)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
                     IconButton(onClick = viewModel::showAddDialog) {
-                        Icon(Icons.Default.Add, contentDescription = "Add rule")
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_rule_2))
                     }
                 }
             )
@@ -55,7 +57,7 @@ fun RegexSettingsScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("No rules yet", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.no_rules_yet), style = MaterialTheme.typography.bodyLarge)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         "Rules are applied to AI output before display,\nor to your messages before sending.",
@@ -63,7 +65,7 @@ fun RegexSettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = viewModel::showAddDialog) { Text("Add Rule") }
+                    Button(onClick = viewModel::showAddDialog) { Text(stringResource(R.string.add_rule)) }
                 }
             }
         } else {
@@ -121,20 +123,20 @@ private fun RegexRuleCard(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (rule.applyToOutput) FilterChip(
-                        selected = true, onClick = {}, label = { Text("Output") },
+                        selected = true, onClick = {}, label = { Text(stringResource(R.string.output)) },
                         modifier = Modifier.height(24.dp)
                     )
                     if (rule.applyToInput) FilterChip(
-                        selected = true, onClick = {}, label = { Text("Input") },
+                        selected = true, onClick = {}, label = { Text(stringResource(R.string.input)) },
                         modifier = Modifier.height(24.dp)
                     )
                 }
             }
             IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.edit), modifier = Modifier.size(18.dp))
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete), modifier = Modifier.size(18.dp))
             }
             Switch(checked = rule.enabled, onCheckedChange = { onToggle() })
         }
@@ -158,7 +160,7 @@ private fun RegexRuleDialog(
                 OutlinedTextField(
                     value = uiState.nameField,
                     onValueChange = viewModel::updateName,
-                    label = { Text("Rule name") },
+                    label = { Text(stringResource(R.string.rule_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -166,7 +168,7 @@ private fun RegexRuleDialog(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Regex pattern", modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.regex_pattern), modifier = Modifier.weight(1f))
                     Switch(checked = uiState.isRegexField, onCheckedChange = viewModel::toggleIsRegex)
                 }
                 OutlinedTextField(
@@ -179,23 +181,23 @@ private fun RegexRuleDialog(
                 OutlinedTextField(
                     value = uiState.replacementField,
                     onValueChange = viewModel::updateReplacement,
-                    label = { Text("Replace with") },
+                    label = { Text(stringResource(R.string.replace_with)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 // Apply to toggles
-                Text("Apply to:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.apply_to), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = uiState.applyToOutputField, onCheckedChange = viewModel::toggleApplyToOutput)
-                    Text("AI output", modifier = Modifier.padding(start = 4.dp))
+                    Text(stringResource(R.string.ai_output), modifier = Modifier.padding(start = 4.dp))
                     Spacer(modifier = Modifier.width(16.dp))
                     Checkbox(checked = uiState.applyToInputField, onCheckedChange = viewModel::toggleApplyToInput)
-                    Text("My input", modifier = Modifier.padding(start = 4.dp))
+                    Text(stringResource(R.string.my_input), modifier = Modifier.padding(start = 4.dp))
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = uiState.caseInsensitiveField, onCheckedChange = viewModel::toggleCaseInsensitive)
-                    Text("Case insensitive", modifier = Modifier.padding(start = 4.dp))
+                    Text(stringResource(R.string.case_insensitive), modifier = Modifier.padding(start = 4.dp))
                 }
 
                 HorizontalDivider()
@@ -204,7 +206,7 @@ private fun RegexRuleDialog(
                 OutlinedTextField(
                     value = uiState.testInput,
                     onValueChange = viewModel::updateTestInput,
-                    label = { Text("Test input") },
+                    label = { Text(stringResource(R.string.test_input)) },
                     minLines = 2,
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
@@ -225,10 +227,10 @@ private fun RegexRuleDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = viewModel::confirmRule) { Text("Save") }
+            TextButton(onClick = viewModel::confirmRule) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
-            TextButton(onClick = viewModel::hideDialog) { Text("Cancel") }
+            TextButton(onClick = viewModel::hideDialog) { Text(stringResource(R.string.cancel)) }
         }
     )
 }

@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.createcharacter
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -207,7 +209,7 @@ private fun BasicTab(
 ) {
     // Avatar section
     if (!uiState.isEditMode) {
-        SectionHeader("Avatar")
+        SectionHeader(stringResource(R.string.avatar))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -244,19 +246,18 @@ private fun BasicTab(
                             OutlinedButton(onClick = { viewModel.cancelGeneration() }) {
                                 Icon(Icons.Default.Close, null, Modifier.size(16.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("Cancel")
+                                Text(stringResource(R.string.cancel))
                             }
                         } else {
                             FilledTonalButton(onClick = { viewModel.generateAvatar() }) {
                                 Icon(Icons.Default.AutoAwesome, null, Modifier.size(16.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("Generate")
+                                Text(stringResource(R.string.generate))
                             }
                         }
                     }
                 } else {
-                    Text(
-                        "Configure Stable Diffusion Forge in Settings to enable AI avatar generation",
+                    Text(stringResource(R.string.configure_stable_diffusion_forge_in_settings),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -268,7 +269,7 @@ private fun BasicTab(
     }
 
     // Name field
-    SectionHeader("Character Name")
+    SectionHeader(stringResource(R.string.character_name))
     CharacterTextField(
         value = uiState.name,
         onValueChange = { viewModel.updateName(it) },
@@ -291,7 +292,7 @@ private fun BasicTab(
             ) {
                 Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
                 Column {
-                    Text("Character Card Detected", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.character_card_detected), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
                     Text(
                         "All data will be imported including ${if (uiState.hasCharacterBook) "${uiState.characterBookEntryCount} lorebook entries" else "metadata"}",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -305,9 +306,8 @@ private fun BasicTab(
 
 @Composable
 private fun PersonalityTab(uiState: CreateCharacterUiState, viewModel: CreateCharacterViewModel) {
-    SectionHeader("Description")
-    Text(
-        "Physical appearance, background, and general information about the character.",
+    SectionHeader(stringResource(R.string.description))
+    Text(stringResource(R.string.physical_appearance_background_and_general_in),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -320,9 +320,8 @@ private fun PersonalityTab(uiState: CreateCharacterUiState, viewModel: CreateCha
         maxLines = 8
     )
 
-    SectionHeader("Personality")
-    Text(
-        "Character traits, demeanor, and how they behave.",
+    SectionHeader(stringResource(R.string.personality))
+    Text(stringResource(R.string.character_traits_demeanor_and_how_they_behave),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -335,9 +334,8 @@ private fun PersonalityTab(uiState: CreateCharacterUiState, viewModel: CreateCha
         maxLines = 6
     )
 
-    SectionHeader("Scenario")
-    Text(
-        "The setting or situation for the conversation.",
+    SectionHeader(stringResource(R.string.scenario))
+    Text(stringResource(R.string.the_setting_or_situation_for_the_conversation),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -353,9 +351,8 @@ private fun PersonalityTab(uiState: CreateCharacterUiState, viewModel: CreateCha
 
 @Composable
 private fun MessagesTab(uiState: CreateCharacterUiState, viewModel: CreateCharacterViewModel) {
-    SectionHeader("First Message")
-    Text(
-        "The opening message when starting a new chat.",
+    SectionHeader(stringResource(R.string.first_message))
+    Text(stringResource(R.string.the_opening_message_when_starting_a_new_chat),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -369,9 +366,8 @@ private fun MessagesTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
     )
 
     // Alternate Greetings
-    SectionHeader("Alternate Greetings")
-    Text(
-        "Additional first messages that can be swiped through.",
+    SectionHeader(stringResource(R.string.alternate_greetings))
+    Text(stringResource(R.string.additional_first_messages_that_can_be_swiped),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -406,14 +402,13 @@ private fun MessagesTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
     ) {
         Icon(Icons.Default.Add, null)
         Spacer(Modifier.width(8.dp))
-        Text("Add Alternate Greeting")
+        Text(stringResource(R.string.add_alternate_greeting))
     }
 
     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
 
-    SectionHeader("Example Dialogue")
-    Text(
-        "Example conversations to guide the AI's writing style.",
+    SectionHeader(stringResource(R.string.example_dialogue))
+    Text(stringResource(R.string.example_conversations_to_guide_the_ai_s_writi),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -429,9 +424,8 @@ private fun MessagesTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
 
 @Composable
 private fun AdvancedTab(uiState: CreateCharacterUiState, viewModel: CreateCharacterViewModel) {
-    SectionHeader("System Prompt")
-    Text(
-        "Overrides the default system prompt. Use {{original}} to include the user's default.",
+    SectionHeader(stringResource(R.string.system_prompt_2))
+    Text(stringResource(R.string.overrides_the_default_system_prompt_use_origi),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -444,9 +438,8 @@ private fun AdvancedTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
         maxLines = 10
     )
 
-    SectionHeader("Post-History Instructions")
-    Text(
-        "Injected after the chat history (like a jailbreak). Use {{original}} to include default.",
+    SectionHeader(stringResource(R.string.post_history_instructions))
+    Text(stringResource(R.string.injected_after_the_chat_history_like_a_jailbr),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -473,7 +466,7 @@ private fun AdvancedTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
             ) {
                 Icon(Icons.Default.Book, null, tint = MaterialTheme.colorScheme.primary)
                 Column(Modifier.weight(1f)) {
-                    Text("Character Lorebook", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.character_lorebook), style = MaterialTheme.typography.titleSmall)
                     Text(
                         "${uiState.characterBookEntryCount} entries will be imported",
                         style = MaterialTheme.typography.bodySmall,
@@ -487,7 +480,7 @@ private fun AdvancedTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
 
 @Composable
 private fun MetaTab(uiState: CreateCharacterUiState, viewModel: CreateCharacterViewModel) {
-    SectionHeader("Creator")
+    SectionHeader(stringResource(R.string.creator))
     CharacterTextField(
         value = uiState.creator,
         onValueChange = { viewModel.updateCreator(it) },
@@ -496,9 +489,8 @@ private fun MetaTab(uiState: CreateCharacterUiState, viewModel: CreateCharacterV
         singleLine = true
     )
 
-    SectionHeader("Tags")
-    Text(
-        "Keywords for categorizing the character.",
+    SectionHeader(stringResource(R.string.tags))
+    Text(stringResource(R.string.keywords_for_categorizing_the_character),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -561,9 +553,8 @@ private fun MetaTab(uiState: CreateCharacterUiState, viewModel: CreateCharacterV
 
     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
 
-    SectionHeader("Creator Notes")
-    Text(
-        "Notes for users about the character (not used in prompts).",
+    SectionHeader(stringResource(R.string.creator_notes))
+    Text(stringResource(R.string.notes_for_users_about_the_character_not_used),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -661,7 +652,7 @@ private fun AvatarPreview(
                 bitmap?.let {
                     Image(
                         bitmap = it.asImageBitmap(),
-                        contentDescription = "Avatar",
+                        contentDescription = stringResource(R.string.avatar),
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
@@ -686,7 +677,7 @@ private fun AvatarPreview(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.AddPhotoAlternate, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(4.dp))
-                    Text("Add Avatar", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.add_avatar), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -703,20 +694,20 @@ private fun AvatarOptionsDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Select Avatar") },
+        title = { Text(stringResource(R.string.select_avatar)) },
         text = {
             Column {
                 TextButton(onClick = onPickImage, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Image, null, Modifier.size(24.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text("Choose from Gallery")
+                    Text(stringResource(R.string.choose_from_gallery))
                 }
 
                 if (uiState.forgeAvailable) {
                     TextButton(onClick = onGenerate, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.AutoAwesome, null, Modifier.size(24.dp))
                         Spacer(Modifier.width(12.dp))
-                        Text("Generate with AI")
+                        Text(stringResource(R.string.generate_with_ai))
                     }
                 }
 
@@ -728,14 +719,14 @@ private fun AvatarOptionsDialog(
                     ) {
                         Icon(Icons.Default.Delete, null, Modifier.size(24.dp))
                         Spacer(Modifier.width(12.dp))
-                        Text("Remove Avatar")
+                        Text(stringResource(R.string.remove_avatar))
                     }
                 }
             }
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }

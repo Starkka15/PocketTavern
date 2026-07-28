@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.risuRealm
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import android.annotation.SuppressLint
 import android.content.Context
 import android.webkit.CookieManager
@@ -113,13 +115,13 @@ fun RisuRealmBrowserScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("RisuRealm") },
+                title = { Text(stringResource(R.string.risurealm)) },
                 navigationIcon = {
                     IconButton(onClick = {
                         val wv = webView
                         if (wv != null && wv.canGoBack()) wv.goBack() else onBack()
                     }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
@@ -178,7 +180,7 @@ fun RisuRealmBrowserScreen(
                             ) {
                                 CircularProgressIndicator()
                                 Spacer(modifier = Modifier.height(12.dp))
-                                Text("Importing character...")
+                                Text(stringResource(R.string.importing_character))
                             }
                         }
                     }
@@ -194,10 +196,10 @@ fun RisuRealmBrowserScreen(
         }
         AlertDialog(
             onDismissRequest = { viewModel.clearStatus() },
-            title = { Text("Imported") },
-            text = { Text("\"$name\" added to your characters.") },
+            title = { Text(stringResource(R.string.imported_2)) },
+            text = { Text(stringResource(R.string.added_to_characters, name)) },
             confirmButton = {
-                TextButton(onClick = { viewModel.clearStatus() }) { Text("OK") }
+                TextButton(onClick = { viewModel.clearStatus() }) { Text(stringResource(R.string.ok)) }
             }
         )
     }
@@ -206,10 +208,10 @@ fun RisuRealmBrowserScreen(
     uiState.error?.let { error ->
         AlertDialog(
             onDismissRequest = { viewModel.clearStatus() },
-            title = { Text("Import failed") },
+            title = { Text(stringResource(R.string.import_failed)) },
             text = { Text(error) },
             confirmButton = {
-                TextButton(onClick = { viewModel.clearStatus() }) { Text("OK") }
+                TextButton(onClick = { viewModel.clearStatus() }) { Text(stringResource(R.string.ok)) }
             }
         )
     }

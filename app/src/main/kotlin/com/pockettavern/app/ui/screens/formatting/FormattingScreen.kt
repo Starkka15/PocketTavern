@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.formatting
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -36,7 +38,7 @@ fun FormattingScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Advanced Formatting") },
+                title = { Text(stringResource(R.string.advanced_formatting)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -89,14 +91,12 @@ fun FormattingScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // System Prompt Section
-                Text(
-                    text = "SYSTEM PROMPT",
+                Text(text = stringResource(R.string.system_prompt),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
 
-                Text(
-                    text = "Instructions given to the AI about how to behave",
+                Text(text = stringResource(R.string.instructions_given_to_the_ai_about_how_to_beh),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -113,7 +113,7 @@ fun FormattingScreen(
                                 ?: "Select preset",
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Preset") },
+                            label = { Text(stringResource(R.string.preset)) },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = syspromptExpanded) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -141,8 +141,8 @@ fun FormattingScreen(
                 OutlinedTextField(
                     value = uiState.syspromptContent,
                     onValueChange = { viewModel.updateSyspromptContent(it) },
-                    label = { Text("Content") },
-                    placeholder = { Text("Enter system prompt text...") },
+                    label = { Text(stringResource(R.string.content)) },
+                    placeholder = { Text(stringResource(R.string.enter_system_prompt_text)) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 160.dp),
@@ -162,7 +162,7 @@ fun FormattingScreen(
                     ) {
                         Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Save")
+                        Text(stringResource(R.string.save))
                     }
                     OutlinedButton(
                         onClick = { viewModel.showNewSyspromptDialog() },
@@ -170,7 +170,7 @@ fun FormattingScreen(
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("New")
+                        Text(stringResource(R.string.action_new))
                     }
                     OutlinedButton(
                         onClick = { viewModel.deleteSyspromptPreset() },
@@ -183,13 +183,12 @@ fun FormattingScreen(
                     ) {
                         Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Delete")
+                        Text(stringResource(R.string.delete))
                     }
                 }
 
                 if (!uiState.syspromptIsUserPreset && uiState.systemPromptPresets.isNotEmpty()) {
-                    Text(
-                        text = "Bundled preset — Save to create an editable copy",
+                    Text(text = stringResource(R.string.bundled_preset_save_to_create_an_editable_cop),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -211,13 +210,12 @@ fun FormattingScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
-                    Text("Save Settings")
+                    Text(stringResource(R.string.save_settings))
                 }
 
                 // Success message
                 if (uiState.saveSuccess) {
-                    Text(
-                        text = "Settings saved successfully!",
+                    Text(text = stringResource(R.string.settings_saved_successfully),
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -238,24 +236,24 @@ fun FormattingScreen(
     if (uiState.showNewSyspromptDialog) {
         AlertDialog(
             onDismissRequest = { viewModel.hideNewSyspromptDialog() },
-            title = { Text("New System Prompt") },
+            title = { Text(stringResource(R.string.new_system_prompt)) },
             text = {
                 OutlinedTextField(
                     value = uiState.newSyspromptNameField,
                     onValueChange = { viewModel.updateNewSyspromptName(it) },
-                    label = { Text("Preset name") },
+                    label = { Text(stringResource(R.string.preset_name_2)) },
                     singleLine = true,
                     colors = textFieldColors()
                 )
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.confirmNewSyspromptPreset() }) {
-                    Text("Create")
+                    Text(stringResource(R.string.create))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.hideNewSyspromptDialog() }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -302,7 +300,7 @@ private fun FormattingSection(
                     value = presets.getOrNull(selectedIndex) ?: "Select template",
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("Template") },
+                    label = { Text(stringResource(R.string.template)) },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                     modifier = Modifier
                         .fillMaxWidth()

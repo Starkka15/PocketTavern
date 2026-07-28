@@ -365,7 +365,7 @@ class CharactersViewModel @Inject constructor(
             TranslateCardUseCase.Field.CREATOR_NOTES to c.creatorNotes,
             TranslateCardUseCase.Field.ALTERNATE_GREETINGS to c.alternateGreetings.joinToString("\n")
         )
-        return fieldMap.filterValues { translateCardUseCase.isNonEnglish(it) }.keys
+        return fieldMap.filterValues { translateCardUseCase.needsTranslation(it) }.keys
     }
 
     fun uploadToCharaVault(character: Character) {

@@ -11,6 +11,15 @@
 
 ---
 
+> ### 🌍 Translators wanted!
+> PocketTavern now supports multiple languages, and we're looking for native speakers to help translate the interface (the AI also replies in your chosen language).
+>
+> **To contribute a translation:** copy the English source file — [`app/src/main/res/values/strings.xml`](https://github.com/Starkka15/PocketTavern/blob/testing/app/src/main/res/values/strings.xml) — into a locale folder (e.g. `values-fr` for French, `values-de` for German, `values-zh-rCN` for Simplified Chinese) and translate the text between the `>...<` tags. Keep the `name="..."` keys, `%1$s`/`%1$d` markers, and `{{user}}`/`{{char}}` macros unchanged, then open a pull request.
+>
+> A ready-to-edit Simplified Chinese starter file is already in place at [`values-zh-rCN/strings.xml`](https://github.com/Starkka15/PocketTavern/blob/testing/app/src/main/res/values-zh-rCN/strings.xml). Questions? Open an issue or ask on [Discord](https://stt.gg/49Bfn8bA).
+
+---
+
 ## Why PocketTavern Exists
 
 Every AI chat app wants a subscription. Monthly fees, token limits, paywalled features, data you don't control. The landscape keeps moving in one direction — and it's not toward the user.

@@ -1,5 +1,7 @@
 package com.pockettavern.app.ui.screens.stimport
 
+import com.pockettavern.app.R
+import androidx.compose.ui.res.stringResource
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -56,7 +58,7 @@ fun StImportScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Import from SillyTavern") },
+                title = { Text(stringResource(R.string.import_from_sillytavern)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -123,8 +125,7 @@ private fun FolderImportTab(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Description
-        Text(
-            text = "Select your SillyTavern data folder. The app will import characters (PNG cards), " +
+        Text(text = stringResource(R.string.select_your_sillytavern_data_folder_the_app_w) +
                     "lorebooks (world info), and chat histories.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -158,7 +159,7 @@ private fun FolderImportTab(
             ) {
                 Icon(Icons.Default.FolderOpen, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Choose SillyTavern Folder", color = Color.Black)
+                Text(stringResource(R.string.choose_sillytavern_folder), color = Color.Black)
             }
         }
 
@@ -184,8 +185,7 @@ private fun ServerImportTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(
-            text = "Connect to a running SillyTavern server to pull all characters and lorebooks. " +
+        Text(text = stringResource(R.string.connect_to_a_running_sillytavern_server_to_pu) +
                     "This is a one-time migration — no server needed afterward.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -194,8 +194,8 @@ private fun ServerImportTab(
         OutlinedTextField(
             value = uiState.serverUrl,
             onValueChange = onUrlChange,
-            label = { Text("Server URL") },
-            placeholder = { Text("http://192.168.1.x:8000") },
+            label = { Text(stringResource(R.string.server_url)) },
+            placeholder = { Text(stringResource(R.string.http_192_168_1_x_8000)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
@@ -206,7 +206,7 @@ private fun ServerImportTab(
         OutlinedTextField(
             value = uiState.username,
             onValueChange = onUsernameChange,
-            label = { Text("Handle (optional)") },
+            label = { Text(stringResource(R.string.handle_optional)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             enabled = !uiState.isImporting,
@@ -216,7 +216,7 @@ private fun ServerImportTab(
         OutlinedTextField(
             value = uiState.password,
             onValueChange = onPasswordChange,
-            label = { Text("Password (optional)") },
+            label = { Text(stringResource(R.string.password_optional)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             enabled = !uiState.isImporting,
@@ -242,7 +242,7 @@ private fun ServerImportTab(
             ) {
                 Icon(Icons.Default.Download, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Import from Server", color = Color.Black)
+                Text(stringResource(R.string.import_from_server), color = Color.Black)
             }
         }
 
@@ -317,7 +317,7 @@ private fun ResultsSummaryCard(
         shape = RoundedCornerShape(8.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Import Complete", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.import_complete), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
 
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 StatItem(label = "Characters", value = uiState.charactersImported, color = MaterialTheme.colorScheme.primary)
@@ -335,7 +335,7 @@ private fun ResultsSummaryCard(
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
             ) {
-                Text("Import Again")
+                Text(stringResource(R.string.import_again))
             }
         }
     }
@@ -369,8 +369,7 @@ private fun LogSection(log: List<String>) {
         }
     }
 
-    Text(
-        text = "Log",
+    Text(text = stringResource(R.string.log),
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )

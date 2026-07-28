@@ -1,6 +1,7 @@
 package com.pockettavern.app.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -60,6 +61,10 @@ fun SillyTavernNavGraph(
     ) {
         composable<Route.Main> {
             MainScreen(
+                // V12: Stories always visible; the screen's empty-state prompts import.
+                onNavigateToStories = {
+                    navController.navigate(Route.Stories)
+                },
                 onNavigateToCharacters = {
                     navController.navigate(Route.Characters)
                 },
@@ -354,6 +359,23 @@ fun SillyTavernNavGraph(
             GroupChatScreen(
                 groupId = route.groupId,
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // Stories (native ensemble) — T8
+        composable<Route.Stories> {
+            com.pockettavern.app.ui.screens.stories.StoriesScreen(
+                onOpenStory = { storyId -> navController.navigate(Route.StoryChat(storyId)) },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable<Route.StoryChat> { backStackEntry ->
+            val route: Route.StoryChat = backStackEntry.toRoute()
+            com.pockettavern.app.ui.screens.stories.StoryChatScreen(
+                storyId = route.storyId,
+                chatFileName = null,
+                onBack = { navController.popBackStack() }
             )
         }
 
