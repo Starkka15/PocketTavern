@@ -33,7 +33,10 @@ class PromptBuilder(
     // system prompt (matching the training format) and SKIP the Chat Completion preset's prose
     // blocks (main jailbreak, NSFW, utility, post-history). Card definition + lorebook + persona +
     // memory + history are all still sent. Defaults false → every other model is unaffected.
-    private val leanMode: Boolean = false
+    private val leanMode: Boolean = false,
+    // Non-null when the app language isn't English: directive telling the model
+    // to respond in that language (see LocaleHelper.responseLanguageDirective).
+    private val languageDirective: String? = null
 ) {
     private val instructTemplate = chatContext.instructTemplate
     // Combine global system prompt with character's custom system prompt.
@@ -77,7 +80,7 @@ class PromptBuilder(
         DebugLogger.logKeyValue("Global system prompt", globalPrompt.take(120).ifBlank { "(empty)" })
         DebugLogger.logKeyValue("Character system prompt", characterPrompt.take(120).ifBlank { "(empty)" })
 
-        systemPrompt = if (leanMode) {
+        val basePrompt = if (leanMode) {
             // PocketTavern model: minimal system matching the training format (gen_dataset.build_system).
             // Character description/personality/scenario still arrive via their marker blocks below;
             // here we only set identity + the baked rule line. Macros resolve at emit time.
@@ -96,6 +99,11 @@ class PromptBuilder(
                 append(it)
             }
         }
+
+        // Language directive applies in both modes — appended last so it wins.
+        systemPrompt = if (languageDirective != null) {
+            if (basePrompt.isBlank()) languageDirective else "$basePrompt\n\n$languageDirective"
+        } else basePrompt
 
         DebugLogger.logKeyValue("Combined system prompt length", systemPrompt.length)
     }

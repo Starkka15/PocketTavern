@@ -1094,7 +1094,8 @@ No preamble, no explanation. Just the numbered list."""
         // baked into the weights, so use the lean prompt (skip preset prose). All other models
         // are unaffected.
         val leanMode = config.currentModel.startsWith("pockettavern", ignoreCase = true)
-        val builder = PromptBuilder(character, chatContext, userName, mainPromptOverride, extensionInjections, _currentMemoryBlock, _currentWorldBook, leanMode)
+        val builder = PromptBuilder(character, chatContext, userName, mainPromptOverride, extensionInjections, _currentMemoryBlock, _currentWorldBook, leanMode,
+            languageDirective = com.pockettavern.app.util.LocaleHelper.responseLanguageDirective(context))
         val prompt = builder.buildPrompt(history, userMessage)
 
         // For chat completion APIs, also build structured messages for proper role formatting.

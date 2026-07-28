@@ -222,7 +222,7 @@
     <string name="help">Help</string>
     <string name="no_characters_found">No characters found</string>
     <string name="characters">Characters</string>
-    <string name="translate_to_english">Translate to English</string>
+    <string name="translate_to_language">Translate to %1$s</string>
     <string name="upload_to_charavault">Upload to CharaVault</string>
     <string name="uploading_to_charavault">Uploading to CharaVault</string>
     <string name="please_wait">Please wait...</string>

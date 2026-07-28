@@ -220,7 +220,7 @@ fun CharactersScreen(
                         ) {
                             Icon(Icons.Default.Translate, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(R.string.translate_to_english))
+                            Text(stringResource(R.string.translate_to_language, com.pockettavern.app.util.LocaleHelper.displayLanguageName(androidx.compose.ui.platform.LocalContext.current)))
                         }
                         TextButton(
                             onClick = {
