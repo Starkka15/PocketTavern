@@ -55,6 +55,9 @@ class PromptBuilder(
     private var _buildNewMessage: String = ""
 
     companion object {
+        // Per-message token overhead for chat completion APIs (role framing etc.)
+        private const val MESSAGE_OVERHEAD_TOKENS = 4
+
         // MUST stay byte-identical to PT_RULES in pockettavern-models/gen_dataset.py — the lean
         // prompt at inference has to match what the PocketTavern models were trained on, or the
         // baked-in behavior gets shaky. Update both together.
@@ -117,18 +120,59 @@ class PromptBuilder(
 
     /**
      * Build the complete prompt for text completion APIs.
+     *
+     * @param tokenBudget total prompt token budget (context size minus response reserve).
+     *   When non-null, oldest chat history is dropped so the estimated prompt size fits.
      */
     fun buildPrompt(
         chatHistory: List<ChatMessage>,
-        newMessage: String
+        newMessage: String,
+        tokenBudget: Int? = null
     ): String {
         _buildHistory = chatHistory
         _buildNewMessage = newMessage
-        return if (instructTemplate != null && instructTemplate.inputSequence.isNotBlank()) {
-            buildInstructPrompt(chatHistory, newMessage)
-        } else {
-            buildSimplePrompt(chatHistory, newMessage)
+        val useInstruct = instructTemplate != null && instructTemplate.inputSequence.isNotBlank()
+        fun build(history: List<ChatMessage>): String =
+            if (useInstruct) buildInstructPrompt(history, newMessage)
+            else buildSimplePrompt(history, newMessage)
+
+        if (tokenBudget == null) return build(chatHistory)
+
+        // Overhead pass: everything except chat history. WI entries triggered only by
+        // trimmed-away history are missed here; the conservative estimator covers that.
+        val overheadTokens = estimatePromptTokens(build(emptyList()))
+        val historyBudget = (tokenBudget - overheadTokens).coerceAtLeast(0)
+        val trimmed = trimHistoryToBudget(chatHistory, historyBudget)
+        DebugLogger.logSection("Context Size Trimming (text completion)")
+        DebugLogger.logKeyValue("Token budget", tokenBudget)
+        DebugLogger.logKeyValue("Non-history overhead (est)", overheadTokens)
+        DebugLogger.logKeyValue("History budget", historyBudget)
+        DebugLogger.logKeyValue("History kept", "${trimmed.size}/${chatHistory.size} messages")
+        _buildHistory = trimmed
+        return build(trimmed)
+    }
+
+    /**
+     * Conservative token estimate for context budgeting: ~3 chars per token.
+     * Overestimates for typical English (~4 chars/token) so trimming errs on the
+     * safe side — better to send slightly less history than to blow the provider limit.
+     */
+    private fun estimatePromptTokens(text: String): Int = text.length / 3 + 1
+
+    /**
+     * Keep as many of the NEWEST messages as fit in [budgetTokens]; drop the oldest.
+     */
+    private fun trimHistoryToBudget(history: List<ChatMessage>, budgetTokens: Int): List<ChatMessage> {
+        if (budgetTokens <= 0) return emptyList()
+        var used = 0
+        var firstKept = history.size
+        for (i in history.indices.reversed()) {
+            val t = estimatePromptTokens(promptContent(history[i])) + MESSAGE_OVERHEAD_TOKENS
+            if (used + t > budgetTokens) break
+            used += t
+            firstKept = i
         }
+        return if (firstKept == 0) history else history.subList(firstKept, history.size)
     }
 
     /**
@@ -143,11 +187,39 @@ class PromptBuilder(
      *  5. system  — World Info (after_char, position=1)
      *  6. system  — post-history instructions
      *  7. user    — new user message
+     *
+     * @param tokenBudget total prompt token budget (context size minus response reserve).
+     *   When non-null, oldest chat history is dropped so the estimated request fits (issue #8).
      */
     fun buildChatCompletionMessages(
         chatHistory: List<ChatMessage>,
         newMessage: String,
-        promptOrder: List<OaiPromptOrderItem> = OaiPromptOrderItem.defaultOrder()
+        promptOrder: List<OaiPromptOrderItem> = OaiPromptOrderItem.defaultOrder(),
+        tokenBudget: Int? = null
+    ): List<PromptMessage> {
+        if (tokenBudget == null) {
+            return buildChatCompletionMessagesInternal(chatHistory, newMessage, promptOrder)
+        }
+        // Overhead pass: build with empty history to measure everything that is NOT chat
+        // history (system prompt, card, examples, world info, post-history, new message).
+        // WI entries triggered only by trimmed-away history are missed here; the
+        // conservative estimator covers that.
+        val overheadTokens = buildChatCompletionMessagesInternal(emptyList(), newMessage, promptOrder)
+            .sumOf { estimatePromptTokens(it.content) + MESSAGE_OVERHEAD_TOKENS }
+        val historyBudget = (tokenBudget - overheadTokens).coerceAtLeast(0)
+        val trimmed = trimHistoryToBudget(chatHistory, historyBudget)
+        DebugLogger.logSection("Context Size Trimming (chat completion)")
+        DebugLogger.logKeyValue("Token budget", tokenBudget)
+        DebugLogger.logKeyValue("Non-history overhead (est)", overheadTokens)
+        DebugLogger.logKeyValue("History budget", historyBudget)
+        DebugLogger.logKeyValue("History kept", "${trimmed.size}/${chatHistory.size} messages")
+        return buildChatCompletionMessagesInternal(trimmed, newMessage, promptOrder)
+    }
+
+    private fun buildChatCompletionMessagesInternal(
+        chatHistory: List<ChatMessage>,
+        newMessage: String,
+        promptOrder: List<OaiPromptOrderItem>
     ): List<PromptMessage> {
         _buildHistory = chatHistory
         _buildNewMessage = newMessage
@@ -1035,7 +1107,7 @@ class PromptBuilder(
         var tokenCount = 0
 
         for (entry in sorted) {
-            val entryTokens = estimateTokens(entry.content)
+            val entryTokens = estimatePromptTokens(entry.content)
             if (tokenCount + entryTokens > settings.budgetCap) {
                 DebugLogger.log("  WI budget cap (${settings.budgetCap}) reached at '${entry.comment}' — skipping")
                 continue
@@ -1049,9 +1121,6 @@ class PromptBuilder(
         }
         return result
     }
-
-    // Rough token estimate: ~0.75 tokens per character on average
-    private fun estimateTokens(text: String): Int = (text.length * 0.75).toInt().coerceAtLeast(1)
 
     /**
      * Wrap content as a system message in instruct format.

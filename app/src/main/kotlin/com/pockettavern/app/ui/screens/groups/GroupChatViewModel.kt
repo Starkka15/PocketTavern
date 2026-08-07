@@ -421,10 +421,19 @@ class GroupChatViewModel @Inject constructor(
         val history = _uiState.value.messages
         val allLoreEntries = loadGroupLoreEntries(group)
         val loreEntries = filterLoreEntries(allLoreEntries, history)
-        val prompt = buildGroupPrompt(character, personaName, group, history, loreEntries)
+        // Context Size budget (issue #8): context size minus response reserve; the builders
+        // subtract their fixed blocks and trim oldest history to fit.
+        val contextBudget = if (config.usesChatCompletions) {
+            oaiPreset?.takeIf { it.contextSizeEnabled }?.let { p ->
+                (p.contextSize - (if (p.maxTokensEnabled) p.maxTokens else 0)).coerceAtLeast(256)
+            }
+        } else {
+            preset?.let { p -> (p.truncationLength - (p.maxNewTokens ?: 0)).coerceAtLeast(256) }
+        }
+        val prompt = buildGroupPrompt(character, personaName, group, history, loreEntries, contextBudget)
         val stopSequences = buildStopSequences(character.name, personaName, group)
         val oaiMessages = if (config.usesChatCompletions)
-            buildGroupOaiMessages(character, fileName, personaName, group, history, loreEntries) else null
+            buildGroupOaiMessages(character, fileName, personaName, group, history, loreEntries, contextBudget) else null
 
         generationJob = viewModelScope.launch {
             llmRepository.generate(prompt, config, preset, stopSequences, oaiMessages, oaiPreset).collect { event ->
@@ -472,12 +481,38 @@ class GroupChatViewModel @Inject constructor(
         generationJob?.join()
     }
 
+    /**
+     * Conservative token estimate for context budgeting: ~3 chars per token
+     * (overestimates so trimming errs on the safe side). Mirrors PromptBuilder.
+     */
+    private fun estimatePromptTokens(text: String): Int = text.length / 3 + 1
+
+    /**
+     * Keep as many of the NEWEST messages as fit in [budgetTokens]; drop the oldest.
+     * Null budget = no token limit (only the fixed 24-message cap applies).
+     */
+    private fun trimGroupHistory(msgs: List<GroupChatMessage>, budgetTokens: Int?): List<GroupChatMessage> {
+        val capped = if (msgs.size > 24) msgs.takeLast(24) else msgs
+        if (budgetTokens == null) return capped
+        if (budgetTokens <= 0) return emptyList()
+        var used = 0
+        var firstKept = capped.size
+        for (i in capped.indices.reversed()) {
+            val t = estimatePromptTokens(capped[i].content) + 8  // +8 for "Name: " prefix/framing
+            if (used + t > budgetTokens) break
+            used += t
+            firstKept = i
+        }
+        return if (firstKept == 0) capped else capped.subList(firstKept, capped.size)
+    }
+
     private fun buildGroupPrompt(
         character: Character,
         personaName: String,
         group: Group,
         history: List<GroupChatMessage>,
-        loreEntries: List<WorldInfoEntry> = emptyList()
+        loreEntries: List<WorldInfoEntry> = emptyList(),
+        contextBudget: Int? = null
     ): String = buildString {
         append("### RULE: You are ${character.name}. You ONLY write ${character.name}'s words and actions. ")
         append("$personaName is the human user — NEVER write their dialogue, thoughts, feelings, or reactions. ")
@@ -535,9 +570,9 @@ class GroupChatViewModel @Inject constructor(
             append("[Scene: ${narratorMsg.content}]\n\n")
         }
 
-        val recent = history.filter { !it.isSystem }.let { msgs ->
-            if (msgs.size > 24) msgs.takeLast(24) else msgs
-        }
+        // `length` here = everything already appended (fixed blocks); trim history to what's left
+        val historyBudget = contextBudget?.minus(length / 3)?.coerceAtLeast(0)
+        val recent = trimGroupHistory(history.filter { !it.isSystem }, historyBudget)
         for (msg in recent) {
             val role = when {
                 msg.isUser -> personaName
@@ -1004,7 +1039,8 @@ No preamble, no explanation. Just the numbered list."""
         personaName: String,
         group: Group,
         history: List<GroupChatMessage>,
-        loreEntries: List<WorldInfoEntry> = emptyList()
+        loreEntries: List<WorldInfoEntry> = emptyList(),
+        contextBudget: Int? = null
     ): List<PromptMessage> {
         val otherNames = group.enabledMembers.mapNotNull { loadedCharacters[it] }
             .filter { it.name != character.name }.map { it.name }.joinToString("/").ifBlank { "other characters" }
@@ -1052,9 +1088,10 @@ No preamble, no explanation. Just the numbered list."""
             val narratorMsg = history.firstOrNull { it.isSystem && it.senderName == "Narrator" }
             if (narratorMsg != null) append("[Scene: ${narratorMsg.content}]\n\n")
 
-            val recent = history.filter { !it.isSystem }.let { msgs ->
-                if (msgs.size > 24) msgs.takeLast(24) else msgs
-            }
+            val historyBudget = contextBudget
+                ?.minus(estimatePromptTokens(systemContent) + length / 3)
+                ?.coerceAtLeast(0)
+            val recent = trimGroupHistory(history.filter { !it.isSystem }, historyBudget)
             for (msg in recent) {
                 val role = when {
                     msg.isUser -> personaName

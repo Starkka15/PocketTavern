@@ -1096,12 +1096,24 @@ No preamble, no explanation. Just the numbered list."""
         val leanMode = config.currentModel.startsWith("pockettavern", ignoreCase = true)
         val builder = PromptBuilder(character, chatContext, userName, mainPromptOverride, extensionInjections, _currentMemoryBlock, _currentWorldBook, leanMode,
             languageDirective = com.pockettavern.app.util.LocaleHelper.responseLanguageDirective(context))
-        val prompt = builder.buildPrompt(history, userMessage)
+        // Context Size budget (issue #8): total prompt budget = configured context size minus
+        // room reserved for the response. PromptBuilder drops oldest history to fit.
+        // Chat completion: only when the preset's Context Size toggle is on.
+        // Text completion: truncationLength always applies (ST semantics).
+        val tokenBudget = if (config.usesChatCompletions) {
+            oaiPreset?.takeIf { it.contextSizeEnabled }?.let { p ->
+                (p.contextSize - (if (p.maxTokensEnabled) p.maxTokens else 0)).coerceAtLeast(256)
+            }
+        } else {
+            preset?.let { p -> (p.truncationLength - (p.maxNewTokens ?: 0)).coerceAtLeast(256) }
+        }
+        val prompt = builder.buildPrompt(history, userMessage,
+            if (config.usesChatCompletions) null else tokenBudget)
 
         // For chat completion APIs, also build structured messages for proper role formatting.
         val messages = if (config.usesChatCompletions) {
             val promptOrder = oaiPreset?.promptOrder ?: com.pockettavern.app.domain.model.OaiPromptOrderItem.defaultOrder()
-            builder.buildChatCompletionMessages(history, userMessage, promptOrder)
+            builder.buildChatCompletionMessages(history, userMessage, promptOrder, tokenBudget)
         } else null
 
         // Notify extensions that a prompt is about to be sent (T23)
