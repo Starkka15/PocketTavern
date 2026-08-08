@@ -733,7 +733,7 @@
     <string name="tap_import_everything_is_pulled_down_and_save">Tap Import — everything is pulled down and saved locally.</string>
     <string name="copy_your_sillytavern_data_directory_to_your">Copy your SillyTavern data directory to your Android device.</string>
     <string name="characters_chats_and_lorebooks_are_scanned_an">Characters, chats, and lorebooks are scanned and imported.</string>
-    <string name="api_configuration_select_backend_type_url_api">API Configuration — Select backend type, URL, API key, model, streaming toggle.</string>
+    <string name="api_configuration_select_backend_type_url_api">API Configuration — Select backend type, URL, API key, model.</string>
     <string name="connection_profiles_save_and_switch_between_m">Connection Profiles — Save and switch between multiple named API configurations.</string>
     <string name="image_generation_configure_image_generation_b">Image Generation — Configure image generation backends (SD WebUI, ComfyUI, DALL-E, Stability AI, Pollinations, HuggingFace).</string>
     <string name="text_generation_sampler_settings_and_presets">Text Generation — Sampler settings and presets for text completion backends (KoboldCpp, llama.cpp, etc.). Dimmed when using chat completion APIs.</string>

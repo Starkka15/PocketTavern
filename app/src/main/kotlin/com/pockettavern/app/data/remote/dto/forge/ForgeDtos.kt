@@ -6,6 +6,11 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class Txt2ImgRequest(
     val prompt: String,
+    // e.g. {"CLIP_stop_at_last_layers": 2}; omitted when null
+    @SerialName("override_settings")
+    val overrideSettings: Map<String, kotlinx.serialization.json.JsonElement>? = null,
+    @SerialName("override_settings_restore_afterwards")
+    val overrideSettingsRestore: Boolean = true,
     @SerialName("negative_prompt")
     val negativePrompt: String = "",
     val steps: Int = 20,
@@ -36,6 +41,10 @@ data class Txt2ImgResponse(
 @Serializable
 data class Img2ImgRequest(
     val prompt: String,
+    @SerialName("override_settings")
+    val overrideSettings: Map<String, kotlinx.serialization.json.JsonElement>? = null,
+    @SerialName("override_settings_restore_afterwards")
+    val overrideSettingsRestore: Boolean = true,
     @SerialName("negative_prompt")
     val negativePrompt: String = "",
     @SerialName("init_images")

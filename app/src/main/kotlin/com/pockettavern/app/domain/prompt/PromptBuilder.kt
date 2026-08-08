@@ -259,7 +259,9 @@ class PromptBuilder(
                     val persona = chatContext.userPersona
                     // Only emit if there's an actual description — a bare name with no
                     // description produces "[User's persona]" which is noise to the model.
-                    if (persona.description.isBlank()) ""
+                    // Positions 1-3 inject via injectDepthPrompts instead; emitting here
+                    // too would double the persona in the request.
+                    if (persona.description.isBlank() || persona.position != 0) ""
                     else buildString {
                         if (persona.name.isNotBlank()) append("[${persona.name}'s persona: ")
                         else append("[Persona: ")
@@ -270,8 +272,12 @@ class PromptBuilder(
                 "char_description" -> if (character.description.isNotBlank()) substituteMacros(character.description) else ""
                 "char_personality" -> if (character.personality.isNotBlank())
                     "${character.name}'s personality: ${substituteMacros(character.personality)}" else ""
-                "scenario" -> if (character.scenario.isNotBlank())
-                    "Scenario: ${substituteMacros(character.scenario)}" else ""
+                "scenario" -> {
+                    val scenario = if (character.scenario.isNotBlank())
+                        "Scenario: ${substituteMacros(character.scenario)}" else ""
+                    listOf(scenarioAuthorsNote(2), scenario, scenarioAuthorsNote(0))
+                        .filter { it.isNotBlank() }.joinToString("\n")
+                }
                 "world_info_after" -> getWorldInfoByPosition(1, chatHistory, newMessage)
                 else -> ""
             }
@@ -656,10 +662,12 @@ class PromptBuilder(
             parts.add("${character.name}'s personality: ${substituteMacros(character.personality)}")
         }
 
-        // Scenario
+        // Scenario (with scenario-relative Author's Note before/after when configured)
+        scenarioAuthorsNote(2).takeIf { it.isNotBlank() }?.let { parts.add(it) }
         if (character.scenario.isNotBlank()) {
             parts.add("Scenario: ${substituteMacros(character.scenario)}")
         }
+        scenarioAuthorsNote(0).takeIf { it.isNotBlank() }?.let { parts.add(it) }
 
         // User persona (position 0 = in prompt)
         if (persona.position == 0 && persona.description.isNotBlank()) {
@@ -746,6 +754,31 @@ class PromptBuilder(
         return result
     }
 
+    /** AN interval: due when interval <= 1, else every Nth user message (counting the one being sent). */
+    private fun authorsNoteDue(): Boolean {
+        val interval = chatContext.authorsNote.interval
+        return interval <= 1 || (_buildHistory.count { it.isUser } + 1) % interval == 0
+    }
+
+    /**
+     * Chat/global Author's Note text when configured for a scenario-relative position
+     * (0 = after scenario, 2 = before scenario) and due this message. Card depth prompts
+     * never come through here — they are always depth-injected.
+     */
+    private fun scenarioAuthorsNote(wantedPosition: Int): String {
+        val an = chatContext.authorsNote
+        if (character.depthPrompt.isNotBlank()) return ""
+        if (an.content.isBlank() || an.position != wantedPosition) return ""
+        if (!authorsNoteDue()) return ""
+        return substituteMacros(an.content)
+    }
+
+    private fun personaRoleString(): String = when (chatContext.userPersona.role) {
+        1 -> "user"
+        2 -> "assistant"
+        else -> "system"
+    }
+
     /**
      * Inject Author's Note, User Persona, World Info, and OAI preset depth-injection blocks
      * at correct depths in chat history.
@@ -761,13 +794,26 @@ class PromptBuilder(
         val reversedHistory = chatHistory.reversed()
         val historySize = chatHistory.size
 
-        // Author's Note settings
+        // Author's Note settings. The chat/global note only depth-injects when its
+        // position is in-chat (1) and its interval says it's due; positions 0/2 are
+        // emitted next to the scenario block instead. Card depth prompts always inject.
         val authorsNote = chatContext.authorsNote
-        val depthPrompt = character.depthPrompt.ifBlank { authorsNote.content }
+        val chatNoteEligible = authorsNote.position == 1 && authorsNoteDue()
+        val depthPrompt = character.depthPrompt.ifBlank {
+            if (chatNoteEligible) authorsNote.content else ""
+        }
         val depthPromptDepth = if (character.depthPrompt.isNotBlank()) {
             character.depthPromptDepth
         } else {
             authorsNote.depth
+        }
+        // Role follows whichever source supplied the note (chat AN role is an int enum)
+        val depthPromptRole = if (character.depthPrompt.isNotBlank()) {
+            character.depthPromptRole.ifBlank { "system" }
+        } else when (authorsNote.role) {
+            1 -> "user"
+            2 -> "assistant"
+            else -> "system"
         }
 
         // Debug logging for Author's Note / Depth Prompt
@@ -788,19 +834,19 @@ class PromptBuilder(
                 2 -> { // TOP_OF_AN - persona before AN
                     val personaDesc = chatContext.userPersona.description
                     if (personaDesc.isNotBlank()) {
-                        result.add(HistoryItem.Injection("[${chatContext.userPersona.name}'s persona: ${substituteMacros(personaDesc)}]"))
+                        result.add(HistoryItem.Injection("[${chatContext.userPersona.name}'s persona: ${substituteMacros(personaDesc)}]", personaRoleString()))
                     }
-                    result.add(HistoryItem.Injection(substituteMacros(depthPrompt)))
+                    result.add(HistoryItem.Injection(substituteMacros(depthPrompt), depthPromptRole))
                 }
                 3 -> { // BOTTOM_OF_AN - persona after AN
-                    result.add(HistoryItem.Injection(substituteMacros(depthPrompt)))
+                    result.add(HistoryItem.Injection(substituteMacros(depthPrompt), depthPromptRole))
                     val personaDesc = chatContext.userPersona.description
                     if (personaDesc.isNotBlank()) {
-                        result.add(HistoryItem.Injection("[${chatContext.userPersona.name}'s persona: ${substituteMacros(personaDesc)}]"))
+                        result.add(HistoryItem.Injection("[${chatContext.userPersona.name}'s persona: ${substituteMacros(personaDesc)}]", personaRoleString()))
                     }
                 }
                 else -> {
-                    result.add(HistoryItem.Injection(substituteMacros(depthPrompt)))
+                    result.add(HistoryItem.Injection(substituteMacros(depthPrompt), depthPromptRole))
                 }
             }
         }
@@ -853,25 +899,25 @@ class PromptBuilder(
                 when (persona.position) {
                     2 -> { // TOP_OF_AN - persona before AN
                         if (personaContent.isNotBlank()) {
-                            result.add(HistoryItem.Injection(personaContent))
+                            result.add(HistoryItem.Injection(personaContent, personaRoleString()))
                         }
-                        result.add(HistoryItem.Injection(substituteMacros(depthPrompt)))
+                        result.add(HistoryItem.Injection(substituteMacros(depthPrompt), depthPromptRole))
                     }
                     3 -> { // BOTTOM_OF_AN - persona after AN
-                        result.add(HistoryItem.Injection(substituteMacros(depthPrompt)))
+                        result.add(HistoryItem.Injection(substituteMacros(depthPrompt), depthPromptRole))
                         if (personaContent.isNotBlank()) {
-                            result.add(HistoryItem.Injection(personaContent))
+                            result.add(HistoryItem.Injection(personaContent, personaRoleString()))
                         }
                     }
                     else -> {
-                        result.add(HistoryItem.Injection(substituteMacros(depthPrompt)))
+                        result.add(HistoryItem.Injection(substituteMacros(depthPrompt), depthPromptRole))
                     }
                 }
             }
 
             // Inject persona at depth if position is IN_CHAT (1)
             if (persona.position == 1 && depth == persona.depth && personaContent.isNotBlank()) {
-                result.add(HistoryItem.Injection(personaContent))
+                result.add(HistoryItem.Injection(personaContent, personaRoleString()))
             }
 
             result.add(HistoryItem.Message(message))
@@ -884,7 +930,7 @@ class PromptBuilder(
 
         // Also inject Author's Note at beginning if depth > history size
         if (depthPromptDepth > historySize && depthPrompt.isNotBlank()) {
-            result.add(HistoryItem.Injection(substituteMacros(depthPrompt)))
+            result.add(HistoryItem.Injection(substituteMacros(depthPrompt), depthPromptRole))
         }
 
         // Inject OAI preset blocks whose depth exceeds history size (goes to top of history).

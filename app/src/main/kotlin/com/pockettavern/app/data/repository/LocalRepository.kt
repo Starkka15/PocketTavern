@@ -181,7 +181,6 @@ class LocalRepository @Inject constructor(
         settingsDataStore.setSelectedInstructPreset(settings.selectedInstructPreset.ifBlank { null })
         settingsDataStore.setSelectedContextPreset(settings.selectedContextPreset.ifBlank { null })
         settingsDataStore.setSelectedSyspromptPreset(settings.selectedSystemPromptPreset.ifBlank { null })
-        settingsDataStore.saveCustomSystemPrompt(settings.customSystemPrompt)
     }
 
     /** Load the currently selected TextGen preset (name from DataStore, content from PresetStorage). */
@@ -283,6 +282,7 @@ class LocalRepository @Inject constructor(
             description = settingsDataStore.getUserPersonaDesc(),
             position = settingsDataStore.getUserPersonaPosition(),
             depth = settingsDataStore.getUserPersonaDepth(),
+            role = settingsDataStore.getUserPersonaRole(),
             avatarPath = settingsDataStore.getUserPersonaAvatarPath(),
             noSpeakForUser = settingsDataStore.getNoSpeakForUser()
         )
@@ -293,6 +293,7 @@ class LocalRepository @Inject constructor(
         settingsDataStore.saveUserPersonaDesc(persona.description)
         settingsDataStore.saveUserPersonaPosition(persona.position)
         settingsDataStore.saveUserPersonaDepth(persona.depth)
+        settingsDataStore.saveUserPersonaRole(persona.role)
         settingsDataStore.saveUserPersonaAvatarPath(persona.avatarPath)
         settingsDataStore.saveNoSpeakForUser(persona.noSpeakForUser)
     }
@@ -333,6 +334,9 @@ class LocalRepository @Inject constructor(
         val persona = UserPersona(
             name = settingsDataStore.getUserPersonaName(),
             description = settingsDataStore.getUserPersonaDesc(),
+            position = settingsDataStore.getUserPersonaPosition(),
+            depth = settingsDataStore.getUserPersonaDepth(),
+            role = settingsDataStore.getUserPersonaRole(),
             avatarPath = settingsDataStore.getUserPersonaAvatarPath(),
             noSpeakForUser = settingsDataStore.getNoSpeakForUser()
         )

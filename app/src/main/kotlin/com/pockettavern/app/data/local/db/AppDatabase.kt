@@ -11,7 +11,7 @@ import com.pockettavern.app.data.local.db.entity.ChatEntity
 
 @Database(
     entities = [CharacterEntity::class, ChatEntity::class],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -63,6 +63,15 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE characters ADD COLUMN attachedWorldInfo TEXT")
+            }
+        }
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE characters ADD COLUMN depthPrompt TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE characters ADD COLUMN depthPromptDepth INTEGER NOT NULL DEFAULT 4")
+                db.execSQL("ALTER TABLE characters ADD COLUMN depthPromptRole TEXT NOT NULL DEFAULT 'system'")
+                db.execSQL("ALTER TABLE characters ADD COLUMN talkativeness REAL NOT NULL DEFAULT 0.5")
             }
         }
     }

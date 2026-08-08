@@ -436,7 +436,7 @@ class GroupChatViewModel @Inject constructor(
             buildGroupOaiMessages(character, fileName, personaName, group, history, loreEntries, contextBudget) else null
 
         generationJob = viewModelScope.launch {
-            llmRepository.generate(prompt, config, preset, stopSequences, oaiMessages, oaiPreset).collect { event ->
+            llmRepository.generate(prompt, config, preset, stopSequences, oaiMessages, oaiPreset, config.showThoughts).collect { event ->
                 when (event) {
                     is StreamEvent.Token -> {
                         _uiState.update { it.copy(streamingContent = event.accumulated) }
@@ -634,7 +634,7 @@ class GroupChatViewModel @Inject constructor(
             buildNarratorOaiMessages(group.name, personaName, chars, hint) else null
 
         generationJob = viewModelScope.launch {
-            llmRepository.generate(prompt, config, preset, emptyList(), oaiMessages, oaiPreset).collect { event ->
+            llmRepository.generate(prompt, config, preset, emptyList(), oaiMessages, oaiPreset, config.showThoughts).collect { event ->
                 when (event) {
                     is StreamEvent.Token -> {
                         _uiState.update { it.copy(streamingContent = event.accumulated) }
@@ -738,7 +738,7 @@ class GroupChatViewModel @Inject constructor(
             buildFirstMessageOaiMessages(character, fileName, group.name, group.chatStyle, group.systemPrompt, personaName, others, _uiState.value.messages) else null
 
         generationJob = viewModelScope.launch {
-            llmRepository.generate(prompt, config, preset, stopSequences, oaiMessages, oaiPreset).collect { event ->
+            llmRepository.generate(prompt, config, preset, stopSequences, oaiMessages, oaiPreset, config.showThoughts).collect { event ->
                 when (event) {
                     is StreamEvent.Token -> {
                         _uiState.update { it.copy(streamingContent = event.accumulated) }

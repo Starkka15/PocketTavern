@@ -218,7 +218,6 @@ fun SetupGuideScreen(
                 BulletItem(stringResource(R.string.enter_the_server_url_and_api_key_if_required))
                 BulletItem(stringResource(R.string.tap_the_refresh_icon_to_fetch_available_model))
                 BulletItem(stringResource(R.string.select_your_model_from_the_dropdown_or_type_i))
-                BulletItem(stringResource(R.string.toggle_streaming_on_off))
                 BulletItem(stringResource(R.string.tap_test_connection_to_verify))
 
                 VerticalSpacer()

@@ -167,8 +167,10 @@ fun CharacterSettingsScreen(
                 // TTS Voice
                 TtsVoiceSection(
                     voiceId = uiState.ttsVoiceId,
+                    providerOverride = uiState.ttsProviderOverride,
                     availableVoices = uiState.availableVoices,
                     onVoiceChange = viewModel::updateTtsVoice,
+                    onProviderChange = viewModel::updateTtsProviderOverride,
                     onTestVoice = viewModel::testTtsVoice
                 )
 
@@ -539,11 +541,14 @@ private fun TalkativenessSection(
 @Composable
 private fun TtsVoiceSection(
     voiceId: String?,
+    providerOverride: String?,
     availableVoices: List<com.pockettavern.app.ui.audio.TtsVoice>,
     onVoiceChange: (String?) -> Unit,
+    onProviderChange: (String?) -> Unit,
     onTestVoice: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var providerExpanded by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(text = stringResource(R.string.tts_voice),
@@ -555,6 +560,48 @@ private fun TtsVoiceSection(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+
+        // Per-character TTS provider override (default = global provider)
+        ExposedDropdownMenuBox(
+            expanded = providerExpanded,
+            onExpandedChange = { providerExpanded = it }
+        ) {
+            OutlinedTextField(
+                value = when (providerOverride) {
+                    "system" -> "System TTS"
+                    "openai" -> "OpenAI-compatible"
+                    else -> "Default (global)"
+                },
+                onValueChange = { },
+                readOnly = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                label = { Text("Provider") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = providerExpanded) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            )
+            ExposedDropdownMenu(
+                expanded = providerExpanded,
+                onDismissRequest = { providerExpanded = false }
+            ) {
+                listOf(null to "Default (global)", "system" to "System TTS", "openai" to "OpenAI-compatible")
+                    .forEach { (value, label) ->
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = {
+                                onProviderChange(value)
+                                providerExpanded = false
+                            }
+                        )
+                    }
+            }
+        }
 
         ExposedDropdownMenuBox(
             expanded = expanded,

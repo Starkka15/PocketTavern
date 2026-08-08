@@ -64,7 +64,8 @@ class CreateCharacterViewModel @Inject constructor(
     private val localRepository: LocalRepository,
     private val forgeRepository: ForgeRepository,
     private val imageGenRepository: ImageGenRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val settingsDataStore: com.pockettavern.app.data.local.SettingsDataStore
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CreateCharacterUiState())
@@ -212,11 +213,17 @@ class CreateCharacterViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            val cfg = settingsDataStore.getImageGenConfig()
             val params = ForgeGenerationParams(
                 prompt = prompt,
-                width = 512,
-                height = 768,
-                steps = 20
+                negativePrompt = cfg.negativePrompt,
+                width = cfg.width,
+                height = cfg.height,
+                steps = cfg.steps,
+                cfgScale = cfg.cfgScale,
+                sampler = cfg.sampler,
+                seed = cfg.seed,
+                clipSkip = cfg.clipSkip
             )
 
             imageGenRepository.generateImageWithProgress(params).collect { state ->

@@ -56,7 +56,9 @@ class PersonaViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val localRepository: LocalRepository,
     private val settingsRepository: SettingsRepository,
-    private val forgeRepository: ForgeRepository
+    private val forgeRepository: ForgeRepository,
+    private val imageGenRepository: com.pockettavern.app.data.repository.ImageGenRepository,
+    private val settingsDataStore: com.pockettavern.app.data.local.SettingsDataStore
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PersonaUiState())
@@ -150,12 +152,17 @@ class PersonaViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
             try {
+                // Carry over stored fields the edit dialog doesn't touch — omitting
+                // avatarPath here used to wipe the persona avatar on every edit
+                val stored = (localRepository.getUserPersona() as? Result.Success)?.data
                 val updated = UserPersona(
                     name = persona.name,
                     description = state.editDescription,
                     position = state.editPosition.value,
                     depth = state.editDepth,
-                    role = state.editRole.value
+                    role = state.editRole.value,
+                    avatarPath = stored?.avatarPath,
+                    noSpeakForUser = stored?.noSpeakForUser ?: false
                 )
                 localRepository.saveUserPersona(updated)
                 _uiState.update {
@@ -296,16 +303,22 @@ class PersonaViewModel @Inject constructor(
         generationJob = viewModelScope.launch {
             _uiState.update { it.copy(isGenerating = true, generationProgress = 0f) }
 
+            // Use the configured image backend + stored generation settings — this
+            // previously hardcoded Forge and 512x512/20 steps regardless of config
+            val cfg = settingsDataStore.getImageGenConfig()
             val params = ForgeGenerationParams(
                 prompt = prompt,
-                negativePrompt = "blurry, low quality, distorted, deformed, bad anatomy, ugly, disfigured",
-                width = 512,
-                height = 512,
-                steps = 20,
-                cfgScale = 7f
+                negativePrompt = cfg.negativePrompt,
+                width = cfg.width,
+                height = cfg.height,
+                steps = cfg.steps,
+                cfgScale = cfg.cfgScale,
+                sampler = cfg.sampler,
+                seed = cfg.seed,
+                clipSkip = cfg.clipSkip
             )
 
-            forgeRepository.generateImageWithProgress(params).collect { state ->
+            imageGenRepository.generateImageWithProgress(params).collect { state ->
                 when (state) {
                     is GenerationState.Starting -> {
                         _uiState.update { it.copy(generationProgress = 0f) }

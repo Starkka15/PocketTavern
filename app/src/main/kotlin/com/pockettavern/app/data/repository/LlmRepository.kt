@@ -341,6 +341,16 @@ class LlmRepository @Inject constructor(
             topK = preset?.topK ?: 40,
             minP = preset?.minP ?: 0.05f,
             repeatPenalty = preset?.repPen ?: 1.1f,
+            repeatLastN = preset?.repPenRange ?: 64,
+            frequencyPenalty = preset?.frequencyPenalty ?: 0f,
+            presencePenalty = preset?.presencePenalty ?: 0f,
+            typicalP = preset?.typicalP ?: 1.0f,
+            dryMultiplier = preset?.dryMultiplier ?: 0f,
+            dryBase = preset?.dryBase ?: 1.75f,
+            dryAllowedLength = preset?.dryAllowedLength ?: 2,
+            dryPenaltyLastN = preset?.dryPenaltyLastN ?: 0,
+            xtcThreshold = preset?.xtcThreshold ?: 0.1f,
+            xtcProbability = preset?.xtcProbability ?: 0f,
             mirostat = preset?.mirostatMode ?: 0,
             mirostatTau = preset?.mirostatTau ?: 5f,
             mirostatEta = preset?.mirostatEta ?: 0.1f,
@@ -509,7 +519,12 @@ class LlmRepository @Inject constructor(
             messages = oaiMessages,
             stream = true,
             temperature = if (oaiPreset != null && oaiPreset.temperatureEnabled) oaiPreset.temperature else null,
-            maxTokens = if (oaiPreset != null && oaiPreset.maxTokensEnabled) oaiPreset.maxTokens else 1024,
+            // Toggle off = omit; the 1024 fallback only applies when no preset exists at all
+            maxTokens = when {
+                oaiPreset == null -> 1024
+                oaiPreset.maxTokensEnabled -> oaiPreset.maxTokens
+                else -> null
+            },
             topP = if (oaiPreset != null && oaiPreset.topPEnabled) oaiPreset.topP else null,
             topK = if (oaiPreset != null && oaiPreset.topKEnabled) oaiPreset.topK else null,
             frequencyPenalty = if (oaiPreset != null && oaiPreset.frequencyPenaltyEnabled) oaiPreset.frequencyPenalty else null,
@@ -624,6 +639,14 @@ class LlmRepository @Inject constructor(
             temperature = preset?.temperature,
             maxTokens = preset?.maxNewTokens,
             topP = preset?.topP,
+            topK = preset?.topK?.takeIf { it > 0 },
+            minP = preset?.minP?.takeIf { it > 0f },
+            repetitionPenalty = preset?.repPen,
+            frequencyPenalty = preset?.frequencyPenalty?.takeIf { it != 0f },
+            presencePenalty = preset?.presencePenalty?.takeIf { it != 0f },
+            guidanceScale = preset?.guidanceScale?.takeIf { it != 1f },
+            smoothingCurve = preset?.smoothingCurve?.takeIf { it != 1f },
+            skipSpecialTokens = preset?.skipSpecialTokens,
             stop = stopSequences.ifEmpty { null }
         )
         val body = json.encodeToString(OaiTextRequest.serializer(), request)

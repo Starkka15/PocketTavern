@@ -26,5 +26,9 @@ data class CharacterEntity(
     val useAvatarForImageGen: Boolean = true,
     val notes: String = "",
     val loreHints: String = "",
-    val attachedWorldInfo: String? = null
+    val attachedWorldInfo: String? = null,
+    val depthPrompt: String = "",
+    val depthPromptDepth: Int = 4,
+    val depthPromptRole: String = "system",
+    val talkativeness: Float = 0.5f
 )

@@ -1690,7 +1690,8 @@ No preamble, no explanation. Just the numbered list."""
                 sampler = imageGenConfig.sampler,
                 seed = seed,
                 sourceImageBase64 = sourceImageBase64,
-                denoisingStrength = denoisingStrength
+                denoisingStrength = denoisingStrength,
+                clipSkip = imageGenConfig.clipSkip
             )
 
             var resultBase64 = ""
