@@ -22,8 +22,8 @@ android {
         applicationId = "com.pockettavern.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 25
-        versionName = "2.3.3-beta2"
+        versionCode = 26
+        versionName = "2.3.3-beta3"
 
         // Stories (native ensemble) = private/dev feature for now. Visible in debug builds,
         // hidden in the public release (overridden false below). Keeps PocketTavern simple.
