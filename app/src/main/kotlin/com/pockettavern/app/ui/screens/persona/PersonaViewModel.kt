@@ -58,13 +58,16 @@ class PersonaViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val forgeRepository: ForgeRepository,
     private val imageGenRepository: com.pockettavern.app.data.repository.ImageGenRepository,
-    private val settingsDataStore: com.pockettavern.app.data.local.SettingsDataStore
+    private val settingsDataStore: com.pockettavern.app.data.local.SettingsDataStore,
+    private val personaStorage: com.pockettavern.app.data.local.PersonaStorage
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PersonaUiState())
     val uiState: StateFlow<PersonaUiState> = _uiState.asStateFlow()
 
     private var generationJob: Job? = null
+    private var roster: List<com.pockettavern.app.data.local.StoredPersona> = emptyList()
+    private var selectedId: String? = null
 
     init {
         viewModelScope.launch {
@@ -79,32 +82,65 @@ class PersonaViewModel @Inject constructor(
     fun loadPersonas() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            when (val result = localRepository.getUserPersona()) {
-                is Result.Success -> {
-                    val persona = result.data.toPersona()
-                    _uiState.update {
-                        it.copy(
-                            personas = listOf(persona),
-                            selectedPersona = persona,
-                            isLoading = false
-                        )
-                    }
-                }
-                is Result.Error -> {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = result.exception.message
-                        )
-                    }
-                }
+            val (loaded, loadedSelected) = personaStorage.load()
+            if (loaded.isEmpty()) {
+                // Migration: seed the roster from the old single-slot DataStore persona
+                val current = (localRepository.getUserPersona() as? Result.Success)?.data
+                val seed = com.pockettavern.app.data.local.StoredPersona(
+                    id = java.util.UUID.randomUUID().toString(),
+                    name = current?.name?.ifBlank { "User" } ?: "User",
+                    description = current?.description ?: "",
+                    position = current?.position ?: 0,
+                    depth = current?.depth ?: 2,
+                    role = current?.role ?: 0,
+                    avatarPath = current?.avatarPath
+                )
+                roster = listOf(seed)
+                selectedId = seed.id
+                personaStorage.save(roster, selectedId)
+            } else {
+                roster = loaded
+                selectedId = loadedSelected ?: loaded.first().id
             }
+            publishRoster()
         }
     }
 
+    private fun publishRoster() {
+        val personas = roster.map { it.toPersona(it.id == selectedId) }
+        _uiState.update {
+            it.copy(
+                personas = personas,
+                selectedPersona = personas.firstOrNull { p -> p.isSelected },
+                isLoading = false
+            )
+        }
+    }
+
+    /** Mirror the selected roster entry into the DataStore slot the prompt path reads. */
+    private suspend fun activate(p: com.pockettavern.app.data.local.StoredPersona) {
+        val noSpeak = (localRepository.getUserPersona() as? Result.Success)?.data?.noSpeakForUser ?: false
+        localRepository.saveUserPersona(
+            UserPersona(
+                name = p.name,
+                description = p.description,
+                position = p.position,
+                depth = p.depth,
+                role = p.role,
+                avatarPath = p.avatarPath,
+                noSpeakForUser = noSpeak
+            )
+        )
+    }
+
     fun selectPersona(persona: Persona) {
-        // Only one persona in standalone mode — selecting it is a no-op
-        _uiState.update { it.copy(selectedPersona = persona) }
+        val target = roster.firstOrNull { it.id == persona.avatarId } ?: return
+        viewModelScope.launch {
+            selectedId = target.id
+            personaStorage.save(roster, selectedId)
+            activate(target)
+            publishRoster()
+        }
     }
 
     fun showEditDialog(persona: Persona) {
@@ -152,19 +188,17 @@ class PersonaViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
             try {
-                // Carry over stored fields the edit dialog doesn't touch — omitting
-                // avatarPath here used to wipe the persona avatar on every edit
-                val stored = (localRepository.getUserPersona() as? Result.Success)?.data
-                val updated = UserPersona(
-                    name = persona.name,
+                val idx = roster.indexOfFirst { it.id == persona.avatarId }
+                if (idx < 0) throw Exception("Persona not found")
+                val updated = roster[idx].copy(
                     description = state.editDescription,
                     position = state.editPosition.value,
                     depth = state.editDepth,
-                    role = state.editRole.value,
-                    avatarPath = stored?.avatarPath,
-                    noSpeakForUser = stored?.noSpeakForUser ?: false
+                    role = state.editRole.value
                 )
-                localRepository.saveUserPersona(updated)
+                roster = roster.toMutableList().also { it[idx] = updated }
+                personaStorage.save(roster, selectedId)
+                if (updated.id == selectedId) activate(updated)
                 _uiState.update {
                     it.copy(
                         isSaving = false,
@@ -193,13 +227,34 @@ class PersonaViewModel @Inject constructor(
     }
 
     fun deletePersona() {
-        // Deleting the only persona is not allowed in standalone mode
-        _uiState.update {
-            it.copy(
-                showDeleteConfirm = false,
-                showEditDialog = false,
-                error = "Cannot delete the only persona in standalone mode"
-            )
+        val target = _uiState.value.editingPersona ?: return
+        if (roster.size <= 1) {
+            _uiState.update {
+                it.copy(
+                    showDeleteConfirm = false,
+                    showEditDialog = false,
+                    error = "Cannot delete the last persona"
+                )
+            }
+            return
+        }
+        viewModelScope.launch {
+            val removed = roster.firstOrNull { it.id == target.avatarId } ?: return@launch
+            roster = roster.filterNot { it.id == removed.id }
+            removed.avatarPath?.let { path -> java.io.File(path).takeIf { f -> f.exists() }?.delete() }
+            if (selectedId == removed.id) {
+                selectedId = roster.first().id
+                activate(roster.first())
+            }
+            personaStorage.save(roster, selectedId)
+            _uiState.update {
+                it.copy(
+                    showDeleteConfirm = false,
+                    showEditDialog = false,
+                    successMessage = "Persona deleted"
+                )
+            }
+            publishRoster()
         }
     }
 
@@ -236,10 +291,22 @@ class PersonaViewModel @Inject constructor(
     }
 
     fun setCreateImage(bytes: ByteArray, mimeType: String) {
+        // Bake EXIF rotation into the pixels — camera photos otherwise save sideways
+        val upright = com.pockettavern.app.util.ImageOrientation.normalize(bytes)
         _uiState.update {
             it.copy(
-                createImageBytes = bytes,
+                createImageBytes = upright,
                 createImageMimeType = mimeType
+            )
+        }
+    }
+
+    fun rotateCreateImage() {
+        val bytes = _uiState.value.createImageBytes ?: return
+        _uiState.update {
+            it.copy(
+                createImageBytes = com.pockettavern.app.util.ImageOrientation.rotate(bytes, 90f),
+                createImageMimeType = "image/png"
             )
         }
     }
@@ -262,26 +329,31 @@ class PersonaViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
             try {
+                val id = java.util.UUID.randomUUID().toString()
                 val avatarPath = state.createImageBytes?.let { bytes ->
-                    val file = File(context.filesDir, "persona_avatar.png")
+                    val file = personaStorage.avatarFile(id)
                     file.writeBytes(bytes)
                     file.absolutePath
                 }
-                val updated = UserPersona(
+                val created = com.pockettavern.app.data.local.StoredPersona(
+                    id = id,
                     name = state.createName.trim(),
                     description = state.createDescription,
                     avatarPath = avatarPath
                 )
-                localRepository.saveUserPersona(updated)
+                roster = roster + created
+                selectedId = id
+                personaStorage.save(roster, selectedId)
+                activate(created)
                 _uiState.update {
                     it.copy(
                         isSaving = false,
                         showCreateDialog = false,
                         createImageBytes = null,
-                        successMessage = "Persona updated to \"${state.createName.trim()}\""
+                        successMessage = "Persona \"${created.name}\" created"
                     )
                 }
-                loadPersonas()
+                publishRoster()
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSaving = false, error = e.message) }
             }
@@ -358,14 +430,16 @@ class PersonaViewModel @Inject constructor(
         }
     }
 
-    // Convert UserPersona to Persona (domain model used by the UI)
-    private fun UserPersona.toPersona(): Persona = Persona(
-        avatarId = avatarPath ?: "",
+    // Convert a roster record to the UI model. The record id rides in avatarId —
+    // it is the stable key the select/edit/delete operations use.
+    private fun com.pockettavern.app.data.local.StoredPersona.toPersona(selected: Boolean): Persona = Persona(
+        avatarId = id,
         name = name,
         description = description,
         position = PersonaPosition.fromInt(position),
         role = PersonaRole.fromInt(role),
         depth = depth,
-        isSelected = true
+        isSelected = selected,
+        avatarPath = avatarPath
     )
 }

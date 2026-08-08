@@ -132,6 +132,9 @@ dependencies {
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
 
+    // EXIF orientation for uploaded photos
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
+
     // SAF DocumentFile support (for folder import)
     implementation("androidx.documentfile:documentfile:1.0.1")
 

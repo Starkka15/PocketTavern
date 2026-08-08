@@ -66,7 +66,7 @@ fun CreateCharacterScreen(
         uri?.let {
             try {
                 context.contentResolver.openInputStream(it)?.use { inputStream ->
-                    val bytes = inputStream.readBytes()
+                    val bytes = com.pockettavern.app.util.ImageOrientation.normalize(inputStream.readBytes())
                     viewModel.setAvatarFromBytes(bytes)
                 }
             } catch (e: Exception) { }

@@ -230,6 +230,7 @@ fun PersonaScreen(
                 onImageSelected = { bytes, mimeType ->
                     viewModel.setCreateImage(bytes, mimeType)
                 },
+                onRotateImage = { viewModel.rotateCreateImage() },
                 onNameChange = { viewModel.updateCreateName(it) },
                 onDescriptionChange = { viewModel.updateCreateDescription(it) },
                 onGenerationPromptChange = { viewModel.updateGenerationPrompt(it) },
@@ -261,9 +262,9 @@ private fun SelectedPersonaCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (persona.avatarId.isNotEmpty()) {
+            if (!persona.avatarPath.isNullOrEmpty()) {
                 AsyncImage(
-                    model = File(persona.avatarId),
+                    model = File(persona.avatarPath),
                     contentDescription = stringResource(R.string.avatar),
                     modifier = Modifier
                         .size(72.dp)
@@ -351,9 +352,9 @@ private fun PersonaListItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (persona.avatarId.isNotEmpty()) {
+            if (!persona.avatarPath.isNullOrEmpty()) {
                 AsyncImage(
-                    model = File(persona.avatarId),
+                    model = File(persona.avatarPath),
                     contentDescription = stringResource(R.string.avatar),
                     modifier = Modifier
                         .size(48.dp)
@@ -614,6 +615,7 @@ private fun CreatePersonaDialog(
     isGenerating: Boolean,
     generationProgress: Float,
     onImageSelected: (ByteArray, String) -> Unit,
+    onRotateImage: () -> Unit,
     onNameChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
     onGenerationPromptChange: (String) -> Unit,
@@ -716,6 +718,18 @@ private fun CreatePersonaDialog(
                                         .clip(avatarShape),
                                     contentScale = ContentScale.Crop
                                 )
+                                IconButton(
+                                    onClick = onRotateImage,
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.RotateRight,
+                                        contentDescription = "Rotate image",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
                         }
                         selectedTab == 0 -> {
