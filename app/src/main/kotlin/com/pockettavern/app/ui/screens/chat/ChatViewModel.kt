@@ -1473,6 +1473,11 @@ No preamble, no explanation. Just the numbered list."""
         localRepository.saveChat(chat)
     }
 
+    private companion object {
+        // Compact the accumulated memory block once it exceeds ~4000 chars (~1300 tokens)
+        const val MEMORY_BLOCK_COMPACT_CHARS = 4_000
+    }
+
     private fun triggerMemorySummarizationIfNeeded() {
         if (!memoryEnabled) return
         val character = _uiState.value.character ?: return
@@ -1490,8 +1495,19 @@ No preamble, no explanation. Just the numbered list."""
                 }
                 val summary = summarizeHistoryUseCase.summarize(unsummarized, config)
                 if (summary.isBlank()) return@launch
-                val newBlock = if (_currentMemoryBlock.isBlank()) summary
+                var newBlock = if (_currentMemoryBlock.isBlank()) summary
                     else "$_currentMemoryBlock\n$summary"
+                // Compact when the accumulated block outgrows its budget — otherwise
+                // marathon chats build an ever-growing [Memory] preamble. On a failed
+                // compaction keep the uncompacted block; never lose memory.
+                if (newBlock.length > MEMORY_BLOCK_COMPACT_CHARS) {
+                    val compacted = summarizeHistoryUseCase.compact(newBlock, config)
+                    if (compacted.isNotBlank()) {
+                        com.pockettavern.app.util.DebugLogger.log(
+                            "ChatViewModel: memory compacted ${newBlock.length} -> ${compacted.length} chars")
+                        newBlock = compacted
+                    }
+                }
                 val newCount = messages.size
                 _currentMemoryBlock = newBlock
                 _currentSummarizedTurnCount = newCount

@@ -58,4 +58,41 @@ class SummarizeHistoryUseCase @Inject constructor(
         }
         return result
     }
+
+    /**
+     * Consolidate an overgrown memory block into a fresh deduplicated summary.
+     * Memory blocks are appended to on every summarization pass; without this a
+     * marathon chat accumulates an ever-growing [Memory] preamble.
+     */
+    suspend fun compact(memoryBlock: String, config: ApiConfiguration): String {
+        if (memoryBlock.isBlank()) return memoryBlock
+
+        val instruction = "The following are accumulated memory notes from a long roleplay conversation, " +
+            "oldest first. Consolidate them into a single deduplicated bullet list. Keep every " +
+            "still-relevant fact, relationship development, and open plot thread; merge duplicates; " +
+            "prefer the newest version of any fact that changed. Maximum 300 tokens. " +
+            "Output only the bullet list — no preamble, no roleplay."
+
+        val messages = listOf(
+            PromptMessage("system", instruction),
+            PromptMessage("user", memoryBlock)
+        )
+        val flatPrompt = "$instruction\n\n$memoryBlock\n\nConsolidated bullets:"
+
+        var result = ""
+        llmRepository.generate(
+            prompt = flatPrompt,
+            config = config,
+            preset = null,
+            stopSequences = emptyList(),
+            messages = if (config.usesChatCompletions) messages else null,
+            oaiPreset = null
+        ).collect { event ->
+            when (event) {
+                is StreamEvent.Complete -> result = event.fullText.trim()
+                else -> {}
+            }
+        }
+        return result
+    }
 }
