@@ -366,6 +366,13 @@ class LocalRepository @Inject constructor(
             globalAuthorsNote
         }
 
+        // Embedded character book — extracted once; entries feed worldInfoEntries and the
+        // book's own scan settings feed WorldInfoSettings below.
+        val characterBook = if (character.hasCharacterBook) {
+            val pngBytes = characterStorage.getCharacterBytes(characterFileName)
+            pngBytes?.let { PngCharacterCard.extractCharacterData(it) }?.data?.characterBook
+        } else null
+
         // Load world info entries
         val worldInfoEntries = buildList {
             // 1. Attached global lorebook
@@ -373,27 +380,31 @@ class LocalRepository @Inject constructor(
                 addAll(loreBookStorage.loadLorebook(lbName))
             }
             // 2. Embedded character book (Phase 5 fix — key part of the plan)
-            if (character.hasCharacterBook) {
-                val pngBytes = characterStorage.getCharacterBytes(characterFileName)
-                val card = pngBytes?.let { PngCharacterCard.extractCharacterData(it) }
-                card?.data?.characterBook?.entries?.forEach { entry ->
-                    add(WorldInfoEntry(
-                        uid = (entry.id ?: 0).toString(),
-                        key = entry.keys,
-                        keysecondary = entry.secondaryKeys,
-                        content = entry.content,
-                        comment = entry.comment.ifBlank { entry.name },
-                        constant = entry.constant,
-                        selective = entry.selective,
-                        order = entry.insertionOrder,
-                        position = if (entry.position == "after_char") 1 else 0,
-                        depth = 4,
-                        probability = 100,
-                        enabled = entry.enabled
-                    ))
-                }
+            characterBook?.entries?.forEach { entry ->
+                add(WorldInfoEntry(
+                    uid = (entry.id ?: 0).toString(),
+                    key = entry.keys,
+                    keysecondary = entry.secondaryKeys,
+                    content = entry.content,
+                    comment = entry.comment.ifBlank { entry.name },
+                    constant = entry.constant,
+                    selective = entry.selective,
+                    order = entry.insertionOrder,
+                    position = if (entry.position == "after_char") 1 else 0,
+                    depth = 4,
+                    probability = 100,
+                    enabled = entry.enabled
+                ))
             }
         }
+
+        // Embedded book's own scan settings (scan_depth / token_budget / recursive_scanning)
+        // override the defaults — previously always defaults (issues #3/#5 from report).
+        val worldInfoSettings = if (characterBook != null) WorldInfoSettings(
+            depth = characterBook.scanDepth ?: WorldInfoSettings().depth,
+            budgetCap = characterBook.tokenBudget ?: 0,
+            recursive = characterBook.recursiveScanning
+        ) else WorldInfoSettings()
 
         ChatContext(
             characterName = character.name,
@@ -407,6 +418,7 @@ class LocalRepository @Inject constructor(
             userPersona = persona,
             authorsNote = authorsNote,
             worldInfoEntries = worldInfoEntries,
+            worldInfoSettings = worldInfoSettings,
             instructTemplate = instructTemplate,
             contextTemplate = contextTemplate,
             systemPromptPreset = systemPrompt,

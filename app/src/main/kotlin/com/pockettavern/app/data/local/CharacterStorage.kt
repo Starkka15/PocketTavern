@@ -84,9 +84,18 @@ class CharacterStorage @Inject constructor(
             else -> defaultAvatarPng()
         }
 
+        // Carry over fields we don't edit from the existing embedded card — otherwise a
+        // save rewrites the PNG without them (embedded character_book destroyed, extensions
+        // from other frontends dropped, creator/version wiped).
+        val existingData = try {
+            PngCharacterCard.extractCharacterData(basePngBytes)?.data
+        } catch (_: Exception) { null }
+
         val extensions = buildMap<String, kotlinx.serialization.json.JsonElement> {
+            existingData?.extensions?.forEach { (k, v) -> put(k, v) }
             if (character.loreHints.isNotBlank())
                 put("pockettavern_lore_hints", JsonPrimitive(character.loreHints))
+            else remove("pockettavern_lore_hints")
         }
         val cardData = CharacterCardV2(
             data = CharacterCardData(
@@ -101,6 +110,9 @@ class CharacterStorage @Inject constructor(
                 postHistoryInstructions = character.postHistoryInstructions,
                 alternateGreetings = character.alternateGreetings,
                 tags = character.tags,
+                characterVersion = existingData?.characterVersion ?: "",
+                creator = existingData?.creator ?: "",
+                characterBook = existingData?.characterBook,
                 extensions = extensions
             )
         )
@@ -283,7 +295,9 @@ class CharacterStorage @Inject constructor(
                 isFavorite = prev?.isFavorite ?: false,
                 useAvatarForImageGen = prev?.useAvatarForImageGen ?: true,
                 notes = prev?.notes ?: "",
-                lastChatDate = prev?.lastChatDate ?: 0
+                lastChatDate = prev?.lastChatDate ?: 0,
+                // App-side field with no PNG counterpart — must survive the rebuild
+                attachedWorldInfo = prev?.attachedWorldInfo
             )
         }
         characterDao.deleteAll()
@@ -344,7 +358,8 @@ class CharacterStorage @Inject constructor(
             isFavorite = character.isFavorite,
             useAvatarForImageGen = character.useAvatarForImageGen,
             notes = character.notes,
-            loreHints = character.loreHints
+            loreHints = character.loreHints,
+            attachedWorldInfo = character.attachedWorldInfo
         )
     }
 
@@ -371,7 +386,8 @@ class CharacterStorage @Inject constructor(
             isFavorite = entity.isFavorite,
             useAvatarForImageGen = entity.useAvatarForImageGen,
             notes = entity.notes,
-            loreHints = entity.loreHints
+            loreHints = entity.loreHints,
+            attachedWorldInfo = entity.attachedWorldInfo
         )
     }
 

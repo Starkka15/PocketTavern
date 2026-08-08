@@ -905,7 +905,9 @@ class PromptBuilder(
      */
     private fun getWorldInfoByDepth(chatHistory: List<ChatMessage>): Map<Int, String> {
         val result = mutableMapOf<Int, String>()
-        val triggered = scanWorldInfo(chatHistory)
+        // Include the new user message in the scan — otherwise entries whose keyword
+        // only appears in the message being sent never inject via the depth path.
+        val triggered = scanWorldInfo(chatHistory, _buildNewMessage)
 
         val depthEntries = triggered.filter { it.depth > 0 }
         DebugLogger.logSection("World Info By Depth")
@@ -959,42 +961,49 @@ class PromptBuilder(
         }
 
         val settings = chatContext.worldInfoSettings
-        val scanDepth = settings.depth
+        val defaultScanDepth = settings.depth
 
-        // Build base scan text (recent messages + character context)
-        val baseText = buildString {
-            append(newMessage)
-            append(" ")
-            chatHistory.takeLast(scanDepth).forEach { msg ->
-                append(promptContent(msg))
+        // Base scan text per depth (recent messages + character context).
+        // Entries may override the global scan depth via entry.scanDepth.
+        val baseTexts = mutableMapOf<Int, String>()
+        fun baseTextFor(depth: Int): String = baseTexts.getOrPut(depth) {
+            buildString {
+                append(newMessage)
                 append(" ")
+                chatHistory.takeLast(depth).forEach { msg ->
+                    append(promptContent(msg))
+                    append(" ")
+                }
+                append(character.description)
+                append(" ")
+                append(character.scenario)
             }
-            append(character.description)
-            append(" ")
-            append(character.scenario)
         }
 
         DebugLogger.logSection("PromptBuilder - World Info Scan")
-        DebugLogger.logKeyValue("Scan depth", scanDepth)
+        DebugLogger.logKeyValue("Scan depth (global)", defaultScanDepth)
         DebugLogger.logKeyValue("Recursive", settings.recursive)
-        DebugLogger.logKeyValue("Base text length", baseText.length)
 
         // Run scan pass(es); recursive adds triggered content to next pass
         val triggered = mutableListOf<WorldInfoEntry>()
         val remainingEntries = allEntries.toMutableList()
-        var scanText = baseText
+        var recursiveExtra = ""
         var passes = 0
 
         do {
             val passTriggered = mutableListOf<WorldInfoEntry>()
             val stillRemaining = mutableListOf<WorldInfoEntry>()
-            val scanLower = scanText.lowercase()
 
-            for (entry in remainingEntries) {
-                if (matchesWorldInfoEntry(entry, scanText, scanLower)) {
-                    passTriggered.add(entry)
-                } else {
-                    stillRemaining.add(entry)
+            // Group by effective scan depth so each group's text is built and lowercased once
+            for ((depth, entries) in remainingEntries.groupBy { it.scanDepth ?: defaultScanDepth }) {
+                val scanText = baseTextFor(depth) + recursiveExtra
+                val scanLower = scanText.lowercase()
+                for (entry in entries) {
+                    if (matchesWorldInfoEntry(entry, scanText, scanLower)) {
+                        passTriggered.add(entry)
+                    } else {
+                        stillRemaining.add(entry)
+                    }
                 }
             }
 
@@ -1005,8 +1014,7 @@ class PromptBuilder(
 
             // For recursive mode: add triggered content to scan text and repeat
             if (settings.recursive && passTriggered.isNotEmpty()) {
-                val newContent = passTriggered.joinToString(" ") { it.content }
-                scanText = "$scanText $newContent"
+                recursiveExtra += " " + passTriggered.joinToString(" ") { it.content }
                 DebugLogger.log("  Recursive pass $passes triggered ${passTriggered.size} entries")
             }
         } while (settings.recursive && passTriggered.isNotEmpty() && remainingEntries.isNotEmpty())
