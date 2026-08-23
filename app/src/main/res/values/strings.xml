@@ -100,6 +100,8 @@
     <string name="http_192_168_1_100_7860">http://192.168.1.100:7860</string>
     <string name="comfyui_url">ComfyUI URL</string>
     <string name="http_192_168_1_100_8188">http://192.168.1.100:8188</string>
+    <string name="local_sdxl_model_path">Local SDXL Model Path</string>
+    <string name="local_sdxl_model_path_placeholder">/path/to/mnn-sdxl-model/</string>
     <string name="openai_api_key">OpenAI API Key</string>
     <string name="sk">sk-...</string>
     <string name="model">Model</string>

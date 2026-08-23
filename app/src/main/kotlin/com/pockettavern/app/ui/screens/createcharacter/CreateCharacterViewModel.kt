@@ -78,7 +78,7 @@ class CreateCharacterViewModel @Inject constructor(
     private fun checkForgeAvailability() {
         viewModelScope.launch {
             val settings = settingsRepository.getSettings()
-            _uiState.update { it.copy(forgeAvailable = settings.forgeUrl.isNotBlank()) }
+            _uiState.update { it.copy(forgeAvailable = settings.imageGenBackendConfigured) }
         }
     }
 

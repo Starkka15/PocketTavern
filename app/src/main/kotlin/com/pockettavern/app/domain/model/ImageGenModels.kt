@@ -9,7 +9,8 @@ enum class ImageGenBackendType {
     STABILITY,
     POLLINATIONS,
     HUGGINGFACE,
-    NANO_GPT;
+    NANO_GPT,
+    LOCAL_SD_MNN;
 
     val displayName: String
         get() = when (this) {
@@ -20,6 +21,7 @@ enum class ImageGenBackendType {
             POLLINATIONS -> "Pollinations"
             HUGGINGFACE -> "HuggingFace"
             NANO_GPT -> "nano-gpt"
+            LOCAL_SD_MNN -> "On-Device (SDXL)"
         }
 }
 
@@ -54,6 +56,12 @@ data class ImageGenConfig(
     val huggingfaceModel: String = "stabilityai/stable-diffusion-xl-base-1.0",
     val nanoGptApiKey: String = "",
     val nanoGptModel: String = "chroma",
+    // Directory containing the MNN-converted SDXL model set (text_encoder.mnn,
+    // text_encoder_2.mnn, unet.mnn, vae_decoder.mnn + weights, tokenizer/, tokenizer_2/) --
+    // see mnn_sdxl_android_pipeline memory for how this gets produced. No download/picker UI
+    // yet (Phase 4); for now this has to be populated by hand (e.g. adb push + run-as) into
+    // whatever path is set here.
+    val localSdxlModelPath: String = "",
     val sdModel: String = "",
     val sampler: String = "Euler",
     val scheduler: String = "",
@@ -70,5 +78,23 @@ data class ImageGenConfig(
             ImageGenBackendType.valueOf(activeBackend)
         } catch (_: Exception) {
             ImageGenBackendType.SD_WEBUI
+        }
+
+    /**
+     * Whether the currently active backend has its required connection info filled in --
+     * general replacement for the old `forgeUrl.isNotBlank()` check that gated AI avatar
+     * generation regardless of which backend was actually selected (a pre-existing bug: any
+     * non-SD_WEBUI backend, not just the on-device one, was affected).
+     */
+    val isActiveBackendConfigured: Boolean
+        get() = when (activeBackendType) {
+            ImageGenBackendType.SD_WEBUI -> sdWebuiUrl.isNotBlank()
+            ImageGenBackendType.COMFYUI -> comfyuiUrl.isNotBlank()
+            ImageGenBackendType.DALLE -> dalleApiKey.isNotBlank()
+            ImageGenBackendType.STABILITY -> stabilityApiKey.isNotBlank()
+            ImageGenBackendType.POLLINATIONS -> true // free tier, no required field
+            ImageGenBackendType.HUGGINGFACE -> huggingfaceApiKey.isNotBlank()
+            ImageGenBackendType.NANO_GPT -> nanoGptApiKey.isNotBlank()
+            ImageGenBackendType.LOCAL_SD_MNN -> localSdxlModelPath.isNotBlank()
         }
 }

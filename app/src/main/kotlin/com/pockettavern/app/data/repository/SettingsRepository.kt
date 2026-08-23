@@ -17,12 +17,14 @@ class SettingsRepository @Inject constructor(
     val settingsFlow: Flow<ServerSettings> = combine(
         dataStore.forgeUrlFlow,
         dataStore.charaVaultUrlFlow,
-        dataStore.charavaultModeFlow
-    ) { forgeUrl, charaVaultUrl, charavaultMode ->
+        dataStore.charavaultModeFlow,
+        dataStore.imageGenConfigFlow
+    ) { forgeUrl, charaVaultUrl, charavaultMode, imageGenConfig ->
         ServerSettings(
             forgeUrl = forgeUrl,
             charaVaultUrl = charaVaultUrl,
-            charavaultMode = charavaultMode
+            charavaultMode = charavaultMode,
+            imageGenBackendConfigured = imageGenConfig.isActiveBackendConfigured
         )
     }
 

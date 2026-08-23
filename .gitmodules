@@ -1,0 +1,3 @@
+[submodule "app/src/main/cpp/MNN"]
+	path = app/src/main/cpp/MNN
+	url = git@github.com:bjthompson805/MNN.git

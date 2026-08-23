@@ -74,6 +74,10 @@ class ImageGenSettingsViewModel @Inject constructor(
         updateConfig { it.copy(comfyuiUrl = url) }
     }
 
+    fun updateLocalSdxlModelPath(path: String) {
+        updateConfig { it.copy(localSdxlModelPath = path) }
+    }
+
     fun updateDalleApiKey(key: String) {
         updateConfig { it.copy(dalleApiKey = key) }
     }

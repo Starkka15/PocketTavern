@@ -142,6 +142,20 @@ fun ImageGenSettingsScreen(
                                     colors = imageGenTextFieldColors()
                                 )
                             }
+                            ImageGenBackendType.LOCAL_SD_MNN -> {
+                                // No download/picker UI yet (Phase 4 of the on-device SD plan) --
+                                // a plain path field is the minimum needed to make this backend
+                                // actually testable through the app right now.
+                                OutlinedTextField(
+                                    value = config.localSdxlModelPath,
+                                    onValueChange = { viewModel.updateLocalSdxlModelPath(it) },
+                                    label = { Text(stringResource(R.string.local_sdxl_model_path)) },
+                                    placeholder = { Text(stringResource(R.string.local_sdxl_model_path_placeholder)) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    colors = imageGenTextFieldColors()
+                                )
+                            }
                             ImageGenBackendType.DALLE -> {
                                 OutlinedTextField(
                                     value = config.dalleApiKey,

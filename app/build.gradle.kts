@@ -17,6 +17,9 @@ val localProps = Properties().apply {
 android {
     namespace = "com.pockettavern.app"
     compileSdk = 36  // required by Llamatik (llama.cpp GGUF); targetSdk stays 35
+    // AGP 8.7.3's default ndkVersion (27.0.12077973) conflicts with the NDK actually installed
+    // and used for the MNN native build (r29, /opt/android-ndk) -- pin explicitly to match.
+    ndkVersion = "29.0.14206865"
 
     defaultConfig {
         applicationId = "com.pockettavern.app"
@@ -33,6 +36,33 @@ android {
 
         // Phones are arm64; dropping x86_64 ~halves the APK (large on-device native libs).
         ndk { abiFilters += "arm64-v8a" }
+
+        externalNativeBuild {
+            cmake {
+                // c++_shared, not c++_static: PocketTavern already ships other native libs as
+                // prebuilt AARs (LiteRT-LM, Llamatik) -- statically linking libc++ into more
+                // than one .so in the same process is an NDK-documented hazard (duplicate
+                // global state / ODR issues). See app/src/main/cpp/CMakeLists.txt's comment.
+                arguments += "-DANDROID_STL=c++_shared"
+                // AGP maps the Gradle "debug" build variant to CMAKE_BUILD_TYPE=Debug by default
+                // (no -O optimization) unless told otherwise -- confirmed via
+                // app/.cxx/Debug/*/arm64-v8a/CMakeCache.txt showing CMAKE_BUILD_TYPE=Debug, vs.
+                // the validated-fast CLI reference build's CMAKE_BUILD_TYPE=Release. On-device
+                // this was ~170s/UNet-step instead of the CLI's ~30-33s/step -- a ~5x gap in line
+                // with an unoptimized debug build of compute-heavy tensor math, not just a
+                // scheduling/affinity difference (see Power_High comment in
+                // stable_diffusion_xl.cpp, which addressed a real but much smaller effect).
+                // Force Release for the native side regardless of the app's own debug/release
+                // variant -- there's no reason to ship or test an unoptimized libMNN.so.
+                arguments += "-DCMAKE_BUILD_TYPE=Release"
+                // Without this, Ninja builds every default target CMake defines -- MNN_BUILD_LLM
+                // pulls in a pile of demo/tool executables (llm_demo, llm_bench, embedding_demo,
+                // quantize_llm, etc.) regardless of MNN_BUILD_TOOLS/MNN_BUILD_DEMO, none of which
+                // the app needs. pockettavern_diffusion links against MNN, which pulls it in
+                // transitively -- nothing else needs to be built.
+                targets += "pockettavern_diffusion"
+            }
+        }
     }
 
     signingConfigs {
@@ -72,6 +102,21 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            // Pinned rather than left to AGP's default so the SDK-managed cmake/ninja package
+            // Gradle downloads is predictable. 3.22.1 (a common AGP default) failed to configure
+            // MNN with MNN_SEP_BUILD=OFF: CMake rejected add_custom_command(TARGET ... PRE_BUILD)
+            // calls on the "MNNOpenCV"/"llm" OBJECT-library targets (tools/cv/CMakeLists.txt,
+            // transformers/llm/engine/CMakeLists.txt) -- the same config built fine with the
+            // system cmake (4.4.2) used for the desktop/Android CLI builds validated earlier
+            // this session, so this looks like version-specific enforcement of that restriction.
+            // Using the newest SDK-managed version to get closer to what actually worked.
+            version = "4.1.2"
+        }
     }
 }
 
