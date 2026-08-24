@@ -96,6 +96,7 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     var showSettingsMenu by remember { mutableStateOf(false) }
     var showDeleteCharacterDialog by remember { mutableStateOf(false) }
+    var showAvatarViewer by remember { mutableStateOf(false) }
 
     // Image picker for background upload
     val backgroundPickerLauncher = rememberLauncherForActivityResult(
@@ -211,7 +212,10 @@ fun ChatScreen(
                             CharacterAvatar(
                                 imageUrl = uiState.characterAvatarUrl,
                                 characterName = char.name,
-                                size = 36.dp
+                                size = 36.dp,
+                                onClick = if (uiState.characterAvatarUrl != null) {
+                                    { showAvatarViewer = true }
+                                } else null
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
@@ -784,6 +788,14 @@ fun ChatScreen(
             isLoading = uiState.modelPickerLoading,
             onSelect = { viewModel.applyModelChange(it) },
             onDismiss = { viewModel.dismissModelPicker() }
+        )
+    }
+
+    if (showAvatarViewer && uiState.characterAvatarUrl != null) {
+        ImageViewerDialog(
+            onDismiss = { showAvatarViewer = false },
+            model = uiState.characterAvatarUrl,
+            contentDescription = uiState.character?.name
         )
     }
 

@@ -5,6 +5,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -74,6 +75,7 @@ fun ChatBubble(
                         android.graphics.BitmapFactory.decodeFile(imageFile.absolutePath)
                     }
                     if (bitmap != null) {
+                        var showImageViewer by remember(message.id) { mutableStateOf(false) }
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -84,9 +86,17 @@ fun ChatBubble(
                                 contentDescription = message.content.ifBlank { "Generated image" },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp)),
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { showImageViewer = true },
                                 contentScale = ContentScale.FillWidth
                             )
+                            if (showImageViewer) {
+                                ImageViewerDialog(
+                                    onDismiss = { showImageViewer = false },
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = message.content.ifBlank { "Generated image" }
+                                )
+                            }
                             // Action button overlay
                             if (onImageAction != null) {
                                 IconButton(
@@ -376,6 +386,7 @@ fun ChatBubble(
                             }
                         }
                         is MessageChunk.ImageChunk -> {
+                            var showImageViewer by remember(chunk) { mutableStateOf(false) }
                             Spacer(modifier = Modifier.height(4.dp))
                             AsyncImage(
                                 model = ImageRequest.Builder(context)
@@ -387,14 +398,23 @@ fun ChatBubble(
                                     .fillMaxWidth(0.85f)
                                     .clip(RoundedCornerShape(8.dp))
                                     .align(Alignment.CenterHorizontally)
-                                    .padding(vertical = 4.dp),
+                                    .padding(vertical = 4.dp)
+                                    .clickable { showImageViewer = true },
                                 contentScale = ContentScale.FillWidth
                             )
+                            if (showImageViewer) {
+                                ImageViewerDialog(
+                                    onDismiss = { showImageViewer = false },
+                                    model = chunk.url,
+                                    contentDescription = chunk.alt.ifEmpty { "image" }
+                                )
+                            }
                         }
                         is MessageChunk.Base64ImageChunk -> {
                             val bitmap = remember(chunk.bytes) {
                                 android.graphics.BitmapFactory.decodeByteArray(chunk.bytes, 0, chunk.bytes.size)
                             }
+                            var showImageViewer by remember(chunk) { mutableStateOf(false) }
                             if (bitmap != null) {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Image(
@@ -404,9 +424,17 @@ fun ChatBubble(
                                         .fillMaxWidth(0.85f)
                                         .clip(RoundedCornerShape(8.dp))
                                         .align(Alignment.CenterHorizontally)
-                                        .padding(vertical = 4.dp),
+                                        .padding(vertical = 4.dp)
+                                        .clickable { showImageViewer = true },
                                     contentScale = ContentScale.FillWidth
                                 )
+                                if (showImageViewer) {
+                                    ImageViewerDialog(
+                                        onDismiss = { showImageViewer = false },
+                                        bitmap = bitmap.asImageBitmap(),
+                                        contentDescription = chunk.alt.ifEmpty { "image" }
+                                    )
+                                }
                             }
                         }
                     }

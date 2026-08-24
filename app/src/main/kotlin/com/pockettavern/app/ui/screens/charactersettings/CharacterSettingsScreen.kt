@@ -22,6 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pockettavern.app.ui.components.CharacterAvatar
 import com.pockettavern.app.ui.components.ErrorDialog
+import com.pockettavern.app.ui.components.ImageViewerDialog
 import com.pockettavern.app.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -224,6 +225,8 @@ private fun CharacterHeader(
     character: com.pockettavern.app.domain.model.Character,
     avatarUrl: String
 ) {
+    var showAvatarViewer by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -232,7 +235,8 @@ private fun CharacterHeader(
         CharacterAvatar(
             imageUrl = avatarUrl,
             characterName = character.name,
-            size = 64.dp
+            size = 64.dp,
+            onClick = { showAvatarViewer = true }
         )
         Column {
             Text(
@@ -248,6 +252,14 @@ private fun CharacterHeader(
                 )
             }
         }
+    }
+
+    if (showAvatarViewer) {
+        ImageViewerDialog(
+            onDismiss = { showAvatarViewer = false },
+            model = avatarUrl,
+            contentDescription = character.name
+        )
     }
 }
 
