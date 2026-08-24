@@ -122,6 +122,14 @@ class ApiConfigViewModel @Inject constructor(
                 availableModels = emptyList()
             )
         }
+        // On-device sources list already-downloaded models straight off disk (no network round
+        // trip, no API key needed) and have no manual refresh button in their section, unlike the
+        // cloud/server branch -- without this, switching to On-Device always showed "No models
+        // downloaded yet" even when one was present, since availableModels was cleared above and
+        // nothing ever repopulated it until the whole screen was reloaded from scratch.
+        if (source.equals("ondevice", ignoreCase = true) || source.equals("ondevice-gguf", ignoreCase = true)) {
+            fetchModels()
+        }
     }
 
     fun setCustomUrl(url: String) {

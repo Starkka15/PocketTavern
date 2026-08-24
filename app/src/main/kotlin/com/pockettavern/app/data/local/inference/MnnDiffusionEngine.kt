@@ -34,7 +34,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class MnnDiffusionEngine @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val memoryManager: OnDeviceMemoryManager
 ) {
     sealed class Progress {
         object Started : Progress()
@@ -51,8 +52,15 @@ class MnnDiffusionEngine @Inject constructor(
 
     val isLoaded: Boolean get() = handle != 0L
 
+    init {
+        memoryManager.register(OnDeviceMemoryManager.Slot.SDXL, ::unload)
+    }
+
     private suspend fun ensureLoaded(modelPath: String) = lock.withLock {
         if (loadedModelPath == modelPath && handle != 0L) return@withLock
+
+        val modelBytes = File(modelPath).walkTopDown().filter { it.isFile }.sumOf { it.length() }
+        memoryManager.prepareLoad(OnDeviceMemoryManager.Slot.SDXL, modelBytes)
 
         if (handle != 0L) {
             MnnDiffusionBridge.nativeDestroy(handle)
