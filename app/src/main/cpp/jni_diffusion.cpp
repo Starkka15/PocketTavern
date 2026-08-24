@@ -110,9 +110,9 @@ Java_com_pockettavern_app_data_local_inference_MnnDiffusionBridge_nativeLoad(
 }
 
 // SDXL-specific: calls StableDiffusionXL::runXL() directly, not the base class's simplified
-// run() (which hardcodes cfgScale=5.0 and an empty negative prompt -- confirmed this session
-// that pureTukanoNSFW ignores prompts almost entirely at that default; a real cfgScale here is
-// the fix). Only valid when nativeCreate's modelType was STABLE_DIFFUSION_XL (4) -- the
+// run() (which hardcodes cfgScale=5.0 and an empty negative prompt) -- runXL() exposes a real
+// negative prompt and cfgScale instead of those hardcoded values. Only valid when nativeCreate's
+// modelType was STABLE_DIFFUSION_XL (4) -- the
 // static_cast below is unchecked, matching this JNI layer being the one place that always knows
 // the real dynamic type it asked createDiffusion() for (see CMakeLists.txt's comment on why
 // static_cast, not dynamic_cast/RTTI, is used here).

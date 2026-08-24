@@ -25,7 +25,6 @@ class MnnDiffusionBackend(
     override val type = ImageGenBackendType.LOCAL_SD_MNN
 
     override val capabilities = ImageGenCapabilities(
-        supportsCancel = false,
         supportsSteps = true,
         supportsCfgScale = true,
         supportsSeed = true,
@@ -45,6 +44,9 @@ class MnnDiffusionBackend(
         // label in ImageGenSettingsScreen.kt says "Model Path", not "URL".
         requiresUrl = true,
         requiresApiKey = false,
+        // See interrupt() below -- MNN's diffusion engine has no cancellation primitive, so
+        // Cancel can't actually stop a generation once started.
+        supportsCancel = false,
     )
 
     private suspend fun modelPath(): String = settingsDataStore.getImageGenConfig().localSdxlModelPath

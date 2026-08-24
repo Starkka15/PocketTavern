@@ -34,8 +34,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class MnnDiffusionEngine @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val memoryManager: OnDeviceMemoryManager
+    @ApplicationContext private val context: Context
 ) {
     sealed class Progress {
         object Started : Progress()
@@ -52,15 +51,8 @@ class MnnDiffusionEngine @Inject constructor(
 
     val isLoaded: Boolean get() = handle != 0L
 
-    init {
-        memoryManager.register(OnDeviceMemoryManager.Slot.SDXL, ::unload)
-    }
-
     private suspend fun ensureLoaded(modelPath: String) = lock.withLock {
         if (loadedModelPath == modelPath && handle != 0L) return@withLock
-
-        val modelBytes = File(modelPath).walkTopDown().filter { it.isFile }.sumOf { it.length() }
-        memoryManager.prepareLoad(OnDeviceMemoryManager.Slot.SDXL, modelBytes)
 
         if (handle != 0L) {
             MnnDiffusionBridge.nativeDestroy(handle)
@@ -137,7 +129,7 @@ class MnnDiffusionEngine @Inject constructor(
                     outputFile = file
                     val actualSeed = if (seed < 0) (0..Int.MAX_VALUE).random() else seed
 
-                    DebugLogger.log("MnnDiffusionEngine: generating ${width}x$height, $steps steps, cfg=$cfgScale")
+                    DebugLogger.log("MnnDiffusionEngine: generating ${width}x$height, $steps steps, cfg=$cfgScale, seed=$actualSeed, prompt=\"$prompt\"")
                     val ok = MnnDiffusionBridge.nativeGenerateXL(
                         handle, prompt, negativePrompt, file.absolutePath,
                         width, height, steps, actualSeed, cfgScale,

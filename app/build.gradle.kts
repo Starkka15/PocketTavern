@@ -32,6 +32,12 @@ android {
         // hidden in the public release (overridden false below). Keeps PocketTavern simple.
         buildConfigField("boolean", "STORIES_ENABLED", "true")
 
+        // On-device SDXL (MNN). Usable only if you have an MNN-converted SDXL model set to
+        // point the downloader at, and none are published yet -- so it stays a debug/dev
+        // feature and is hidden from the public release (overridden false below), which also
+        // strips libMNN.so from the release APK. Flip both when real models exist.
+        buildConfigField("boolean", "MNN_SDXL_ENABLED", "true")
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Phones are arm64; dropping x86_64 ~halves the APK (large on-device native libs).
@@ -79,6 +85,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             buildConfigField("boolean", "STORIES_ENABLED", "false")  // hide Stories in the public release
+            buildConfigField("boolean", "MNN_SDXL_ENABLED", "false")  // no published SDXL models yet
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -102,6 +109,15 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    // MNN_SDXL_ENABLED=false only hides the UI; the .so files would still be packaged and
+    // are pure dead weight in a build that cannot reach them. Drop them from release.
+    androidComponents {
+        onVariants(selector().withBuildType("release")) { variant ->
+            variant.packaging.jniLibs.excludes.add("**/libMNN.so")
+            variant.packaging.jniLibs.excludes.add("**/libpockettavern_diffusion.so")
+        }
     }
 
     externalNativeBuild {

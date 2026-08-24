@@ -3,7 +3,9 @@ package com.pockettavern.app.ui.screens.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pockettavern.app.data.local.SettingsDataStore
+import com.pockettavern.app.data.local.inference.SdxlModelManager
 import com.pockettavern.app.data.repository.ImageGenRepository
+import com.pockettavern.app.domain.model.AvailableModel
 import com.pockettavern.app.domain.model.ImageGenBackendType
 import com.pockettavern.app.domain.model.ImageGenCapabilities
 import com.pockettavern.app.domain.model.ImageGenConfig
@@ -19,20 +21,29 @@ import javax.inject.Inject
 data class ImageGenSettingsUiState(
     val config: ImageGenConfig = ImageGenConfig(),
     val capabilities: ImageGenCapabilities = ImageGenCapabilities(),
-    val availableBackends: List<ImageGenBackendType> = ImageGenBackendType.entries,
+    val availableBackends: List<ImageGenBackendType> = ImageGenBackendType.entries.filter {
+        // Hidden in release until MNN-converted SDXL models are actually published.
+        it != ImageGenBackendType.LOCAL_SD_MNN || com.pockettavern.app.BuildConfig.MNN_SDXL_ENABLED
+    },
     val samplers: List<String> = emptyList(),
     val models: List<String> = emptyList(),
     val isLoading: Boolean = true,
     val isTesting: Boolean = false,
     val testResult: String? = null,
     val isLoadingSamplers: Boolean = false,
-    val isLoadingModels: Boolean = false
+    val isLoadingModels: Boolean = false,
+    // On-device SDXL (MNN) model sets
+    val sdxlModels: List<AvailableModel> = emptyList(),
+    val isDownloadingSdxl: Boolean = false,
+    val sdxlDownloadProgress: Float? = null,
+    val sdxlDownloadStatus: String? = null,
 )
 
 @HiltViewModel
 class ImageGenSettingsViewModel @Inject constructor(
     private val settingsDataStore: SettingsDataStore,
-    private val imageGenRepository: ImageGenRepository
+    private val imageGenRepository: ImageGenRepository,
+    private val sdxlModelManager: SdxlModelManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ImageGenSettingsUiState())
@@ -48,6 +59,57 @@ class ImageGenSettingsViewModel @Inject constructor(
                         capabilities = backend?.capabilities ?: ImageGenCapabilities(),
                         isLoading = false
                     )
+                }
+            }
+        }
+        refreshSdxlModels()
+    }
+
+    private fun refreshSdxlModels() {
+        _uiState.update { it.copy(sdxlModels = sdxlModelManager.listModels()) }
+    }
+
+    fun selectSdxlModel(modelId: String) {
+        sdxlModelManager.pathFor(modelId)?.let { updateLocalSdxlModelPath(it) }
+    }
+
+    fun deleteSdxlModel(modelId: String) {
+        val wasActive = sdxlModelManager.pathFor(modelId) == _uiState.value.config.localSdxlModelPath
+        sdxlModelManager.delete(modelId)
+        if (wasActive) updateLocalSdxlModelPath("")
+        refreshSdxlModels()
+    }
+
+    fun downloadSdxlModel(url: String, token: String?) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isDownloadingSdxl = true, sdxlDownloadProgress = null, sdxlDownloadStatus = null) }
+            sdxlModelManager.download(url, token).collect { progress ->
+                when (progress) {
+                    is SdxlModelManager.Progress.Downloading -> _uiState.update {
+                        it.copy(
+                            sdxlDownloadProgress = if (progress.totalBytes > 0)
+                                progress.bytesDownloaded.toFloat() / progress.totalBytes else null,
+                            sdxlDownloadStatus = "Downloading ${progress.bytesDownloaded / (1024 * 1024)} MB" +
+                                if (progress.totalBytes > 0) " / ${progress.totalBytes / (1024 * 1024)} MB" else ""
+                        )
+                    }
+                    is SdxlModelManager.Progress.Extracting -> _uiState.update {
+                        it.copy(
+                            sdxlDownloadProgress = if (progress.totalFiles > 0)
+                                progress.filesExtracted.toFloat() / progress.totalFiles else null,
+                            sdxlDownloadStatus = "Extracting ${progress.filesExtracted}/${progress.totalFiles} files"
+                        )
+                    }
+                    is SdxlModelManager.Progress.Done -> {
+                        _uiState.update {
+                            it.copy(isDownloadingSdxl = false, sdxlDownloadProgress = null, sdxlDownloadStatus = "Done")
+                        }
+                        updateLocalSdxlModelPath(progress.path)
+                        refreshSdxlModels()
+                    }
+                    is SdxlModelManager.Progress.Error -> _uiState.update {
+                        it.copy(isDownloadingSdxl = false, sdxlDownloadProgress = null, sdxlDownloadStatus = progress.message)
+                    }
                 }
             }
         }

@@ -40,10 +40,11 @@ data class ImageGenCapabilities(
     val supportsProgress: Boolean = false,
     val requiresApiKey: Boolean = false,
     val requiresUrl: Boolean = false,
-    // Whether interrupt() can actually stop a generation already in flight. False for
-    // on-device MNN: its diffusion engine exposes no cancellation, so a started run always
-    // completes natively and interrupt() only detaches our listener. UI greys Cancel rather
-    // than offering a button that silently does nothing.
+    // Whether interrupt() actually stops in-flight generation, vs. only detaching the listener
+    // while the backend keeps generating regardless (true by default: most backends' interrupt()
+    // cancels a real in-flight HTTP call). False for MnnDiffusionBackend specifically -- MNN's
+    // diffusion engine has no cancellation primitive, so a started generation always runs to
+    // completion natively no matter what the UI does.
     val supportsCancel: Boolean = true
 )
 
@@ -63,9 +64,8 @@ data class ImageGenConfig(
     val nanoGptModel: String = "chroma",
     // Directory containing the MNN-converted SDXL model set (text_encoder.mnn,
     // text_encoder_2.mnn, unet.mnn, vae_decoder.mnn + weights, tokenizer/, tokenizer_2/) --
-    // see mnn_sdxl_android_pipeline memory for how this gets produced. No download/picker UI
-    // yet (Phase 4); for now this has to be populated by hand (e.g. adb push + run-as) into
-    // whatever path is set here.
+    // see mnn_sdxl_android_pipeline memory for how this gets produced. Populated via
+    // SdxlModelManager's download-by-URL flow (ImageGenSettingsScreen's SdxlModelSection).
     val localSdxlModelPath: String = "",
     val sdModel: String = "",
     val sampler: String = "Euler",

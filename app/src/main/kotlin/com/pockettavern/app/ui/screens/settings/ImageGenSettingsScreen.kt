@@ -2,12 +2,14 @@ package com.pockettavern.app.ui.screens.settings
 
 import com.pockettavern.app.R
 import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.material3.MenuAnchorType
@@ -143,17 +145,15 @@ fun ImageGenSettingsScreen(
                                 )
                             }
                             ImageGenBackendType.LOCAL_SD_MNN -> {
-                                // No download/picker UI yet (Phase 4 of the on-device SD plan) --
-                                // a plain path field is the minimum needed to make this backend
-                                // actually testable through the app right now.
-                                OutlinedTextField(
-                                    value = config.localSdxlModelPath,
-                                    onValueChange = { viewModel.updateLocalSdxlModelPath(it) },
-                                    label = { Text(stringResource(R.string.local_sdxl_model_path)) },
-                                    placeholder = { Text(stringResource(R.string.local_sdxl_model_path_placeholder)) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    colors = imageGenTextFieldColors()
+                                SdxlModelSection(
+                                    currentPath = config.localSdxlModelPath,
+                                    models = uiState.sdxlModels,
+                                    isDownloading = uiState.isDownloadingSdxl,
+                                    downloadProgress = uiState.sdxlDownloadProgress,
+                                    downloadStatus = uiState.sdxlDownloadStatus,
+                                    onSelectModel = viewModel::selectSdxlModel,
+                                    onDownload = viewModel::downloadSdxlModel,
+                                    onDelete = viewModel::deleteSdxlModel,
                                 )
                             }
                             ImageGenBackendType.DALLE -> {
@@ -660,6 +660,99 @@ private fun ImageGenSectionCard(content: @Composable ColumnScope.() -> Unit) {
             modifier = Modifier.padding(16.dp),
             content = content
         )
+    }
+}
+
+@Composable
+private fun SdxlModelSection(
+    currentPath: String,
+    models: List<com.pockettavern.app.domain.model.AvailableModel>,
+    isDownloading: Boolean,
+    downloadProgress: Float?,
+    downloadStatus: String?,
+    onSelectModel: (String) -> Unit,
+    onDownload: (String, String?) -> Unit,
+    onDelete: (String) -> Unit,
+) {
+    var url by remember { mutableStateOf("") }
+    var token by remember { mutableStateOf("") }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Each SDXL model set is a zip of ~14 files (~3.6-3.7GB). Point this at a " +
+                "URL serving one -- e.g. a small HTTP server on your own desktop.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        OutlinedTextField(
+            value = token,
+            onValueChange = { token = it },
+            label = { Text("Access token (for gated URLs)") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            enabled = !isDownloading,
+            colors = imageGenTextFieldColors()
+        )
+
+        if (models.isEmpty()) {
+            Text("No model sets downloaded yet.", style = MaterialTheme.typography.bodyMedium)
+        } else {
+            Text("Downloaded model sets", style = MaterialTheme.typography.labelLarge)
+            models.forEach { model ->
+                val isSelected = currentPath.isNotBlank() && currentPath.endsWith("/${model.id}")
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !isDownloading) { onSelectModel(model.id) },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = isSelected,
+                        onClick = { onSelectModel(model.id) },
+                        enabled = !isDownloading
+                    )
+                    Text(model.name, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { onDelete(model.id) }, enabled = !isDownloading) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete ${model.name}")
+                    }
+                }
+            }
+        }
+
+        HorizontalDivider()
+
+        Text("Download by URL (zip)", style = MaterialTheme.typography.labelLarge)
+        OutlinedTextField(
+            value = url,
+            onValueChange = { url = it },
+            label = { Text("Model set URL") },
+            placeholder = { Text("https://.../pureTukanoNSFW-xl.zip") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            enabled = !isDownloading,
+            colors = imageGenTextFieldColors()
+        )
+
+        if (isDownloading) {
+            if (downloadProgress != null) {
+                LinearProgressIndicator(progress = { downloadProgress }, modifier = Modifier.fillMaxWidth())
+            } else {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+        }
+
+        Button(
+            onClick = { onDownload(url, token) },
+            enabled = !isDownloading && url.isNotBlank(),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (isDownloading) "Downloading…" else "Download")
+        }
+
+        downloadStatus?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

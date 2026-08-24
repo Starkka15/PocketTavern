@@ -127,7 +127,11 @@ object NetworkModule {
             ImageGenBackendType.HUGGINGFACE to HuggingFaceBackend(forgeClient, settingsDataStore),
             ImageGenBackendType.NANO_GPT to NanoGptBackend(forgeClient, settingsDataStore),
             ImageGenBackendType.LOCAL_SD_MNN to MnnDiffusionBackend(mnnDiffusionEngine, settingsDataStore)
-        )
+        ).filterKeys {
+            // Release ships without the MNN native libs, so registering this backend would
+            // hand out one whose first call hits an UnsatisfiedLinkError.
+            it != ImageGenBackendType.LOCAL_SD_MNN || com.pockettavern.app.BuildConfig.MNN_SDXL_ENABLED
+        }
     }
 
     @Provides
