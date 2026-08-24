@@ -25,6 +25,7 @@ class MnnDiffusionBackend(
     override val type = ImageGenBackendType.LOCAL_SD_MNN
 
     override val capabilities = ImageGenCapabilities(
+        supportsCancel = false,
         supportsSteps = true,
         supportsCfgScale = true,
         supportsSeed = true,

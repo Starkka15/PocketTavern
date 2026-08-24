@@ -39,7 +39,12 @@ data class ImageGenCapabilities(
     val supportsResolutionPresets: Boolean = true,
     val supportsProgress: Boolean = false,
     val requiresApiKey: Boolean = false,
-    val requiresUrl: Boolean = false
+    val requiresUrl: Boolean = false,
+    // Whether interrupt() can actually stop a generation already in flight. False for
+    // on-device MNN: its diffusion engine exposes no cancellation, so a started run always
+    // completes natively and interrupt() only detaches our listener. UI greys Cancel rather
+    // than offering a button that silently does nothing.
+    val supportsCancel: Boolean = true
 )
 
 @Serializable

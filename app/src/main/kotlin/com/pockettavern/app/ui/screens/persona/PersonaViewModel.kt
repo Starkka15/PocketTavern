@@ -11,6 +11,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import com.pockettavern.app.domain.model.ForgeGenerationParams
 import com.pockettavern.app.domain.model.GenerationState
+import com.pockettavern.app.domain.model.ImageGenCapabilities
 import com.pockettavern.app.domain.model.Persona
 import com.pockettavern.app.domain.model.PersonaPosition
 import com.pockettavern.app.domain.model.PersonaRole
@@ -44,6 +45,11 @@ data class PersonaUiState(
     val createName: String = "",
     val createDescription: String = "",
     val forgeAvailable: Boolean = false,
+    val imageGenCapabilities: ImageGenCapabilities = ImageGenCapabilities(),
+    // Set only when the user picks/generates a NEW avatar while editing. Left null means
+    // "don't touch the existing avatar file" -- savePersonaEdit() copies the record forward.
+    val editImageBytes: ByteArray? = null,
+    val editImageMimeType: String = "image/png",
     val generationPrompt: String = "",
     val isGenerating: Boolean = false,
     val generationProgress: Float = 0f,
@@ -72,8 +78,12 @@ class PersonaViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             val settings = settingsRepository.getSettings()
+            val capabilities = imageGenRepository.getCapabilities()
             _uiState.update {
-                it.copy(forgeAvailable = settings.imageGenBackendConfigured)
+                it.copy(
+                    forgeAvailable = settings.imageGenBackendConfigured,
+                    imageGenCapabilities = capabilities
+                )
             }
         }
         loadPersonas()
@@ -151,7 +161,10 @@ class PersonaViewModel @Inject constructor(
                 editDescription = persona.description,
                 editPosition = persona.position,
                 editRole = persona.role,
-                editDepth = persona.depth
+                editDepth = persona.depth,
+                // Start clean: a leftover pick from a previous edit would otherwise be written
+                // onto whichever persona is opened next.
+                editImageBytes = null
             )
         }
     }
@@ -160,7 +173,8 @@ class PersonaViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 showEditDialog = false,
-                editingPersona = null
+                editingPersona = null,
+                editImageBytes = null
             )
         }
     }
@@ -190,11 +204,20 @@ class PersonaViewModel @Inject constructor(
             try {
                 val idx = roster.indexOfFirst { it.id == persona.avatarId }
                 if (idx < 0) throw Exception("Persona not found")
+                // Only touch the avatar file when the user actually chose a new image.
+                // editImageBytes == null means "leave it exactly as it was" -- the copy()
+                // below carries the existing avatarPath forward untouched.
+                val newAvatarPath = state.editImageBytes?.let { bytes ->
+                    val file = personaStorage.avatarFile(roster[idx].id)
+                    file.writeBytes(bytes)
+                    file.absolutePath
+                }
                 val updated = roster[idx].copy(
                     description = state.editDescription,
                     position = state.editPosition.value,
                     depth = state.editDepth,
-                    role = state.editRole.value
+                    role = state.editRole.value,
+                    avatarPath = newAvatarPath ?: roster[idx].avatarPath
                 )
                 roster = roster.toMutableList().also { it[idx] = updated }
                 personaStorage.save(roster, selectedId)
@@ -307,6 +330,24 @@ class PersonaViewModel @Inject constructor(
             it.copy(
                 createImageBytes = com.pockettavern.app.util.ImageOrientation.rotate(bytes, 90f),
                 createImageMimeType = "image/png"
+            )
+        }
+    }
+
+    fun setEditImage(bytes: ByteArray, mimeType: String) {
+        // Bake EXIF rotation into the pixels — camera photos otherwise save sideways
+        val upright = com.pockettavern.app.util.ImageOrientation.normalize(bytes)
+        _uiState.update {
+            it.copy(editImageBytes = upright, editImageMimeType = mimeType)
+        }
+    }
+
+    fun rotateEditImage() {
+        val bytes = _uiState.value.editImageBytes ?: return
+        _uiState.update {
+            it.copy(
+                editImageBytes = com.pockettavern.app.util.ImageOrientation.rotate(bytes, 90f),
+                editImageMimeType = "image/png"
             )
         }
     }
@@ -425,7 +466,9 @@ class PersonaViewModel @Inject constructor(
     fun cancelGeneration() {
         generationJob?.cancel()
         viewModelScope.launch {
-            forgeRepository.interrupt()
+            // Was forgeRepository.interrupt(), which hit SD WebUI no matter which backend was
+            // actually generating -- so Cancel silently did nothing on every other backend.
+            imageGenRepository.interrupt()
             _uiState.update { it.copy(isGenerating = false, generationProgress = 0f) }
         }
     }
