@@ -67,9 +67,12 @@ paths must therefore still be set by hand via the raw settings text field.**
 
 ## Risks / follow-ups
 
-- **Submodule points at a personal fork** (`bjthompson805/MNN`). If it is renamed or
-  deleted, builds break. Fork under `Starkka15` or get his 3 diffusion commits
-  upstreamed to `alibaba/MNN`.
+- ~~Submodule points at a personal fork~~ **RESOLVED 2026-08-24**: forked to
+  `Starkka15/MNN` (Apache-2.0 preserved, 3 ahead / 0 behind `alibaba/MNN`), and the
+  submodule now points there, so Brandon renaming or deleting his repo cannot break
+  our builds. His 3 diffusion commits are preserved with him as author. Still worth
+  upstreaming them to `alibaba/MNN` — his commit messages already follow MNN's own
+  `[Diffusion:Feature]` convention.
 - **APK size / build time** from the MNN native build — not yet measured.
 - **Practicality**: ~18 min/image on a Pixel 10 Pro XL. On a Moto G Power 2025 this
   is not a usable feature. Fine for flagship users.
