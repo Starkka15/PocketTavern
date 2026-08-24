@@ -1,10 +1,21 @@
 package com.pockettavern.app.util
 
 import android.util.Base64
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -59,10 +70,48 @@ data class CharacterCardData(
 /**
  * Embedded lorebook/world info in character card
  */
+/**
+ * character_book.entries appears in the wild BOTH as the spec's array and as an
+ * ST-style object keyed by uid (some card generators emit the latter). Accept both;
+ * always serialize back out as the spec array.
+ */
+object BookEntriesSerializer : KSerializer<List<CharacterBookEntry>> {
+    private val listSerializer = ListSerializer(CharacterBookEntry.serializer())
+    override val descriptor = listSerializer.descriptor
+    override fun serialize(encoder: Encoder, value: List<CharacterBookEntry>) =
+        listSerializer.serialize(encoder, value)
+    override fun deserialize(decoder: Decoder): List<CharacterBookEntry> {
+        val input = decoder as? JsonDecoder ?: return listSerializer.deserialize(decoder)
+        return when (val el = input.decodeJsonElement()) {
+            is JsonArray -> el.map { input.json.decodeFromJsonElement(CharacterBookEntry.serializer(), it) }
+            is JsonObject -> el.entries
+                .sortedBy { it.key.toIntOrNull() ?: Int.MAX_VALUE }
+                .map { input.json.decodeFromJsonElement(CharacterBookEntry.serializer(), it.value) }
+            else -> emptyList()
+        }
+    }
+}
+
+/**
+ * Entry position appears both as the spec's string ("before_char"/"after_char") and
+ * as an ST world-info int (0/1). Accept both; serialize as the spec string.
+ */
+object BookPositionSerializer : KSerializer<String> {
+    override val descriptor = String.serializer().descriptor
+    override fun serialize(encoder: Encoder, value: String) = encoder.encodeString(value)
+    override fun deserialize(decoder: Decoder): String {
+        val input = decoder as? JsonDecoder ?: return decoder.decodeString()
+        val prim = input.decodeJsonElement().jsonPrimitive
+        prim.intOrNull?.let { return if (it == 1) "after_char" else "before_char" }
+        return prim.content
+    }
+}
+
 @Serializable
 data class CharacterBook(
     val name: String = "",
     val description: String = "",
+    @Serializable(with = BookEntriesSerializer::class)
     val entries: List<CharacterBookEntry> = emptyList(),
 
     // Scan settings
@@ -96,7 +145,8 @@ data class CharacterBookEntry(
     @SerialName("insertion_order")
     val insertionOrder: Int = 100,
     val priority: Int? = null,
-    val position: String = "before_char",  // before_char, after_char
+    @Serializable(with = BookPositionSerializer::class)
+    val position: String = "before_char",  // before_char, after_char (int 0/1 also accepted)
 
     // Match settings
     @SerialName("case_sensitive")

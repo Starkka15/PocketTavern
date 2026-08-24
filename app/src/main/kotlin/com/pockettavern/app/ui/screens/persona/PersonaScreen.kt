@@ -179,6 +179,9 @@ fun PersonaScreen(
             EditPersonaDialog(
                 persona = uiState.editingPersona!!,
                 description = uiState.editDescription,
+                editImageBytes = uiState.editImageBytes,
+                onImageSelected = { bytes, mime -> viewModel.setEditImage(bytes, mime) },
+                onRotateImage = { viewModel.rotateEditImage() },
                 position = uiState.editPosition,
                 role = uiState.editRole,
                 depth = uiState.editDepth,
@@ -224,12 +227,14 @@ fun PersonaScreen(
                 name = uiState.createName,
                 description = uiState.createDescription,
                 forgeAvailable = uiState.forgeAvailable,
+                supportsCancel = uiState.imageGenCapabilities.supportsCancel,
                 generationPrompt = uiState.generationPrompt,
                 isGenerating = uiState.isGenerating,
                 generationProgress = uiState.generationProgress,
                 onImageSelected = { bytes, mimeType ->
                     viewModel.setCreateImage(bytes, mimeType)
                 },
+                onRotateImage = { viewModel.rotateCreateImage() },
                 onNameChange = { viewModel.updateCreateName(it) },
                 onDescriptionChange = { viewModel.updateCreateDescription(it) },
                 onGenerationPromptChange = { viewModel.updateGenerationPrompt(it) },
@@ -261,9 +266,9 @@ private fun SelectedPersonaCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (persona.avatarId.isNotEmpty()) {
+            if (!persona.avatarPath.isNullOrEmpty()) {
                 AsyncImage(
-                    model = File(persona.avatarId),
+                    model = File(persona.avatarPath),
                     contentDescription = stringResource(R.string.avatar),
                     modifier = Modifier
                         .size(72.dp)
@@ -351,9 +356,9 @@ private fun PersonaListItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (persona.avatarId.isNotEmpty()) {
+            if (!persona.avatarPath.isNullOrEmpty()) {
                 AsyncImage(
-                    model = File(persona.avatarId),
+                    model = File(persona.avatarPath),
                     contentDescription = stringResource(R.string.avatar),
                     modifier = Modifier
                         .size(48.dp)
@@ -432,11 +437,110 @@ private fun PersonaListItem(
     }
 }
 
+/**
+ * Avatar preview + picker shared by the Create and Edit persona dialogs.
+ *
+ * The Edit dialog previously had no avatar UI at all, so a persona's avatar could be set at
+ * creation and then never changed. Shows the newly picked image if there is one, otherwise the
+ * avatar already on disk, otherwise a "tap to select" placeholder.
+ */
+@Composable
+private fun AvatarPickerSection(
+    existingAvatarPath: String?,
+    pickedBytes: ByteArray?,
+    onImageSelected: (ByteArray, String) -> Unit,
+    onRotateImage: () -> Unit,
+    enabled: Boolean = true
+) {
+    val context = LocalContext.current
+    val avatarShape = LocalPocketTavernColors.current.avatarShape.toShape()
+
+    val picker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            try {
+                val stream = context.contentResolver.openInputStream(it)
+                val bytes = stream?.readBytes()
+                stream?.close()
+                if (bytes != null) {
+                    onImageSelected(bytes, context.contentResolver.getType(it) ?: "image/png")
+                }
+            } catch (_: Exception) {
+                // Same swallow as the Create dialog's picker; a failed read just leaves the
+                // existing avatar in place.
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .size(120.dp)
+            .clip(avatarShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .then(if (enabled) Modifier.clickable { picker.launch("image/*") } else Modifier),
+        contentAlignment = Alignment.Center
+    ) {
+        val bitmap = remember(pickedBytes, existingAvatarPath) {
+            when {
+                pickedBytes != null ->
+                    BitmapFactory.decodeByteArray(pickedBytes, 0, pickedBytes.size)
+                !existingAvatarPath.isNullOrBlank() ->
+                    runCatching { BitmapFactory.decodeFile(existingAvatarPath) }.getOrNull()
+                else -> null
+            }
+        }
+
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = stringResource(R.string.avatar),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(avatarShape),
+                contentScale = ContentScale.Crop
+            )
+            // Rotate only applies to a freshly picked image -- the stored one is already upright.
+            if (pickedBytes != null) {
+                IconButton(
+                    onClick = onRotateImage,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.RotateRight,
+                        contentDescription = "Rotate image",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        } else {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    Icons.Default.AddAPhoto,
+                    contentDescription = stringResource(R.string.select_image),
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    stringResource(R.string.tap_to_select),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditPersonaDialog(
     persona: Persona,
     description: String,
+    editImageBytes: ByteArray?,
+    onImageSelected: (ByteArray, String) -> Unit,
+    onRotateImage: () -> Unit,
     position: PersonaPosition,
     role: PersonaRole,
     depth: Int,
@@ -455,8 +559,17 @@ private fun EditPersonaDialog(
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                AvatarPickerSection(
+                    existingAvatarPath = persona.avatarPath,
+                    pickedBytes = editImageBytes,
+                    onImageSelected = onImageSelected,
+                    onRotateImage = onRotateImage,
+                    enabled = !isSaving
+                )
+
                 OutlinedTextField(
                     value = description,
                     onValueChange = onDescriptionChange,
@@ -610,10 +723,12 @@ private fun CreatePersonaDialog(
     name: String,
     description: String,
     forgeAvailable: Boolean,
+    supportsCancel: Boolean,
     generationPrompt: String,
     isGenerating: Boolean,
     generationProgress: Float,
     onImageSelected: (ByteArray, String) -> Unit,
+    onRotateImage: () -> Unit,
     onNameChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
     onGenerationPromptChange: (String) -> Unit,
@@ -716,6 +831,18 @@ private fun CreatePersonaDialog(
                                         .clip(avatarShape),
                                     contentScale = ContentScale.Crop
                                 )
+                                IconButton(
+                                    onClick = onRotateImage,
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.RotateRight,
+                                        contentDescription = "Rotate image",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
                         }
                         selectedTab == 0 -> {
@@ -771,11 +898,24 @@ private fun CreatePersonaDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         if (isGenerating) {
-                            OutlinedButton(
-                                onClick = onCancelGeneration,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(stringResource(R.string.cancel))
+                            // On-device MNN cannot stop a run once started (no cancellation exists
+                            // in its diffusion engine), so offering a live Cancel there would be a
+                            // button that silently does nothing. Grey it and say why instead.
+                            Column(modifier = Modifier.weight(1f)) {
+                                OutlinedButton(
+                                    onClick = onCancelGeneration,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = supportsCancel
+                                ) {
+                                    Text(stringResource(R.string.cancel))
+                                }
+                                if (!supportsCancel) {
+                                    Text(
+                                        "This backend can't stop a generation once it has started.",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         } else {
                             Button(

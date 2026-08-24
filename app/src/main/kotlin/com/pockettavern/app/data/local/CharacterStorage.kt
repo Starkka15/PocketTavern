@@ -12,8 +12,12 @@ import com.pockettavern.app.util.PngCharacterCard
 import com.pockettavern.app.util.CharacterCardData
 import com.pockettavern.app.util.CharacterCardV2
 import com.pockettavern.app.util.DebugLogger
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -84,9 +88,28 @@ class CharacterStorage @Inject constructor(
             else -> defaultAvatarPng()
         }
 
-        val extensions = buildMap<String, kotlinx.serialization.json.JsonElement> {
+        // Carry over fields we don't edit from the existing embedded card — otherwise a
+        // save rewrites the PNG without them (embedded character_book destroyed, extensions
+        // from other frontends dropped, creator/version wiped).
+        val existingData = try {
+            PngCharacterCard.extractCharacterData(basePngBytes)?.data
+        } catch (_: Exception) { null }
+
+        val extensions = buildMap<String, JsonElement> {
+            existingData?.extensions?.forEach { (k, v) -> put(k, v) }
             if (character.loreHints.isNotBlank())
                 put("pockettavern_lore_hints", JsonPrimitive(character.loreHints))
+            else remove("pockettavern_lore_hints")
+            // Author's Note lives in extensions.depth_prompt (ST V2) — write the
+            // app-edited values so they survive the PNG rebuild (issue #8 AN report)
+            if (character.depthPrompt.isNotBlank()) {
+                put("depth_prompt", buildJsonObject {
+                    put("prompt", character.depthPrompt)
+                    put("depth", character.depthPromptDepth)
+                    put("role", character.depthPromptRole.ifBlank { "system" })
+                })
+            } else remove("depth_prompt")
+            put("talkativeness", JsonPrimitive(character.talkativeness.toString()))
         }
         val cardData = CharacterCardV2(
             data = CharacterCardData(
@@ -101,6 +124,9 @@ class CharacterStorage @Inject constructor(
                 postHistoryInstructions = character.postHistoryInstructions,
                 alternateGreetings = character.alternateGreetings,
                 tags = character.tags,
+                characterVersion = existingData?.characterVersion ?: "",
+                creator = existingData?.creator ?: "",
+                characterBook = existingData?.characterBook,
                 extensions = extensions
             )
         )
@@ -283,7 +309,9 @@ class CharacterStorage @Inject constructor(
                 isFavorite = prev?.isFavorite ?: false,
                 useAvatarForImageGen = prev?.useAvatarForImageGen ?: true,
                 notes = prev?.notes ?: "",
-                lastChatDate = prev?.lastChatDate ?: 0
+                lastChatDate = prev?.lastChatDate ?: 0,
+                // App-side field with no PNG counterpart — must survive the rebuild
+                attachedWorldInfo = prev?.attachedWorldInfo
             )
         }
         characterDao.deleteAll()
@@ -317,7 +345,11 @@ class CharacterStorage @Inject constructor(
             tags = data?.tags?.joinToString(",") ?: "",
             hasCharacterBook = data?.characterBook != null,
             characterBookEntryCount = data?.characterBook?.entries?.size ?: 0,
-            loreHints = loreHints
+            loreHints = loreHints,
+            depthPrompt = depthPromptFrom(data?.extensions).first,
+            depthPromptDepth = depthPromptFrom(data?.extensions).second,
+            depthPromptRole = depthPromptFrom(data?.extensions).third,
+            talkativeness = talkativenessFrom(data?.extensions)
         )
     }
 
@@ -344,7 +376,12 @@ class CharacterStorage @Inject constructor(
             isFavorite = character.isFavorite,
             useAvatarForImageGen = character.useAvatarForImageGen,
             notes = character.notes,
-            loreHints = character.loreHints
+            loreHints = character.loreHints,
+            attachedWorldInfo = character.attachedWorldInfo,
+            depthPrompt = character.depthPrompt,
+            depthPromptDepth = character.depthPromptDepth,
+            depthPromptRole = character.depthPromptRole,
+            talkativeness = character.talkativeness
         )
     }
 
@@ -371,9 +408,37 @@ class CharacterStorage @Inject constructor(
             isFavorite = entity.isFavorite,
             useAvatarForImageGen = entity.useAvatarForImageGen,
             notes = entity.notes,
-            loreHints = entity.loreHints
+            loreHints = entity.loreHints,
+            attachedWorldInfo = entity.attachedWorldInfo,
+            depthPrompt = entity.depthPrompt,
+            depthPromptDepth = entity.depthPromptDepth,
+            depthPromptRole = entity.depthPromptRole,
+            talkativeness = entity.talkativeness
         )
     }
+
+    // ── ST V2 extensions.depth_prompt (Author's Note) round-trip ──────────────
+    // Spec shape: extensions.depth_prompt = { "prompt": str, "depth": int, "role": str }
+    // and extensions.talkativeness as a stringified float. These are the app-editable
+    // fields that live ONLY in the PNG — losing them on save was issue #8's AN report.
+
+    private fun depthPromptFrom(extensions: Map<String, JsonElement>?): Triple<String, Int, String> {
+        val obj = try { extensions?.get("depth_prompt")?.jsonObject } catch (_: Exception) { null }
+            ?: return Triple("", 4, "system")
+        val prompt = try { obj["prompt"]?.jsonPrimitive?.content ?: "" } catch (_: Exception) { "" }
+        val depth = try {
+            obj["depth"]?.jsonPrimitive?.content?.toFloatOrNull()?.toInt() ?: 4
+        } catch (_: Exception) { 4 }
+        val role = try {
+            (obj["role"]?.jsonPrimitive?.content ?: "").ifBlank { "system" }
+        } catch (_: Exception) { "system" }
+        return Triple(prompt, depth, role)
+    }
+
+    private fun talkativenessFrom(extensions: Map<String, JsonElement>?): Float =
+        try {
+            extensions?.get("talkativeness")?.jsonPrimitive?.content?.toFloatOrNull() ?: 0.5f
+        } catch (_: Exception) { 0.5f }
 
     private fun readCharacterFile(file: File): Character? {
         if (!file.exists()) return null
@@ -382,6 +447,7 @@ class CharacterStorage @Inject constructor(
             val card = PngCharacterCard.extractCharacterData(bytes)
             val data = card?.data
             val extensions = data?.extensions
+            val (dpPrompt, dpDepth, dpRole) = depthPromptFrom(extensions)
             Character(
                 name = data?.name ?: file.nameWithoutExtension,
                 avatar = file.name, // local file name used as avatar key
@@ -399,7 +465,11 @@ class CharacterStorage @Inject constructor(
                 characterBookEntryCount = data?.characterBook?.entries?.size ?: 0,
                 loreHints = try {
                     extensions?.get("pockettavern_lore_hints")?.jsonPrimitive?.content ?: ""
-                } catch (_: Exception) { "" }
+                } catch (_: Exception) { "" },
+                depthPrompt = dpPrompt,
+                depthPromptDepth = dpDepth,
+                depthPromptRole = dpRole,
+                talkativeness = talkativenessFrom(extensions)
             )
         } catch (e: Exception) {
             DebugLogger.logError("CharacterStorage", "Failed to read ${file.name}", e)

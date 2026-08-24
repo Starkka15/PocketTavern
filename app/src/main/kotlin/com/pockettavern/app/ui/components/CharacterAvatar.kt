@@ -1,6 +1,7 @@
 package com.pockettavern.app.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
@@ -24,10 +25,12 @@ fun CharacterAvatar(
     imageUrl: String?,
     characterName: String,
     modifier: Modifier = Modifier,
-    size: Dp = 48.dp
+    size: Dp = 48.dp,
+    onClick: (() -> Unit)? = null
 ) {
     val ptColors = LocalPocketTavernColors.current
     val avatarShape = ptColors.avatarShape.toShape()
+    val clickModifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
 
     if (imageUrl != null) {
         val context = LocalContext.current
@@ -42,7 +45,8 @@ fun CharacterAvatar(
             contentDescription = characterName,
             modifier = modifier
                 .size(size)
-                .clip(avatarShape),
+                .clip(avatarShape)
+                .then(clickModifier),
             contentScale = ContentScale.Crop
         )
     } else {
@@ -50,7 +54,8 @@ fun CharacterAvatar(
             modifier = modifier
                 .size(size)
                 .clip(avatarShape)
-                .background(MaterialTheme.colorScheme.primary),
+                .background(MaterialTheme.colorScheme.primary)
+                .then(clickModifier),
             contentAlignment = Alignment.Center
         ) {
             Text(

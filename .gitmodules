@@ -1,0 +1,3 @@
+[submodule "app/src/main/cpp/MNN"]
+	path = app/src/main/cpp/MNN
+	url = https://github.com/Starkka15/MNN.git

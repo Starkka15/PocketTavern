@@ -22,6 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pockettavern.app.ui.components.CharacterAvatar
 import com.pockettavern.app.ui.components.ErrorDialog
+import com.pockettavern.app.ui.components.ImageViewerDialog
 import com.pockettavern.app.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -167,8 +168,10 @@ fun CharacterSettingsScreen(
                 // TTS Voice
                 TtsVoiceSection(
                     voiceId = uiState.ttsVoiceId,
+                    providerOverride = uiState.ttsProviderOverride,
                     availableVoices = uiState.availableVoices,
                     onVoiceChange = viewModel::updateTtsVoice,
+                    onProviderChange = viewModel::updateTtsProviderOverride,
                     onTestVoice = viewModel::testTtsVoice
                 )
 
@@ -222,6 +225,8 @@ private fun CharacterHeader(
     character: com.pockettavern.app.domain.model.Character,
     avatarUrl: String
 ) {
+    var showAvatarViewer by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -230,7 +235,8 @@ private fun CharacterHeader(
         CharacterAvatar(
             imageUrl = avatarUrl,
             characterName = character.name,
-            size = 64.dp
+            size = 64.dp,
+            onClick = { showAvatarViewer = true }
         )
         Column {
             Text(
@@ -246,6 +252,14 @@ private fun CharacterHeader(
                 )
             }
         }
+    }
+
+    if (showAvatarViewer) {
+        ImageViewerDialog(
+            onDismiss = { showAvatarViewer = false },
+            model = avatarUrl,
+            contentDescription = character.name
+        )
     }
 }
 
@@ -539,11 +553,14 @@ private fun TalkativenessSection(
 @Composable
 private fun TtsVoiceSection(
     voiceId: String?,
+    providerOverride: String?,
     availableVoices: List<com.pockettavern.app.ui.audio.TtsVoice>,
     onVoiceChange: (String?) -> Unit,
+    onProviderChange: (String?) -> Unit,
     onTestVoice: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var providerExpanded by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(text = stringResource(R.string.tts_voice),
@@ -555,6 +572,48 @@ private fun TtsVoiceSection(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+
+        // Per-character TTS provider override (default = global provider)
+        ExposedDropdownMenuBox(
+            expanded = providerExpanded,
+            onExpandedChange = { providerExpanded = it }
+        ) {
+            OutlinedTextField(
+                value = when (providerOverride) {
+                    "system" -> "System TTS"
+                    "openai" -> "OpenAI-compatible"
+                    else -> "Default (global)"
+                },
+                onValueChange = { },
+                readOnly = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                label = { Text("Provider") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = providerExpanded) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            )
+            ExposedDropdownMenu(
+                expanded = providerExpanded,
+                onDismissRequest = { providerExpanded = false }
+            ) {
+                listOf(null to "Default (global)", "system" to "System TTS", "openai" to "OpenAI-compatible")
+                    .forEach { (value, label) ->
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = {
+                                onProviderChange(value)
+                                providerExpanded = false
+                            }
+                        )
+                    }
+            }
+        }
 
         ExposedDropdownMenuBox(
             expanded = expanded,

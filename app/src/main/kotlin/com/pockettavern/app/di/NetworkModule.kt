@@ -115,7 +115,8 @@ object NetworkModule {
     fun provideImageGenBackends(
         apiProvider: @JvmSuppressWildcards () -> ForgeApi,
         @Named("Forge") forgeClient: OkHttpClient,
-        settingsDataStore: SettingsDataStore
+        settingsDataStore: SettingsDataStore,
+        mnnDiffusionEngine: com.pockettavern.app.data.local.inference.MnnDiffusionEngine
     ): Map<ImageGenBackendType, @JvmSuppressWildcards ImageGenBackend> {
         return mapOf(
             ImageGenBackendType.SD_WEBUI to SdWebuiBackend(apiProvider),
@@ -124,8 +125,13 @@ object NetworkModule {
             ImageGenBackendType.STABILITY to StabilityBackend(forgeClient, settingsDataStore),
             ImageGenBackendType.POLLINATIONS to PollinationsBackend(forgeClient, settingsDataStore),
             ImageGenBackendType.HUGGINGFACE to HuggingFaceBackend(forgeClient, settingsDataStore),
-            ImageGenBackendType.NANO_GPT to NanoGptBackend(forgeClient, settingsDataStore)
-        )
+            ImageGenBackendType.NANO_GPT to NanoGptBackend(forgeClient, settingsDataStore),
+            ImageGenBackendType.LOCAL_SD_MNN to MnnDiffusionBackend(mnnDiffusionEngine, settingsDataStore)
+        ).filterKeys {
+            // Release ships without the MNN native libs, so registering this backend would
+            // hand out one whose first call hits an UnsatisfiedLinkError.
+            it != ImageGenBackendType.LOCAL_SD_MNN || com.pockettavern.app.BuildConfig.MNN_SDXL_ENABLED
+        }
     }
 
     @Provides

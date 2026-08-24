@@ -341,7 +341,8 @@ class PresetStorage @Inject constructor(
             topA = float("top_a", 0f),
             topAEnabled = false,
             contextSize = int("openai_max_context", 4095).coerceIn(512, 131072),
-            contextSizeEnabled = false,
+            // ST always applies openai_max_context — imported presets get trimming on
+            contextSizeEnabled = true,
             seed = int("seed", -1),
             seedEnabled = false,
             promptOrder = orderedItems

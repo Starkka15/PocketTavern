@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,7 +26,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class GgufEngine @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val memoryManager: OnDeviceMemoryManager
 ) {
     data class Params(
         val maxTokens: Int = 512,
@@ -46,6 +48,10 @@ class GgufEngine @Inject constructor(
     private var loadedCtx = 0
     private var loadedGpuLayers = 0
 
+    init {
+        memoryManager.register(OnDeviceMemoryManager.Slot.GGUF, ::unload)
+    }
+
     private fun applyParams(ctx: Int, threads: Int, params: Params) {
         LlamaBridge.updateGenerateParams(
             temperature = params.temperature,
@@ -64,6 +70,7 @@ class GgufEngine @Inject constructor(
 
     private suspend fun ensureLoaded(modelPath: String, ctx: Int, threads: Int, params: Params) = lock.withLock {
         if (loadedModelPath == modelPath && loadedCtx == ctx && loadedGpuLayers == params.gpuLayers) return@withLock
+        memoryManager.prepareLoad(OnDeviceMemoryManager.Slot.GGUF, File(modelPath).length())
         // Reload-dependent params (contextLength, useMmap, gpuLayers) MUST be set BEFORE load,
         // or llama.cpp loads with defaults (slow/wrong context). Set them, then load.
         applyParams(ctx, threads, params)

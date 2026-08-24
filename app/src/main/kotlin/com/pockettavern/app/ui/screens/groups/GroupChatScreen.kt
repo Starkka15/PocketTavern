@@ -50,6 +50,7 @@ import com.pockettavern.app.domain.model.Character
 import com.pockettavern.app.domain.model.ChatInfo
 import com.pockettavern.app.domain.model.ChatStyle
 import com.pockettavern.app.domain.model.GroupChatMessage
+import com.pockettavern.app.ui.components.ImageViewerDialog
 import com.pockettavern.app.ui.components.ScanloreConfirmDialog
 import com.pockettavern.app.ui.theme.*
 import com.pockettavern.app.ui.theme.LocalPocketTavernColors
@@ -587,6 +588,7 @@ private fun StreamingBubble(
     content: String
 ) {
     val avatarShape = LocalPocketTavernColors.current.avatarShape.toShape()
+    var showAvatarViewer by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Start
@@ -598,9 +600,17 @@ private fun StreamingBubble(
             modifier = Modifier
                 .size(36.dp)
                 .clip(avatarShape)
-                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), avatarShape),
+                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), avatarShape)
+                .then(if (avatarUrl != null) Modifier.clickable { showAvatarViewer = true } else Modifier),
             contentScale = ContentScale.Crop
         )
+        if (showAvatarViewer) {
+            ImageViewerDialog(
+                onDismiss = { showAvatarViewer = false },
+                model = avatarUrl,
+                contentDescription = characterName
+            )
+        }
         Spacer(modifier = Modifier.width(8.dp))
 
         Column(
@@ -692,6 +702,8 @@ private fun GroupMessageBubble(
     val avatarShape = LocalPocketTavernColors.current.avatarShape.toShape()
     val isUser = message.isUser
     val context = LocalContext.current
+    var showAvatarViewer by remember { mutableStateOf(false) }
+    var showImageViewer by remember(message.imagePath) { mutableStateOf(false) }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -704,9 +716,17 @@ private fun GroupMessageBubble(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(avatarShape)
-                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), avatarShape),
+                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), avatarShape)
+                    .then(if (avatarUrl != null) Modifier.clickable { showAvatarViewer = true } else Modifier),
                 contentScale = ContentScale.Crop
             )
+            if (showAvatarViewer) {
+                ImageViewerDialog(
+                    onDismiss = { showAvatarViewer = false },
+                    model = avatarUrl,
+                    contentDescription = message.senderName
+                )
+            }
             Spacer(modifier = Modifier.width(8.dp))
         }
 
@@ -738,9 +758,16 @@ private fun GroupMessageBubble(
                     modifier = Modifier
                         .widthIn(max = 260.dp)
                         .clip(bubbleShape)
-                        .combinedClickable(onClick = {}, onLongClick = onLongPress),
+                        .combinedClickable(onClick = { showImageViewer = true }, onLongClick = onLongPress),
                     contentScale = ContentScale.FillWidth
                 )
+                if (showImageViewer) {
+                    ImageViewerDialog(
+                        onDismiss = { showImageViewer = false },
+                        model = imageFile,
+                        contentDescription = stringResource(R.string.scene_image)
+                    )
+                }
             } else {
                 Surface(
                     shape = bubbleShape,

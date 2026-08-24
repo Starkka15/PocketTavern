@@ -116,6 +116,11 @@ data class ChatUiState(
     // Image gallery
     val showGallery: Boolean = false,
     val galleryImages: List<GalleryImage> = emptyList(),
+    // Extension-triggered image generation progress (0..1, null = not generating)
+    val extensionImageGenProgress: Float? = null,
+    // Transient status line set by extensions via PT.setStatus(), e.g. while composing
+    // an image prompt before real generation progress is available
+    val extensionStatusMessage: String? = null,
     // Message search
     val isSearching: Boolean = false,
     val searchQuery: String = "",
@@ -264,6 +269,10 @@ class ChatViewModel @Inject constructor(
         // Wire insert message callback so PT.insertMessage() works
         extensionManager.jsHost.insertMessageCallback = { content, optionsJson ->
             viewModelScope.launch { doExtensionInsertMessage(content, optionsJson) }
+        }
+        // Wire status line callback so PT.setStatus() works
+        extensionManager.jsHost.setStatusCallback = { message ->
+            _uiState.update { it.copy(extensionStatusMessage = message.ifBlank { null }) }
         }
         // Observe token counter enabled state
         _uiState.update { it.copy(showTokenCount = extensionManager.tokenCounter.enabled) }
@@ -1096,12 +1105,24 @@ No preamble, no explanation. Just the numbered list."""
         val leanMode = config.currentModel.startsWith("pockettavern", ignoreCase = true)
         val builder = PromptBuilder(character, chatContext, userName, mainPromptOverride, extensionInjections, _currentMemoryBlock, _currentWorldBook, leanMode,
             languageDirective = com.pockettavern.app.util.LocaleHelper.responseLanguageDirective(context))
-        val prompt = builder.buildPrompt(history, userMessage)
+        // Context Size budget (issue #8): total prompt budget = configured context size minus
+        // room reserved for the response. PromptBuilder drops oldest history to fit.
+        // Chat completion: only when the preset's Context Size toggle is on.
+        // Text completion: truncationLength always applies (ST semantics).
+        val tokenBudget = if (config.usesChatCompletions) {
+            oaiPreset?.takeIf { it.contextSizeEnabled }?.let { p ->
+                (p.contextSize - (if (p.maxTokensEnabled) p.maxTokens else 0)).coerceAtLeast(256)
+            }
+        } else {
+            preset?.let { p -> (p.truncationLength - (p.maxNewTokens ?: 0)).coerceAtLeast(256) }
+        }
+        val prompt = builder.buildPrompt(history, userMessage,
+            if (config.usesChatCompletions) null else tokenBudget)
 
         // For chat completion APIs, also build structured messages for proper role formatting.
         val messages = if (config.usesChatCompletions) {
             val promptOrder = oaiPreset?.promptOrder ?: com.pockettavern.app.domain.model.OaiPromptOrderItem.defaultOrder()
-            builder.buildChatCompletionMessages(history, userMessage, promptOrder)
+            builder.buildChatCompletionMessages(history, userMessage, promptOrder, tokenBudget)
         } else null
 
         // Notify extensions that a prompt is about to be sent (T23)
@@ -1461,6 +1482,11 @@ No preamble, no explanation. Just the numbered list."""
         localRepository.saveChat(chat)
     }
 
+    private companion object {
+        // Compact the accumulated memory block once it exceeds ~4000 chars (~1300 tokens)
+        const val MEMORY_BLOCK_COMPACT_CHARS = 4_000
+    }
+
     private fun triggerMemorySummarizationIfNeeded() {
         if (!memoryEnabled) return
         val character = _uiState.value.character ?: return
@@ -1478,8 +1504,19 @@ No preamble, no explanation. Just the numbered list."""
                 }
                 val summary = summarizeHistoryUseCase.summarize(unsummarized, config)
                 if (summary.isBlank()) return@launch
-                val newBlock = if (_currentMemoryBlock.isBlank()) summary
+                var newBlock = if (_currentMemoryBlock.isBlank()) summary
                     else "$_currentMemoryBlock\n$summary"
+                // Compact when the accumulated block outgrows its budget — otherwise
+                // marathon chats build an ever-growing [Memory] preamble. On a failed
+                // compaction keep the uncompacted block; never lose memory.
+                if (newBlock.length > MEMORY_BLOCK_COMPACT_CHARS) {
+                    val compacted = summarizeHistoryUseCase.compact(newBlock, config)
+                    if (compacted.isNotBlank()) {
+                        com.pockettavern.app.util.DebugLogger.log(
+                            "ChatViewModel: memory compacted ${newBlock.length} -> ${compacted.length} chars")
+                        newBlock = compacted
+                    }
+                }
                 val newCount = messages.size
                 _currentMemoryBlock = newBlock
                 _currentSummarizedTurnCount = newCount
@@ -1678,17 +1715,34 @@ No preamble, no explanation. Just the numbered list."""
                 sampler = imageGenConfig.sampler,
                 seed = seed,
                 sourceImageBase64 = sourceImageBase64,
-                denoisingStrength = denoisingStrength
+                denoisingStrength = denoisingStrength,
+                clipSkip = imageGenConfig.clipSkip
             )
 
             var resultBase64 = ""
+            var errorMessage: String? = null
+            _uiState.update { it.copy(extensionImageGenProgress = 0f, extensionStatusMessage = null) }
             imageGenRepository.generateImageWithProgress(params).collect { state ->
-                if (state is GenerationState.Complete) {
-                    resultBase64 = state.imageBase64
+                when (state) {
+                    is GenerationState.InProgress -> {
+                        _uiState.update { it.copy(extensionImageGenProgress = state.progress) }
+                    }
+                    is GenerationState.Complete -> {
+                        resultBase64 = state.imageBase64
+                    }
+                    is GenerationState.Error -> {
+                        errorMessage = state.message
+                    }
+                    else -> {}
                 }
+            }
+            _uiState.update { it.copy(extensionImageGenProgress = null) }
+            if (errorMessage != null) {
+                _uiState.update { it.copy(error = "Image generation failed: $errorMessage") }
             }
             extensionManager.jsHost.completeImageGenerate(callbackId, resultBase64)
         } catch (e: Exception) {
+            _uiState.update { it.copy(extensionImageGenProgress = null, error = "Image generation failed: ${e.message}") }
             extensionManager.jsHost.completeImageGenerate(callbackId, "")
         }
     }

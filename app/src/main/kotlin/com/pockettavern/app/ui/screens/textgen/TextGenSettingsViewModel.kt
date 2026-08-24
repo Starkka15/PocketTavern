@@ -288,6 +288,9 @@ class TextGenSettingsViewModel @Inject constructor(
 
             when (val result = localRepository.saveTextGenPreset(preset)) {
                 is Result.Success -> {
+                    // Saving under a new name must also select it, or generation keeps
+                    // using the previously selected preset
+                    localRepository.selectTextGenPreset(preset.name)
                     _uiState.update {
                         it.copy(
                             isSaving = false,
@@ -343,8 +346,23 @@ class TextGenSettingsViewModel @Inject constructor(
     }
 
     fun applySettings() {
-        // Settings are applied at generation time from DataStore, no separate "apply" step needed
-        _uiState.update { it.copy(saveSuccess = true) }
+        // Persist the current slider state into the selected preset — generation reads
+        // the preset FILE, so without this write the edits were lost on navigation
+        val state = _uiState.value
+        val currentName = state.presets.getOrNull(state.selectedPresetIndex)?.name ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSaving = true) }
+            when (val result = localRepository.saveTextGenPreset(buildPresetFromState(currentName))) {
+                is Result.Success -> {
+                    localRepository.selectTextGenPreset(currentName)
+                    _uiState.update { it.copy(isSaving = false, saveSuccess = true) }
+                    loadPresets()
+                }
+                is Result.Error -> {
+                    _uiState.update { it.copy(isSaving = false, error = result.exception.message) }
+                }
+            }
+        }
     }
 
     fun clearError() {

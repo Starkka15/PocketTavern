@@ -62,6 +62,15 @@ data class OaiTextRequest(
     val temperature: Float? = null,
     @SerialName("max_tokens") val maxTokens: Int? = null,
     @SerialName("top_p") val topP: Float? = null,
+    // Extended sampler params (ooba/vLLM/Aphrodite/TabbyAPI accept these; null = omitted)
+    @SerialName("top_k") val topK: Int? = null,
+    @SerialName("min_p") val minP: Float? = null,
+    @SerialName("repetition_penalty") val repetitionPenalty: Float? = null,
+    @SerialName("frequency_penalty") val frequencyPenalty: Float? = null,
+    @SerialName("presence_penalty") val presencePenalty: Float? = null,
+    @SerialName("guidance_scale") val guidanceScale: Float? = null,
+    @SerialName("smoothing_curve") val smoothingCurve: Float? = null,
+    @SerialName("skip_special_tokens") val skipSpecialTokens: Boolean? = null,
     val stop: List<String>? = null
 )
 

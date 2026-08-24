@@ -55,6 +55,9 @@ class PromptBuilder(
     private var _buildNewMessage: String = ""
 
     companion object {
+        // Per-message token overhead for chat completion APIs (role framing etc.)
+        private const val MESSAGE_OVERHEAD_TOKENS = 4
+
         // MUST stay byte-identical to PT_RULES in pockettavern-models/gen_dataset.py — the lean
         // prompt at inference has to match what the PocketTavern models were trained on, or the
         // baked-in behavior gets shaky. Update both together.
@@ -117,18 +120,59 @@ class PromptBuilder(
 
     /**
      * Build the complete prompt for text completion APIs.
+     *
+     * @param tokenBudget total prompt token budget (context size minus response reserve).
+     *   When non-null, oldest chat history is dropped so the estimated prompt size fits.
      */
     fun buildPrompt(
         chatHistory: List<ChatMessage>,
-        newMessage: String
+        newMessage: String,
+        tokenBudget: Int? = null
     ): String {
         _buildHistory = chatHistory
         _buildNewMessage = newMessage
-        return if (instructTemplate != null && instructTemplate.inputSequence.isNotBlank()) {
-            buildInstructPrompt(chatHistory, newMessage)
-        } else {
-            buildSimplePrompt(chatHistory, newMessage)
+        val useInstruct = instructTemplate != null && instructTemplate.inputSequence.isNotBlank()
+        fun build(history: List<ChatMessage>): String =
+            if (useInstruct) buildInstructPrompt(history, newMessage)
+            else buildSimplePrompt(history, newMessage)
+
+        if (tokenBudget == null) return build(chatHistory)
+
+        // Overhead pass: everything except chat history. WI entries triggered only by
+        // trimmed-away history are missed here; the conservative estimator covers that.
+        val overheadTokens = estimatePromptTokens(build(emptyList()))
+        val historyBudget = (tokenBudget - overheadTokens).coerceAtLeast(0)
+        val trimmed = trimHistoryToBudget(chatHistory, historyBudget)
+        DebugLogger.logSection("Context Size Trimming (text completion)")
+        DebugLogger.logKeyValue("Token budget", tokenBudget)
+        DebugLogger.logKeyValue("Non-history overhead (est)", overheadTokens)
+        DebugLogger.logKeyValue("History budget", historyBudget)
+        DebugLogger.logKeyValue("History kept", "${trimmed.size}/${chatHistory.size} messages")
+        _buildHistory = trimmed
+        return build(trimmed)
+    }
+
+    /**
+     * Conservative token estimate for context budgeting: ~3 chars per token.
+     * Overestimates for typical English (~4 chars/token) so trimming errs on the
+     * safe side — better to send slightly less history than to blow the provider limit.
+     */
+    private fun estimatePromptTokens(text: String): Int = text.length / 3 + 1
+
+    /**
+     * Keep as many of the NEWEST messages as fit in [budgetTokens]; drop the oldest.
+     */
+    private fun trimHistoryToBudget(history: List<ChatMessage>, budgetTokens: Int): List<ChatMessage> {
+        if (budgetTokens <= 0) return emptyList()
+        var used = 0
+        var firstKept = history.size
+        for (i in history.indices.reversed()) {
+            val t = estimatePromptTokens(promptContent(history[i])) + MESSAGE_OVERHEAD_TOKENS
+            if (used + t > budgetTokens) break
+            used += t
+            firstKept = i
         }
+        return if (firstKept == 0) history else history.subList(firstKept, history.size)
     }
 
     /**
@@ -143,11 +187,39 @@ class PromptBuilder(
      *  5. system  — World Info (after_char, position=1)
      *  6. system  — post-history instructions
      *  7. user    — new user message
+     *
+     * @param tokenBudget total prompt token budget (context size minus response reserve).
+     *   When non-null, oldest chat history is dropped so the estimated request fits (issue #8).
      */
     fun buildChatCompletionMessages(
         chatHistory: List<ChatMessage>,
         newMessage: String,
-        promptOrder: List<OaiPromptOrderItem> = OaiPromptOrderItem.defaultOrder()
+        promptOrder: List<OaiPromptOrderItem> = OaiPromptOrderItem.defaultOrder(),
+        tokenBudget: Int? = null
+    ): List<PromptMessage> {
+        if (tokenBudget == null) {
+            return buildChatCompletionMessagesInternal(chatHistory, newMessage, promptOrder)
+        }
+        // Overhead pass: build with empty history to measure everything that is NOT chat
+        // history (system prompt, card, examples, world info, post-history, new message).
+        // WI entries triggered only by trimmed-away history are missed here; the
+        // conservative estimator covers that.
+        val overheadTokens = buildChatCompletionMessagesInternal(emptyList(), newMessage, promptOrder)
+            .sumOf { estimatePromptTokens(it.content) + MESSAGE_OVERHEAD_TOKENS }
+        val historyBudget = (tokenBudget - overheadTokens).coerceAtLeast(0)
+        val trimmed = trimHistoryToBudget(chatHistory, historyBudget)
+        DebugLogger.logSection("Context Size Trimming (chat completion)")
+        DebugLogger.logKeyValue("Token budget", tokenBudget)
+        DebugLogger.logKeyValue("Non-history overhead (est)", overheadTokens)
+        DebugLogger.logKeyValue("History budget", historyBudget)
+        DebugLogger.logKeyValue("History kept", "${trimmed.size}/${chatHistory.size} messages")
+        return buildChatCompletionMessagesInternal(trimmed, newMessage, promptOrder)
+    }
+
+    private fun buildChatCompletionMessagesInternal(
+        chatHistory: List<ChatMessage>,
+        newMessage: String,
+        promptOrder: List<OaiPromptOrderItem>
     ): List<PromptMessage> {
         _buildHistory = chatHistory
         _buildNewMessage = newMessage
@@ -187,7 +259,9 @@ class PromptBuilder(
                     val persona = chatContext.userPersona
                     // Only emit if there's an actual description — a bare name with no
                     // description produces "[User's persona]" which is noise to the model.
-                    if (persona.description.isBlank()) ""
+                    // Positions 1-3 inject via injectDepthPrompts instead; emitting here
+                    // too would double the persona in the request.
+                    if (persona.description.isBlank() || persona.position != 0) ""
                     else buildString {
                         if (persona.name.isNotBlank()) append("[${persona.name}'s persona: ")
                         else append("[Persona: ")
@@ -198,8 +272,12 @@ class PromptBuilder(
                 "char_description" -> if (character.description.isNotBlank()) substituteMacros(character.description) else ""
                 "char_personality" -> if (character.personality.isNotBlank())
                     "${character.name}'s personality: ${substituteMacros(character.personality)}" else ""
-                "scenario" -> if (character.scenario.isNotBlank())
-                    "Scenario: ${substituteMacros(character.scenario)}" else ""
+                "scenario" -> {
+                    val scenario = if (character.scenario.isNotBlank())
+                        "Scenario: ${substituteMacros(character.scenario)}" else ""
+                    listOf(scenarioAuthorsNote(2), scenario, scenarioAuthorsNote(0))
+                        .filter { it.isNotBlank() }.joinToString("\n")
+                }
                 "world_info_after" -> getWorldInfoByPosition(1, chatHistory, newMessage)
                 else -> ""
             }
@@ -584,10 +662,12 @@ class PromptBuilder(
             parts.add("${character.name}'s personality: ${substituteMacros(character.personality)}")
         }
 
-        // Scenario
+        // Scenario (with scenario-relative Author's Note before/after when configured)
+        scenarioAuthorsNote(2).takeIf { it.isNotBlank() }?.let { parts.add(it) }
         if (character.scenario.isNotBlank()) {
             parts.add("Scenario: ${substituteMacros(character.scenario)}")
         }
+        scenarioAuthorsNote(0).takeIf { it.isNotBlank() }?.let { parts.add(it) }
 
         // User persona (position 0 = in prompt)
         if (persona.position == 0 && persona.description.isNotBlank()) {
@@ -674,6 +754,31 @@ class PromptBuilder(
         return result
     }
 
+    /** AN interval: due when interval <= 1, else every Nth user message (counting the one being sent). */
+    private fun authorsNoteDue(): Boolean {
+        val interval = chatContext.authorsNote.interval
+        return interval <= 1 || (_buildHistory.count { it.isUser } + 1) % interval == 0
+    }
+
+    /**
+     * Chat/global Author's Note text when configured for a scenario-relative position
+     * (0 = after scenario, 2 = before scenario) and due this message. Card depth prompts
+     * never come through here — they are always depth-injected.
+     */
+    private fun scenarioAuthorsNote(wantedPosition: Int): String {
+        val an = chatContext.authorsNote
+        if (character.depthPrompt.isNotBlank()) return ""
+        if (an.content.isBlank() || an.position != wantedPosition) return ""
+        if (!authorsNoteDue()) return ""
+        return substituteMacros(an.content)
+    }
+
+    private fun personaRoleString(): String = when (chatContext.userPersona.role) {
+        1 -> "user"
+        2 -> "assistant"
+        else -> "system"
+    }
+
     /**
      * Inject Author's Note, User Persona, World Info, and OAI preset depth-injection blocks
      * at correct depths in chat history.
@@ -689,13 +794,26 @@ class PromptBuilder(
         val reversedHistory = chatHistory.reversed()
         val historySize = chatHistory.size
 
-        // Author's Note settings
+        // Author's Note settings. The chat/global note only depth-injects when its
+        // position is in-chat (1) and its interval says it's due; positions 0/2 are
+        // emitted next to the scenario block instead. Card depth prompts always inject.
         val authorsNote = chatContext.authorsNote
-        val depthPrompt = character.depthPrompt.ifBlank { authorsNote.content }
+        val chatNoteEligible = authorsNote.position == 1 && authorsNoteDue()
+        val depthPrompt = character.depthPrompt.ifBlank {
+            if (chatNoteEligible) authorsNote.content else ""
+        }
         val depthPromptDepth = if (character.depthPrompt.isNotBlank()) {
             character.depthPromptDepth
         } else {
             authorsNote.depth
+        }
+        // Role follows whichever source supplied the note (chat AN role is an int enum)
+        val depthPromptRole = if (character.depthPrompt.isNotBlank()) {
+            character.depthPromptRole.ifBlank { "system" }
+        } else when (authorsNote.role) {
+            1 -> "user"
+            2 -> "assistant"
+            else -> "system"
         }
 
         // Debug logging for Author's Note / Depth Prompt
@@ -716,19 +834,19 @@ class PromptBuilder(
                 2 -> { // TOP_OF_AN - persona before AN
                     val personaDesc = chatContext.userPersona.description
                     if (personaDesc.isNotBlank()) {
-                        result.add(HistoryItem.Injection("[${chatContext.userPersona.name}'s persona: ${substituteMacros(personaDesc)}]"))
+                        result.add(HistoryItem.Injection("[${chatContext.userPersona.name}'s persona: ${substituteMacros(personaDesc)}]", personaRoleString()))
                     }
-                    result.add(HistoryItem.Injection(substituteMacros(depthPrompt)))
+                    result.add(HistoryItem.Injection(substituteMacros(depthPrompt), depthPromptRole))
                 }
                 3 -> { // BOTTOM_OF_AN - persona after AN
-                    result.add(HistoryItem.Injection(substituteMacros(depthPrompt)))
+                    result.add(HistoryItem.Injection(substituteMacros(depthPrompt), depthPromptRole))
                     val personaDesc = chatContext.userPersona.description
                     if (personaDesc.isNotBlank()) {
-                        result.add(HistoryItem.Injection("[${chatContext.userPersona.name}'s persona: ${substituteMacros(personaDesc)}]"))
+                        result.add(HistoryItem.Injection("[${chatContext.userPersona.name}'s persona: ${substituteMacros(personaDesc)}]", personaRoleString()))
                     }
                 }
                 else -> {
-                    result.add(HistoryItem.Injection(substituteMacros(depthPrompt)))
+                    result.add(HistoryItem.Injection(substituteMacros(depthPrompt), depthPromptRole))
                 }
             }
         }
@@ -781,25 +899,25 @@ class PromptBuilder(
                 when (persona.position) {
                     2 -> { // TOP_OF_AN - persona before AN
                         if (personaContent.isNotBlank()) {
-                            result.add(HistoryItem.Injection(personaContent))
+                            result.add(HistoryItem.Injection(personaContent, personaRoleString()))
                         }
-                        result.add(HistoryItem.Injection(substituteMacros(depthPrompt)))
+                        result.add(HistoryItem.Injection(substituteMacros(depthPrompt), depthPromptRole))
                     }
                     3 -> { // BOTTOM_OF_AN - persona after AN
-                        result.add(HistoryItem.Injection(substituteMacros(depthPrompt)))
+                        result.add(HistoryItem.Injection(substituteMacros(depthPrompt), depthPromptRole))
                         if (personaContent.isNotBlank()) {
-                            result.add(HistoryItem.Injection(personaContent))
+                            result.add(HistoryItem.Injection(personaContent, personaRoleString()))
                         }
                     }
                     else -> {
-                        result.add(HistoryItem.Injection(substituteMacros(depthPrompt)))
+                        result.add(HistoryItem.Injection(substituteMacros(depthPrompt), depthPromptRole))
                     }
                 }
             }
 
             // Inject persona at depth if position is IN_CHAT (1)
             if (persona.position == 1 && depth == persona.depth && personaContent.isNotBlank()) {
-                result.add(HistoryItem.Injection(personaContent))
+                result.add(HistoryItem.Injection(personaContent, personaRoleString()))
             }
 
             result.add(HistoryItem.Message(message))
@@ -812,7 +930,7 @@ class PromptBuilder(
 
         // Also inject Author's Note at beginning if depth > history size
         if (depthPromptDepth > historySize && depthPrompt.isNotBlank()) {
-            result.add(HistoryItem.Injection(substituteMacros(depthPrompt)))
+            result.add(HistoryItem.Injection(substituteMacros(depthPrompt), depthPromptRole))
         }
 
         // Inject OAI preset blocks whose depth exceeds history size (goes to top of history).
@@ -833,7 +951,9 @@ class PromptBuilder(
      */
     private fun getWorldInfoByDepth(chatHistory: List<ChatMessage>): Map<Int, String> {
         val result = mutableMapOf<Int, String>()
-        val triggered = scanWorldInfo(chatHistory)
+        // Include the new user message in the scan — otherwise entries whose keyword
+        // only appears in the message being sent never inject via the depth path.
+        val triggered = scanWorldInfo(chatHistory, _buildNewMessage)
 
         val depthEntries = triggered.filter { it.depth > 0 }
         DebugLogger.logSection("World Info By Depth")
@@ -887,42 +1007,49 @@ class PromptBuilder(
         }
 
         val settings = chatContext.worldInfoSettings
-        val scanDepth = settings.depth
+        val defaultScanDepth = settings.depth
 
-        // Build base scan text (recent messages + character context)
-        val baseText = buildString {
-            append(newMessage)
-            append(" ")
-            chatHistory.takeLast(scanDepth).forEach { msg ->
-                append(promptContent(msg))
+        // Base scan text per depth (recent messages + character context).
+        // Entries may override the global scan depth via entry.scanDepth.
+        val baseTexts = mutableMapOf<Int, String>()
+        fun baseTextFor(depth: Int): String = baseTexts.getOrPut(depth) {
+            buildString {
+                append(newMessage)
                 append(" ")
+                chatHistory.takeLast(depth).forEach { msg ->
+                    append(promptContent(msg))
+                    append(" ")
+                }
+                append(character.description)
+                append(" ")
+                append(character.scenario)
             }
-            append(character.description)
-            append(" ")
-            append(character.scenario)
         }
 
         DebugLogger.logSection("PromptBuilder - World Info Scan")
-        DebugLogger.logKeyValue("Scan depth", scanDepth)
+        DebugLogger.logKeyValue("Scan depth (global)", defaultScanDepth)
         DebugLogger.logKeyValue("Recursive", settings.recursive)
-        DebugLogger.logKeyValue("Base text length", baseText.length)
 
         // Run scan pass(es); recursive adds triggered content to next pass
         val triggered = mutableListOf<WorldInfoEntry>()
         val remainingEntries = allEntries.toMutableList()
-        var scanText = baseText
+        var recursiveExtra = ""
         var passes = 0
 
         do {
             val passTriggered = mutableListOf<WorldInfoEntry>()
             val stillRemaining = mutableListOf<WorldInfoEntry>()
-            val scanLower = scanText.lowercase()
 
-            for (entry in remainingEntries) {
-                if (matchesWorldInfoEntry(entry, scanText, scanLower)) {
-                    passTriggered.add(entry)
-                } else {
-                    stillRemaining.add(entry)
+            // Group by effective scan depth so each group's text is built and lowercased once
+            for ((depth, entries) in remainingEntries.groupBy { it.scanDepth ?: defaultScanDepth }) {
+                val scanText = baseTextFor(depth) + recursiveExtra
+                val scanLower = scanText.lowercase()
+                for (entry in entries) {
+                    if (matchesWorldInfoEntry(entry, scanText, scanLower)) {
+                        passTriggered.add(entry)
+                    } else {
+                        stillRemaining.add(entry)
+                    }
                 }
             }
 
@@ -933,8 +1060,7 @@ class PromptBuilder(
 
             // For recursive mode: add triggered content to scan text and repeat
             if (settings.recursive && passTriggered.isNotEmpty()) {
-                val newContent = passTriggered.joinToString(" ") { it.content }
-                scanText = "$scanText $newContent"
+                recursiveExtra += " " + passTriggered.joinToString(" ") { it.content }
                 DebugLogger.log("  Recursive pass $passes triggered ${passTriggered.size} entries")
             }
         } while (settings.recursive && passTriggered.isNotEmpty() && remainingEntries.isNotEmpty())
@@ -1035,7 +1161,7 @@ class PromptBuilder(
         var tokenCount = 0
 
         for (entry in sorted) {
-            val entryTokens = estimateTokens(entry.content)
+            val entryTokens = estimatePromptTokens(entry.content)
             if (tokenCount + entryTokens > settings.budgetCap) {
                 DebugLogger.log("  WI budget cap (${settings.budgetCap}) reached at '${entry.comment}' — skipping")
                 continue
@@ -1049,9 +1175,6 @@ class PromptBuilder(
         }
         return result
     }
-
-    // Rough token estimate: ~0.75 tokens per character on average
-    private fun estimateTokens(text: String): Int = (text.length * 0.75).toInt().coerceAtLeast(1)
 
     /**
      * Wrap content as a system message in instruct format.

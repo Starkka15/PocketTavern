@@ -67,10 +67,14 @@ class SdWebuiBackend(
         emit(GenerationState.Starting)
 
         try {
+            val overrides = if (params.clipSkip > 1) mapOf(
+                "CLIP_stop_at_last_layers" to kotlinx.serialization.json.JsonPrimitive(params.clipSkip)
+            ) else null
             val response = if (params.sourceImageBase64 != null) {
                 api.img2img(
                     Img2ImgRequest(
                         prompt = params.prompt,
+                        overrideSettings = overrides,
                         negativePrompt = params.negativePrompt,
                         initImages = listOf(params.sourceImageBase64),
                         steps = params.steps,
@@ -86,6 +90,7 @@ class SdWebuiBackend(
                 api.generateImage(
                     Txt2ImgRequest(
                         prompt = params.prompt,
+                        overrideSettings = overrides,
                         negativePrompt = params.negativePrompt,
                         steps = params.steps,
                         cfgScale = params.cfgScale,

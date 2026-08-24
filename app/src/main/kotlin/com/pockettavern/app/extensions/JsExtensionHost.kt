@@ -133,6 +133,9 @@ class JsExtensionHost @Inject constructor(
     // Insert message request: JS calls PT.insertMessage() → Kotlin inserts a non-LLM message into chat
     var insertMessageCallback: ((String, String) -> Unit)? = null  // (content, optionsJson) -> Unit
 
+    // Status line: JS calls PT.setStatus() → Kotlin shows/clears a transient status row in chat
+    var setStatusCallback: ((String) -> Unit)? = null  // (message) -> Unit
+
     // Character import: JS calls PT.importCharacter() / PT.importCharacterFromBase64()
     var importCharacterCallback: ((String, String, String) -> Unit)? = null         // (url, filename, callbackId)
     var importCharacterBase64Callback: ((String, String, String) -> Unit)? = null   // (base64, filename, callbackId)
@@ -955,6 +958,18 @@ class JsExtensionHost @Inject constructor(
         fun insertMessage(content: String, optionsJson: String) {
             scope.launch(Dispatchers.Main) {
                 insertMessageCallback?.invoke(content, optionsJson)
+            }
+        }
+
+        /**
+         * Called by PT.setStatus(message).
+         * Shows a transient status row in chat (e.g. "Composing image prompt...");
+         * pass an empty string to clear it.
+         */
+        @JavascriptInterface
+        fun setStatus(message: String) {
+            scope.launch(Dispatchers.Main) {
+                setStatusCallback?.invoke(message)
             }
         }
 

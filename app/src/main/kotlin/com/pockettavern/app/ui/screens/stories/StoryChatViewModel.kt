@@ -180,8 +180,29 @@ class StoryChatViewModel @Inject constructor(
 
             // The single-call ensemble prompt (V1). Opening seed only matters on a fresh scene.
             val builder = StoryPromptBuilder(story, personaName)
-            val chatHistory = history.map { it.toChatMessage() }
+            val fullHistory = history.map { it.toChatMessage() }
             val s = _uiState.value
+            // Context Size budget (parity with solo/group): measure non-history overhead
+            // with an empty-history build, then keep the newest messages that fit.
+            val tokenBudget = if (config.usesChatCompletions) {
+                oaiPreset?.takeIf { it.contextSizeEnabled }?.let { p ->
+                    (p.contextSize - (if (p.maxTokensEnabled) p.maxTokens else 0)).coerceAtLeast(256)
+                }
+            } else {
+                preset?.let { p -> (p.truncationLength - (p.maxNewTokens ?: 0)).coerceAtLeast(256) }
+            }
+            val chatHistory = if (tokenBudget == null) fullHistory else {
+                val overhead = builder.buildMessages(emptyList(), opening, s.activeMission, s.roster)
+                    .sumOf { it.content.length / 3 + 4 }
+                var remaining = (tokenBudget - overhead).coerceAtLeast(0)
+                val kept = ArrayList<com.pockettavern.app.domain.model.ChatMessage>()
+                for (msg in fullHistory.asReversed()) {
+                    val t = msg.content.length / 3 + 4
+                    if (t > remaining) break
+                    kept.add(msg); remaining -= t
+                }
+                kept.reversed()
+            }
             val messages = builder.buildMessages(chatHistory, opening, s.activeMission, s.roster)
             val promptText = messages.joinToString("\n\n") { "${it.role.uppercase()}: ${it.content}" }
 

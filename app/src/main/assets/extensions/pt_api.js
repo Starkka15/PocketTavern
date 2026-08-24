@@ -512,6 +512,24 @@
             }
         },
 
+        /**
+         * Show (or clear) a transient status row in chat, e.g. while an extension
+         * is doing background work before it has a real progress indicator to show.
+         * Pass an empty string (or omit) to clear it.
+         *
+         * @param {string} [message]
+         *
+         * @example
+         *   PT.setStatus('Composing image prompt...');
+         *   // ... later, once real progress starts elsewhere ...
+         *   PT.setStatus('');
+         */
+        setStatus: function (message) {
+            if (window.PtBridge) {
+                PtBridge.setStatus(message || '');
+            }
+        },
+
         // ── Per-character extension state ────────────────────────────────────
 
         /**

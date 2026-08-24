@@ -12,7 +12,8 @@ data class Persona(
     val role: PersonaRole = PersonaRole.SYSTEM,
     val depth: Int = 2,             // Depth for in-chat injection
     val lorebook: String = "",      // Attached lorebook name
-    val isSelected: Boolean = false // Whether this is the active persona
+    val isSelected: Boolean = false, // Whether this is the active persona
+    val avatarPath: String? = null  // Absolute path to the avatar image file
 )
 
 enum class PersonaPosition(val value: Int) {

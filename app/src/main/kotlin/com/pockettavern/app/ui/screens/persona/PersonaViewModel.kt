@@ -11,6 +11,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import com.pockettavern.app.domain.model.ForgeGenerationParams
 import com.pockettavern.app.domain.model.GenerationState
+import com.pockettavern.app.domain.model.ImageGenCapabilities
 import com.pockettavern.app.domain.model.Persona
 import com.pockettavern.app.domain.model.PersonaPosition
 import com.pockettavern.app.domain.model.PersonaRole
@@ -44,6 +45,11 @@ data class PersonaUiState(
     val createName: String = "",
     val createDescription: String = "",
     val forgeAvailable: Boolean = false,
+    val imageGenCapabilities: ImageGenCapabilities = ImageGenCapabilities(),
+    // Set only when the user picks/generates a NEW avatar while editing. Left null means
+    // "don't touch the existing avatar file" -- savePersonaEdit() copies the record forward.
+    val editImageBytes: ByteArray? = null,
+    val editImageMimeType: String = "image/png",
     val generationPrompt: String = "",
     val isGenerating: Boolean = false,
     val generationProgress: Float = 0f,
@@ -56,19 +62,28 @@ class PersonaViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val localRepository: LocalRepository,
     private val settingsRepository: SettingsRepository,
-    private val forgeRepository: ForgeRepository
+    private val forgeRepository: ForgeRepository,
+    private val imageGenRepository: com.pockettavern.app.data.repository.ImageGenRepository,
+    private val settingsDataStore: com.pockettavern.app.data.local.SettingsDataStore,
+    private val personaStorage: com.pockettavern.app.data.local.PersonaStorage
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PersonaUiState())
     val uiState: StateFlow<PersonaUiState> = _uiState.asStateFlow()
 
     private var generationJob: Job? = null
+    private var roster: List<com.pockettavern.app.data.local.StoredPersona> = emptyList()
+    private var selectedId: String? = null
 
     init {
         viewModelScope.launch {
             val settings = settingsRepository.getSettings()
+            val capabilities = imageGenRepository.getCapabilities()
             _uiState.update {
-                it.copy(forgeAvailable = settings.forgeUrl.isNotBlank())
+                it.copy(
+                    forgeAvailable = settings.imageGenBackendConfigured,
+                    imageGenCapabilities = capabilities
+                )
             }
         }
         loadPersonas()
@@ -77,32 +92,65 @@ class PersonaViewModel @Inject constructor(
     fun loadPersonas() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            when (val result = localRepository.getUserPersona()) {
-                is Result.Success -> {
-                    val persona = result.data.toPersona()
-                    _uiState.update {
-                        it.copy(
-                            personas = listOf(persona),
-                            selectedPersona = persona,
-                            isLoading = false
-                        )
-                    }
-                }
-                is Result.Error -> {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = result.exception.message
-                        )
-                    }
-                }
+            val (loaded, loadedSelected) = personaStorage.load()
+            if (loaded.isEmpty()) {
+                // Migration: seed the roster from the old single-slot DataStore persona
+                val current = (localRepository.getUserPersona() as? Result.Success)?.data
+                val seed = com.pockettavern.app.data.local.StoredPersona(
+                    id = java.util.UUID.randomUUID().toString(),
+                    name = current?.name?.ifBlank { "User" } ?: "User",
+                    description = current?.description ?: "",
+                    position = current?.position ?: 0,
+                    depth = current?.depth ?: 2,
+                    role = current?.role ?: 0,
+                    avatarPath = current?.avatarPath
+                )
+                roster = listOf(seed)
+                selectedId = seed.id
+                personaStorage.save(roster, selectedId)
+            } else {
+                roster = loaded
+                selectedId = loadedSelected ?: loaded.first().id
             }
+            publishRoster()
         }
     }
 
+    private fun publishRoster() {
+        val personas = roster.map { it.toPersona(it.id == selectedId) }
+        _uiState.update {
+            it.copy(
+                personas = personas,
+                selectedPersona = personas.firstOrNull { p -> p.isSelected },
+                isLoading = false
+            )
+        }
+    }
+
+    /** Mirror the selected roster entry into the DataStore slot the prompt path reads. */
+    private suspend fun activate(p: com.pockettavern.app.data.local.StoredPersona) {
+        val noSpeak = (localRepository.getUserPersona() as? Result.Success)?.data?.noSpeakForUser ?: false
+        localRepository.saveUserPersona(
+            UserPersona(
+                name = p.name,
+                description = p.description,
+                position = p.position,
+                depth = p.depth,
+                role = p.role,
+                avatarPath = p.avatarPath,
+                noSpeakForUser = noSpeak
+            )
+        )
+    }
+
     fun selectPersona(persona: Persona) {
-        // Only one persona in standalone mode — selecting it is a no-op
-        _uiState.update { it.copy(selectedPersona = persona) }
+        val target = roster.firstOrNull { it.id == persona.avatarId } ?: return
+        viewModelScope.launch {
+            selectedId = target.id
+            personaStorage.save(roster, selectedId)
+            activate(target)
+            publishRoster()
+        }
     }
 
     fun showEditDialog(persona: Persona) {
@@ -113,7 +161,10 @@ class PersonaViewModel @Inject constructor(
                 editDescription = persona.description,
                 editPosition = persona.position,
                 editRole = persona.role,
-                editDepth = persona.depth
+                editDepth = persona.depth,
+                // Start clean: a leftover pick from a previous edit would otherwise be written
+                // onto whichever persona is opened next.
+                editImageBytes = null
             )
         }
     }
@@ -122,7 +173,8 @@ class PersonaViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 showEditDialog = false,
-                editingPersona = null
+                editingPersona = null,
+                editImageBytes = null
             )
         }
     }
@@ -150,14 +202,26 @@ class PersonaViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
             try {
-                val updated = UserPersona(
-                    name = persona.name,
+                val idx = roster.indexOfFirst { it.id == persona.avatarId }
+                if (idx < 0) throw Exception("Persona not found")
+                // Only touch the avatar file when the user actually chose a new image.
+                // editImageBytes == null means "leave it exactly as it was" -- the copy()
+                // below carries the existing avatarPath forward untouched.
+                val newAvatarPath = state.editImageBytes?.let { bytes ->
+                    val file = personaStorage.avatarFile(roster[idx].id)
+                    file.writeBytes(bytes)
+                    file.absolutePath
+                }
+                val updated = roster[idx].copy(
                     description = state.editDescription,
                     position = state.editPosition.value,
                     depth = state.editDepth,
-                    role = state.editRole.value
+                    role = state.editRole.value,
+                    avatarPath = newAvatarPath ?: roster[idx].avatarPath
                 )
-                localRepository.saveUserPersona(updated)
+                roster = roster.toMutableList().also { it[idx] = updated }
+                personaStorage.save(roster, selectedId)
+                if (updated.id == selectedId) activate(updated)
                 _uiState.update {
                     it.copy(
                         isSaving = false,
@@ -186,13 +250,34 @@ class PersonaViewModel @Inject constructor(
     }
 
     fun deletePersona() {
-        // Deleting the only persona is not allowed in standalone mode
-        _uiState.update {
-            it.copy(
-                showDeleteConfirm = false,
-                showEditDialog = false,
-                error = "Cannot delete the only persona in standalone mode"
-            )
+        val target = _uiState.value.editingPersona ?: return
+        if (roster.size <= 1) {
+            _uiState.update {
+                it.copy(
+                    showDeleteConfirm = false,
+                    showEditDialog = false,
+                    error = "Cannot delete the last persona"
+                )
+            }
+            return
+        }
+        viewModelScope.launch {
+            val removed = roster.firstOrNull { it.id == target.avatarId } ?: return@launch
+            roster = roster.filterNot { it.id == removed.id }
+            removed.avatarPath?.let { path -> java.io.File(path).takeIf { f -> f.exists() }?.delete() }
+            if (selectedId == removed.id) {
+                selectedId = roster.first().id
+                activate(roster.first())
+            }
+            personaStorage.save(roster, selectedId)
+            _uiState.update {
+                it.copy(
+                    showDeleteConfirm = false,
+                    showEditDialog = false,
+                    successMessage = "Persona deleted"
+                )
+            }
+            publishRoster()
         }
     }
 
@@ -229,10 +314,40 @@ class PersonaViewModel @Inject constructor(
     }
 
     fun setCreateImage(bytes: ByteArray, mimeType: String) {
+        // Bake EXIF rotation into the pixels — camera photos otherwise save sideways
+        val upright = com.pockettavern.app.util.ImageOrientation.normalize(bytes)
         _uiState.update {
             it.copy(
-                createImageBytes = bytes,
+                createImageBytes = upright,
                 createImageMimeType = mimeType
+            )
+        }
+    }
+
+    fun rotateCreateImage() {
+        val bytes = _uiState.value.createImageBytes ?: return
+        _uiState.update {
+            it.copy(
+                createImageBytes = com.pockettavern.app.util.ImageOrientation.rotate(bytes, 90f),
+                createImageMimeType = "image/png"
+            )
+        }
+    }
+
+    fun setEditImage(bytes: ByteArray, mimeType: String) {
+        // Bake EXIF rotation into the pixels — camera photos otherwise save sideways
+        val upright = com.pockettavern.app.util.ImageOrientation.normalize(bytes)
+        _uiState.update {
+            it.copy(editImageBytes = upright, editImageMimeType = mimeType)
+        }
+    }
+
+    fun rotateEditImage() {
+        val bytes = _uiState.value.editImageBytes ?: return
+        _uiState.update {
+            it.copy(
+                editImageBytes = com.pockettavern.app.util.ImageOrientation.rotate(bytes, 90f),
+                editImageMimeType = "image/png"
             )
         }
     }
@@ -255,26 +370,31 @@ class PersonaViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
             try {
+                val id = java.util.UUID.randomUUID().toString()
                 val avatarPath = state.createImageBytes?.let { bytes ->
-                    val file = File(context.filesDir, "persona_avatar.png")
+                    val file = personaStorage.avatarFile(id)
                     file.writeBytes(bytes)
                     file.absolutePath
                 }
-                val updated = UserPersona(
+                val created = com.pockettavern.app.data.local.StoredPersona(
+                    id = id,
                     name = state.createName.trim(),
                     description = state.createDescription,
                     avatarPath = avatarPath
                 )
-                localRepository.saveUserPersona(updated)
+                roster = roster + created
+                selectedId = id
+                personaStorage.save(roster, selectedId)
+                activate(created)
                 _uiState.update {
                     it.copy(
                         isSaving = false,
                         showCreateDialog = false,
                         createImageBytes = null,
-                        successMessage = "Persona updated to \"${state.createName.trim()}\""
+                        successMessage = "Persona \"${created.name}\" created"
                     )
                 }
-                loadPersonas()
+                publishRoster()
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSaving = false, error = e.message) }
             }
@@ -296,16 +416,22 @@ class PersonaViewModel @Inject constructor(
         generationJob = viewModelScope.launch {
             _uiState.update { it.copy(isGenerating = true, generationProgress = 0f) }
 
+            // Use the configured image backend + stored generation settings — this
+            // previously hardcoded Forge and 512x512/20 steps regardless of config
+            val cfg = settingsDataStore.getImageGenConfig()
             val params = ForgeGenerationParams(
                 prompt = prompt,
-                negativePrompt = "blurry, low quality, distorted, deformed, bad anatomy, ugly, disfigured",
-                width = 512,
-                height = 512,
-                steps = 20,
-                cfgScale = 7f
+                negativePrompt = cfg.negativePrompt,
+                width = cfg.width,
+                height = cfg.height,
+                steps = cfg.steps,
+                cfgScale = cfg.cfgScale,
+                sampler = cfg.sampler,
+                seed = cfg.seed,
+                clipSkip = cfg.clipSkip
             )
 
-            forgeRepository.generateImageWithProgress(params).collect { state ->
+            imageGenRepository.generateImageWithProgress(params).collect { state ->
                 when (state) {
                     is GenerationState.Starting -> {
                         _uiState.update { it.copy(generationProgress = 0f) }
@@ -340,19 +466,23 @@ class PersonaViewModel @Inject constructor(
     fun cancelGeneration() {
         generationJob?.cancel()
         viewModelScope.launch {
-            forgeRepository.interrupt()
+            // Was forgeRepository.interrupt(), which hit SD WebUI no matter which backend was
+            // actually generating -- so Cancel silently did nothing on every other backend.
+            imageGenRepository.interrupt()
             _uiState.update { it.copy(isGenerating = false, generationProgress = 0f) }
         }
     }
 
-    // Convert UserPersona to Persona (domain model used by the UI)
-    private fun UserPersona.toPersona(): Persona = Persona(
-        avatarId = avatarPath ?: "",
+    // Convert a roster record to the UI model. The record id rides in avatarId —
+    // it is the stable key the select/edit/delete operations use.
+    private fun com.pockettavern.app.data.local.StoredPersona.toPersona(selected: Boolean): Persona = Persona(
+        avatarId = id,
         name = name,
         description = description,
         position = PersonaPosition.fromInt(position),
         role = PersonaRole.fromInt(role),
         depth = depth,
-        isSelected = true
+        isSelected = selected,
+        avatarPath = avatarPath
     )
 }

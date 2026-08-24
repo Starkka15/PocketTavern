@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -35,7 +36,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class OnDeviceEngine @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val memoryManager: OnDeviceMemoryManager
 ) {
     data class Params(
         val maxTokens: Int = 1024,
@@ -58,9 +60,14 @@ class OnDeviceEngine @Inject constructor(
 
     val isLoaded: Boolean get() = engine != null
 
+    init {
+        memoryManager.register(OnDeviceMemoryManager.Slot.LITERTLM, ::unload)
+    }
+
     @OptIn(ExperimentalApi::class)
     private suspend fun ensureLoaded(modelPath: String, useGpu: Boolean) = loadMutex.withLock {
         if (engine != null && loadedModelPath == modelPath) return@withLock
+        memoryManager.prepareLoad(OnDeviceMemoryManager.Slot.LITERTLM, File(modelPath).length())
         closeInternal()
         // Attempt best→safest backend with fallback. NPU only on capable SoCs (needs a vendor
         // delegate that may be absent → falls back). GPU/OpenCL works on most Adreno (and some
