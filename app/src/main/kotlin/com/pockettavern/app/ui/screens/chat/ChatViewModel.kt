@@ -116,6 +116,11 @@ data class ChatUiState(
     // Image gallery
     val showGallery: Boolean = false,
     val galleryImages: List<GalleryImage> = emptyList(),
+    // Extension-triggered image generation progress (0..1, null = not generating)
+    val extensionImageGenProgress: Float? = null,
+    // Transient status line set by extensions via PT.setStatus(), e.g. while composing
+    // an image prompt before real generation progress is available
+    val extensionStatusMessage: String? = null,
     // Message search
     val isSearching: Boolean = false,
     val searchQuery: String = "",
@@ -264,6 +269,10 @@ class ChatViewModel @Inject constructor(
         // Wire insert message callback so PT.insertMessage() works
         extensionManager.jsHost.insertMessageCallback = { content, optionsJson ->
             viewModelScope.launch { doExtensionInsertMessage(content, optionsJson) }
+        }
+        // Wire status line callback so PT.setStatus() works
+        extensionManager.jsHost.setStatusCallback = { message ->
+            _uiState.update { it.copy(extensionStatusMessage = message.ifBlank { null }) }
         }
         // Observe token counter enabled state
         _uiState.update { it.copy(showTokenCount = extensionManager.tokenCounter.enabled) }
@@ -1711,13 +1720,29 @@ No preamble, no explanation. Just the numbered list."""
             )
 
             var resultBase64 = ""
+            var errorMessage: String? = null
+            _uiState.update { it.copy(extensionImageGenProgress = 0f, extensionStatusMessage = null) }
             imageGenRepository.generateImageWithProgress(params).collect { state ->
-                if (state is GenerationState.Complete) {
-                    resultBase64 = state.imageBase64
+                when (state) {
+                    is GenerationState.InProgress -> {
+                        _uiState.update { it.copy(extensionImageGenProgress = state.progress) }
+                    }
+                    is GenerationState.Complete -> {
+                        resultBase64 = state.imageBase64
+                    }
+                    is GenerationState.Error -> {
+                        errorMessage = state.message
+                    }
+                    else -> {}
                 }
+            }
+            _uiState.update { it.copy(extensionImageGenProgress = null) }
+            if (errorMessage != null) {
+                _uiState.update { it.copy(error = "Image generation failed: $errorMessage") }
             }
             extensionManager.jsHost.completeImageGenerate(callbackId, resultBase64)
         } catch (e: Exception) {
+            _uiState.update { it.copy(extensionImageGenProgress = null, error = "Image generation failed: ${e.message}") }
             extensionManager.jsHost.completeImageGenerate(callbackId, "")
         }
     }

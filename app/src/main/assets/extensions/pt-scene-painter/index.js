@@ -123,6 +123,7 @@
 
         _isGenerating = true;
         PT.log('[ScenePainter] Generating ' + mode + ' from message #' + messageIndex);
+        PT.setStatus('Composing image prompt...');
 
         var artStyle = getArtStyle();
         var charName = getCurrentCharName();
@@ -158,6 +159,7 @@
         PT.generateHidden(analysisPrompt).then(function (sdPrompt) {
             if (!sdPrompt || !sdPrompt.trim()) {
                 PT.log('[ScenePainter] Empty prompt from analysis');
+                PT.setStatus('');
                 _isGenerating = false;
                 return;
             }
@@ -212,10 +214,12 @@
                 PT.insertMessage('', { type: 'image', imageBase64: base64 });
             }).catch(function(e) {
                 PT.log('[ScenePainter] generateImage error: ' + e);
+                PT.setStatus('');
                 _isGenerating = false;
             });
         }).catch(function(e) {
             PT.log('[ScenePainter] generateHidden error: ' + e);
+            PT.setStatus('');
             _isGenerating = false;
         });
     }

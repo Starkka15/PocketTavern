@@ -187,6 +187,13 @@ fun ChatScreen(
     LaunchedEffect(uiState.isGenerating) {
         if (uiState.isGenerating) userScrolledAway = false
     }
+    // Scroll the image-gen progress/status row into view when it first appears
+    LaunchedEffect(uiState.extensionImageGenProgress != null, uiState.extensionStatusMessage != null) {
+        if ((uiState.extensionImageGenProgress != null || uiState.extensionStatusMessage != null) && !userScrolledAway) {
+            val itemCount = uiState.messages.size + 1
+            listState.scrollToItem(itemCount - 1, scrollOffset = Int.MAX_VALUE)
+        }
+    }
     // Auto-follow during streaming unless the user has scrolled away
     LaunchedEffect(uiState.streamingContent) {
         if (uiState.isGenerating && uiState.streamingContent.isNotEmpty() && !userScrolledAway) {
@@ -654,6 +661,54 @@ fun ChatScreen(
                                             )
                                         }
                                     }
+                                }
+                            }
+                        }
+                        // Show a transient status row while an extension is doing background work
+                        // before it has real progress to report (e.g. composing an image prompt)
+                        if (uiState.extensionImageGenProgress == null) {
+                            uiState.extensionStatusMessage?.let { status ->
+                                item {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = status,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        // Show a progress row while an extension (e.g. Scene Painter) is generating an image
+                        uiState.extensionImageGenProgress?.let { progress ->
+                            item {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CircularProgressIndicator(
+                                        progress = { progress },
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Generating image... ${(progress * 100).toInt()}%",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
                         }
