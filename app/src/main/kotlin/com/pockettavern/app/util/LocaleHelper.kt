@@ -14,8 +14,7 @@ object LocaleHelper {
     private const val KEY_LANGUAGE = "language"
 
     /** BCP-47 tags the app ships resources for. "" = system default. */
-    val AVAILABLE = listOf("", "en")
-    // Add "zh-CN" here once values-zh-rCN/strings.xml lands.
+    val AVAILABLE = listOf("", "en", "zh-CN")
 
     fun getLanguage(context: Context): String =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
