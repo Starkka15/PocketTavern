@@ -217,7 +217,7 @@ private fun CharacterFileRow(
         IconButton(onClick = onDelete) {
             Icon(
                 Icons.Default.Delete,
-                contentDescription = "Delete ${file.displayName}",
+                contentDescription = stringResource(R.string.delete_named, file.displayName),
                 tint = MaterialTheme.colorScheme.error
             )
         }

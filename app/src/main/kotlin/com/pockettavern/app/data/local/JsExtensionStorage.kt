@@ -2,17 +2,18 @@ package com.pockettavern.app.data.local
 
 import android.content.Context
 import android.net.Uri
+import com.pockettavern.app.R
 import com.pockettavern.app.extensions.JsExtension
 import com.pockettavern.app.util.DebugLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.*
 import java.io.File
 import java.net.URL
 import java.util.zip.ZipInputStream
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.*
 
 @Singleton
 class JsExtensionStorage @Inject constructor(
@@ -168,7 +169,7 @@ class JsExtensionStorage @Inject constructor(
                 put("id", baseName)
                 put("name", baseName)
                 put("version", "1.0.0")
-                put("description", "Imported from file")
+                put("description", context.getString(R.string.imported_from_file))
                 put("author", "")
                 put("sourceUrl", "")
             }.toString())
@@ -176,7 +177,7 @@ class JsExtensionStorage @Inject constructor(
             DebugLogger.log("[JsExtensionStorage] Installed '$baseName' from file")
             JsExtension(
                 id = baseName, name = baseName, version = "1.0.0",
-                description = "Imported from file", author = "", sourceUrl = "",
+                description = context.getString(R.string.imported_from_file), author = "", sourceUrl = "",
                 enabled = true, scriptFile = File(extDir, "index.js")
             )
         }

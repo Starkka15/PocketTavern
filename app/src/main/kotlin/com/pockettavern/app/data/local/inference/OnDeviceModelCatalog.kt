@@ -1,5 +1,8 @@
 package com.pockettavern.app.data.local.inference
 
+import androidx.annotation.StringRes
+import com.pockettavern.app.R
+
 /**
  * Curated catalog of freely-available on-device models in LiteRT-LM's **`.litertlm`** format.
  * PocketTavern never bundles weights — these are user-downloaded from HuggingFace on demand.
@@ -11,7 +14,7 @@ package com.pockettavern.app.data.local.inference
 data class CatalogModel(
     val name: String,
     val category: String,
-    val description: String,
+    @StringRes val descriptionRes: Int,
     val url: String,
     val sizeBytes: Long,
     val gated: Boolean = false,
@@ -60,72 +63,72 @@ object OnDeviceModelCatalog {
         // ── PocketTavern (official, RP-tuned, hosted on CharaVault) ───────────
         CatalogModel(
             name = "PocketTavern 1.5B (q8)", category = "PocketTavern (official)",
-            description = "Our own RP-tuned model — lean prompt, stays in character, doesn't ramble. Apache-2.0.",
+            descriptionRes = R.string.model_desc_pt_rp,
             url = "https://charavault.net/models/PocketTavern-1.5B.litertlm",
             sizeBytes = 1490 * MB, topK = 40, topP = 0.9f, temperature = 0.85f,
         ),
         CatalogModel(
             name = "PocketTavern 360M (q8)", category = "PocketTavern (official)",
-            description = "Tiny RP-tuned model for low-end devices. Lean prompt. Apache-2.0.",
+            descriptionRes = R.string.model_desc_pt_rp_tiny,
             url = "https://charavault.net/models/PocketTavern-360M.litertlm",
             sizeBytes = 356 * MB, topK = 40, topP = 0.9f, temperature = 0.85f,
         ),
         // ── Recommended ──────────────────────────────────────────────────────
         CatalogModel(
             name = "Qwen2.5 1.5B Instruct (q8)", category = "Recommended",
-            description = "Balanced quality/size. Apache-2.0.",
+            descriptionRes = R.string.model_desc_balanced,
             url = "$LC/Qwen2.5-1.5B-Instruct/resolve/main/Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm?download=true",
             sizeBytes = 1523 * MB, topK = 40,
         ),
         CatalogModel(
             name = "Gemma 3 1B (q4)", category = "Recommended",
-            description = "Small, capable. NPU-optimized on recent flagships. Gemma license.",
+            descriptionRes = R.string.model_desc_small_npu,
             url = "$LC/Gemma3-1B-IT/resolve/main/Gemma3-1B-IT_multi-prefill-seq_q4_ekv4096.litertlm?download=true",
             sizeBytes = 557 * MB, socVariants = GEMMA3_1B_SOC, topK = 64,
         ),
         // ── Small / Fast ─────────────────────────────────────────────────────
         CatalogModel(
             name = "Gemma 3 270M (q8)", category = "Small / Fast",
-            description = "Tiny — runs on almost anything. Limited quality. Gemma license.",
+            descriptionRes = R.string.model_desc_tiny_anything,
             url = "$LC/gemma-3-270m-it/resolve/main/gemma3-270m-it-q8.litertlm?download=true",
             sizeBytes = 289 * MB, socVariants = GEMMA3_270M_SOC, topK = 64,
         ),
         CatalogModel(
             name = "Qwen3 0.6B (int4)", category = "Small / Fast",
-            description = "Small, newer Qwen3. Apache-2.0.",
+            descriptionRes = R.string.model_desc_small_qwen3,
             url = "$LC/Qwen3-0.6B/resolve/main/qwen3_0_6b_mixed_int4.litertlm?download=true",
             sizeBytes = 474 * MB, topK = 40,
         ),
         // ── Larger / Higher quality ──────────────────────────────────────────
         CatalogModel(
             name = "Qwen3 4B Instruct (int4)", category = "Larger / Higher quality",
-            description = "Best general quality here (~2.5GB). Needs a capable device. Apache-2.0.",
+            descriptionRes = R.string.model_desc_best_general,
             url = "$LC/Qwen3-4B-Instruct-2507/resolve/main/qwen3_4b_instruct_2507_mixed_int4.litertlm?download=true",
             sizeBytes = 2535 * MB, topK = 40,
         ),
         CatalogModel(
             name = "Phi-4 mini Instruct (q8)", category = "Larger / Higher quality",
-            description = "~3.7GB, high quality. MIT.",
+            descriptionRes = R.string.model_desc_phi4_mini,
             url = "$LC/Phi-4-mini-instruct/resolve/main/Phi-4-mini-instruct_multi-prefill-seq_q8_ekv4096.litertlm?download=true",
             sizeBytes = 3728 * MB, topK = 40,
         ),
         // ── Reasoning ────────────────────────────────────────────────────────
         CatalogModel(
             name = "DeepSeek-R1 Distill Qwen 1.5B (q8)", category = "Reasoning",
-            description = "Shows reasoning/thinking tokens. MIT.",
+            descriptionRes = R.string.model_desc_reasoning,
             url = "$LC/DeepSeek-R1-Distill-Qwen-1.5B/resolve/main/DeepSeek-R1-Distill-Qwen-1.5B_multi-prefill-seq_q8_ekv4096.litertlm?download=true",
             sizeBytes = 1748 * MB, topK = 40,
         ),
         // ── Uncensored (community builds — unvetted, use at your own risk) ─────
         CatalogModel(
             name = "Gemma 4 E2B Uncensored", category = "Uncensored (community)",
-            description = "Community uncensored build for unfiltered RP (~2.4GB). Unofficial — quality varies.",
+            descriptionRes = R.string.model_desc_community_uncensored,
             url = "https://huggingface.co/PeppX/gemma-4-e2b-uncensored-litertlm/resolve/main/gemma-4-E2B-it-Uncensored-MAX.litertlm?download=true",
             sizeBytes = 2431 * MB, topK = 64,
         ),
         CatalogModel(
             name = "Gemma 4 E2B Abliterated", category = "Uncensored (community)",
-            description = "Community abliterated build, refusals removed (~4.8GB). Unofficial.",
+            descriptionRes = R.string.model_desc_community_abliterated,
             url = "https://huggingface.co/nqd145/Gemma-4-E2B-it-abliterated-litertlm/resolve/main/Gemma-4-E2B-it-abliterated.litertlm?download=true",
             sizeBytes = 4830 * MB, topK = 64,
         ),
@@ -139,49 +142,49 @@ object OnDeviceModelCatalog {
         // ── PocketTavern (official, RP-tuned) — GGUF supports repetition penalty ──
         CatalogModel(
             name = "PocketTavern 1.5B (Q4_K_M)", category = "PocketTavern (official)",
-            description = "Our RP-tuned model, GGUF (repetition penalty available). Apache-2.0.",
+            descriptionRes = R.string.model_desc_pt_rp_gguf,
             url = "https://charavault.net/models/PocketTavern-1.5B-Q4_K_M.gguf",
             sizeBytes = 941 * MB,
         ),
         CatalogModel(
             name = "PocketTavern 360M (Q4_K_M)", category = "PocketTavern (official)",
-            description = "Tiny RP-tuned model for low-end devices, GGUF. Apache-2.0.",
+            descriptionRes = R.string.model_desc_pt_rp_tiny_gguf,
             url = "https://charavault.net/models/PocketTavern-360M-Q4_K_M.gguf",
             sizeBytes = 259 * MB,
         ),
         CatalogModel(
             name = "Josiefied Llama 3.2 1B (uncensored)", category = "Small / Uncensored",
-            description = "Tiny uncensored 1B — best for budget/4GB phones (~770MB Q4_K_M). Won't refuse.",
+            descriptionRes = R.string.model_desc_tiny_uncensored_1b,
             url = "https://huggingface.co/mradermacher/Josiefied-Llama-3.2-1B-Instruct-abliterated-v1-GGUF/resolve/main/Josiefied-Llama-3.2-1B-Instruct-abliterated-v1.Q4_K_M.gguf?download=true",
             sizeBytes = 770 * MB,
         ),
         CatalogModel(
             name = "Josiefied Qwen2.5 1.5B (uncensored)", category = "Small / Uncensored",
-            description = "Uncensored 1.5B — small but more capable than 1B (~940MB Q4_K_M).",
+            descriptionRes = R.string.model_desc_uncensored_15b,
             url = "https://huggingface.co/Goekdeniz-Guelmez/Josiefied-Qwen2.5-1.5B-Instruct-abliterated-v2-gguf/resolve/main/josiefied-qwen2.5-1.5b-instruct-abliterated-v2.Q4_K_M.gguf?download=true",
             sizeBytes = 940 * MB,
         ),
         CatalogModel(
             name = "Impish LLAMA 3B (RP)", category = "Roleplay / Uncensored",
-            description = "RP-tuned, uncensored 3B. Great for character chat (~1.9GB Q4_K_M).",
+            descriptionRes = R.string.model_desc_rp_uncensored_3b,
             url = "https://huggingface.co/SicariusSicariiStuff/Impish_LLAMA_3B_GGUF/resolve/main/Impish_LLAMA_3B-Q4_K_M.gguf?download=true",
             sizeBytes = 1925 * MB,
         ),
         CatalogModel(
             name = "Llama 3.2 3B Abliterated", category = "Roleplay / Uncensored",
-            description = "Refusals removed (huihui abliterated). Solid all-rounder (~2.1GB Q4_K_M).",
+            descriptionRes = R.string.model_desc_huihui_abliterated,
             url = "https://huggingface.co/Hasaranga85/Llama-3.2-3B-Instruct-abliterated-Q4_K_M-GGUF/resolve/main/llama-3.2-3b-instruct-abliterated-q4_k_m.gguf?download=true",
             sizeBytes = 2137 * MB,
         ),
         CatalogModel(
             name = "Qwen2.5 3B Abliterated", category = "Roleplay / Uncensored",
-            description = "Uncensored Qwen2.5 3B (~2.0GB Q4_K_M).",
+            descriptionRes = R.string.model_desc_uncensored_qwen25_3b,
             url = "https://huggingface.co/mradermacher/Qwen2.5-3B-Instruct-abliterated-GGUF/resolve/main/Qwen2.5-3B-Instruct-Abliterated.Q4_K_M.gguf?download=true",
             sizeBytes = 2007 * MB,
         ),
         CatalogModel(
             name = "Qwen2.5 1.5B Instruct", category = "Small / Fast",
-            description = "Small, aligned (will refuse NSFW). Fast baseline (~1.1GB Q4_K_M). Apache-2.0.",
+            descriptionRes = R.string.model_desc_small_aligned,
             url = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf?download=true",
             sizeBytes = 1120 * MB,
         ),

@@ -74,7 +74,7 @@ fun SetupGuideScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             // ── Getting Started ─────────────────────────────────────
-            HelpDropdown(title = "Getting Started") {
+            HelpDropdown(title = stringResource(R.string.help_getting_started)) {
                 SectionHeading(stringResource(R.string.step_1_get_some_characters))
                 BulletItem(stringResource(R.string.import_a_png_card_go_to_characters_tap_the_im))
                 BulletItem(stringResource(R.string.create_a_character_tap_create_character_on_th))
@@ -95,7 +95,7 @@ fun SetupGuideScreen(
             }
 
             // ── Home Screen ─────────────────────────────────────────
-            HelpDropdown(title = "Home Screen") {
+            HelpDropdown(title = stringResource(R.string.help_home_screen)) {
                 HelpText(stringResource(R.string.the_home_screen_is_your_main_hub_with_five_na))
                 BulletItem(stringResource(R.string.characters_browse_import_and_manage_your_char))
                 BulletItem(stringResource(R.string.recent_chats_shows_your_latest_conversations))
@@ -108,7 +108,7 @@ fun SetupGuideScreen(
             }
 
             // ── Chat ────────────────────────────────────────────────
-            HelpDropdown(title = "Chat") {
+            HelpDropdown(title = stringResource(R.string.help_chat)) {
                 SectionHeading(stringResource(R.string.sending_messages))
                 BulletItem(stringResource(R.string.type_in_the_message_box_at_the_bottom_and_tap))
                 BulletItem(stringResource(R.string.you_can_also_use_the_keyboard_s_send_done_act))
@@ -159,7 +159,7 @@ fun SetupGuideScreen(
             }
 
             // ── Characters ──────────────────────────────────────────
-            HelpDropdown(title = "Characters & Cards") {
+            HelpDropdown(title = stringResource(R.string.help_characters_cards)) {
                 SectionHeading(stringResource(R.string.character_list))
                 BulletItem(stringResource(R.string.tap_a_character_to_start_or_resume_a_chat))
                 BulletItem(stringResource(R.string.long_press_a_character_to_open_the_action_men))
@@ -190,7 +190,7 @@ fun SetupGuideScreen(
             }
 
             // ── Group Chat ──────────────────────────────────────────
-            HelpDropdown(title = "Group Chats") {
+            HelpDropdown(title = stringResource(R.string.help_group_chats)) {
                 HelpText(stringResource(R.string.chat_with_multiple_ai_characters_simultaneous))
                 VerticalSpacer()
                 SectionHeading(stringResource(R.string.creating_a_group))
@@ -211,7 +211,7 @@ fun SetupGuideScreen(
             }
 
             // ── LLM Backends ────────────────────────────────────────
-            HelpDropdown(title = "LLM Backends") {
+            HelpDropdown(title = stringResource(R.string.help_llm_backends)) {
                 SectionHeading(stringResource(R.string.api_configuration))
                 HelpText(stringResource(R.string.go_to_settings_api_configuration_to_connect_t))
                 BulletItem(stringResource(R.string.select_the_api_type_from_the_dropdown_text_co))
@@ -244,7 +244,7 @@ fun SetupGuideScreen(
             }
 
             // ── Image Generation ────────────────────────────────────
-            HelpDropdown(title = "Image Generation") {
+            HelpDropdown(title = stringResource(R.string.help_image_generation)) {
                 SectionHeading(stringResource(R.string.supported_backends))
                 BulletItem(stringResource(R.string.sd_webui_forge_local_server_requires_api_flag))
                 BulletItem(stringResource(R.string.comfyui_local_node_graph_server_enter_url_in))
@@ -283,7 +283,7 @@ fun SetupGuideScreen(
             }
 
             // ── Text-to-Speech ──────────────────────────────────────
-            HelpDropdown(title = "Text-to-Speech (TTS)") {
+            HelpDropdown(title = stringResource(R.string.help_text_to_speech)) {
                 SectionHeading(stringResource(R.string.providers))
                 BulletItem(stringResource(R.string.system_tts_uses_android_s_built_in_speech_eng))
                 BulletItem(stringResource(R.string.openai_compatible_sends_text_to_any_server_im))
@@ -307,7 +307,7 @@ fun SetupGuideScreen(
             }
 
             // ── World Info ──────────────────────────────────────────
-            HelpDropdown(title = "World Info & Lorebooks") {
+            HelpDropdown(title = stringResource(R.string.help_world_info_lorebooks)) {
                 HelpText(stringResource(R.string.lorebooks_inject_relevant_lore_into_the_ai_s))
                 VerticalSpacer()
                 SectionHeading(stringResource(R.string.how_it_works))
@@ -335,7 +335,7 @@ fun SetupGuideScreen(
             }
 
             // ── Personas ────────────────────────────────────────────
-            HelpDropdown(title = "User Personas") {
+            HelpDropdown(title = stringResource(R.string.help_user_personas)) {
                 HelpText(stringResource(R.string.personas_tell_the_ai_who_it_s_talking_to_you))
                 VerticalSpacer()
                 SectionHeading(stringResource(R.string.creating_a_persona))
@@ -358,7 +358,7 @@ fun SetupGuideScreen(
             }
 
             // ── Prompt Building ──────────────────────────────────────
-            HelpDropdown(title = "Prompt Building & Templates") {
+            HelpDropdown(title = stringResource(R.string.help_prompt_building_templates)) {
                 HelpText(stringResource(R.string.pockettavern_ships_with_96_bundled_templates))
                 VerticalSpacer()
                 SectionHeading(stringResource(R.string.instruct_templates_42_bundled))
@@ -382,7 +382,7 @@ fun SetupGuideScreen(
             }
 
             // ── Generation Settings ─────────────────────────────────
-            HelpDropdown(title = "Text Generation Settings") {
+            HelpDropdown(title = stringResource(R.string.help_text_generation_settings)) {
                 SectionHeading(stringResource(R.string.text_completion_local_backends))
                 HelpText(stringResource(R.string.settings_text_generation_key_parameters))
                 BulletItem(stringResource(R.string.temperature_randomness_of_output_higher_more))
@@ -414,7 +414,7 @@ fun SetupGuideScreen(
             }
 
             // ── CharaVault ──────────────────────────────────────────
-            HelpDropdown(title = "CharaVault") {
+            HelpDropdown(title = stringResource(R.string.help_charavault)) {
                 HelpText(stringResource(R.string.browse_and_import_community_characters_and_lo))
                 VerticalSpacer()
                 SectionHeading(stringResource(R.string.modes))
@@ -441,7 +441,7 @@ fun SetupGuideScreen(
             }
 
             // ── Extensions ──────────────────────────────────────────
-            HelpDropdown(title = "Extensions") {
+            HelpDropdown(title = stringResource(R.string.help_extensions)) {
                 SectionHeading(stringResource(R.string.built_in_extensions))
                 HelpText(stringResource(R.string.go_to_settings_extensions_to_enable_disable))
                 BulletItem(stringResource(R.string.quick_reply_preset_buttons_above_the_chat_inp))
@@ -460,7 +460,7 @@ fun SetupGuideScreen(
             }
 
             // ── Themes ──────────────────────────────────────────────
-            HelpDropdown(title = "Themes & Appearance") {
+            HelpDropdown(title = stringResource(R.string.help_themes_appearance)) {
                 SectionHeading(stringResource(R.string.applying_a_theme))
                 HelpText(stringResource(R.string.go_to_settings_appearance_tap_apply_on_any_th))
                 VerticalSpacer()
@@ -487,7 +487,7 @@ fun SetupGuideScreen(
             }
 
             // ── SillyTavern Import ──────────────────────────────────
-            HelpDropdown(title = "SillyTavern Import") {
+            HelpDropdown(title = stringResource(R.string.help_sillytavern_import)) {
                 HelpText(stringResource(R.string.migrate_your_characters_chats_and_lorebooks_f))
                 VerticalSpacer()
                 SectionHeading(stringResource(R.string.from_server))
@@ -507,7 +507,7 @@ fun SetupGuideScreen(
             }
 
             // ── Settings Overview ───────────────────────────────────
-            HelpDropdown(title = "Settings Overview") {
+            HelpDropdown(title = stringResource(R.string.help_settings_overview)) {
                 HelpText(stringResource(R.string.settings_are_organized_into_five_groups))
                 VerticalSpacer()
                 SectionHeading(stringResource(R.string.connection))
@@ -542,7 +542,7 @@ fun SetupGuideScreen(
             }
 
             // ── FAQ ─────────────────────────────────────────────────
-            HelpDropdown(title = "Frequently Asked Questions") {
+            HelpDropdown(title = stringResource(R.string.help_faq)) {
                 FaqItem(
                     question = "Do I need a SillyTavern server to use PocketTavern?",
                     answer = "No. PocketTavern is fully standalone. It connects directly to LLM backends (KoboldCpp, Ollama, OpenAI, etc.) with no middleman. SillyTavern is not required."
@@ -614,7 +614,7 @@ fun SetupGuideScreen(
             }
 
             // ── Troubleshooting ─────────────────────────────────────
-            HelpDropdown(title = "Troubleshooting") {
+            HelpDropdown(title = stringResource(R.string.help_troubleshooting)) {
                 TroubleshootBlock(
                     problem = "Can't connect to local backend",
                     solutions = listOf(

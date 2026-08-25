@@ -84,7 +84,7 @@ fun OaiPresetSettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Preset selector
-                OaiSectionHeader("Preset")
+                OaiSectionHeader(stringResource(R.string.oai_section_preset))
                 OaiPresetDropdown(
                     presets = uiState.presets.map { it.name },
                     selectedIndex = uiState.selectedPresetIndex,
@@ -101,10 +101,10 @@ fun OaiPresetSettingsScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // ── Sampling Parameters ──────────────────────────────────────
-                OaiSectionHeader("Sampling")
+                OaiSectionHeader(stringResource(R.string.oai_section_sampling))
 
                 OaiParamWithSlider(
-                    label = "Temperature",
+                    label = stringResource(R.string.temperature),
                     enabled = uiState.temperatureEnabled,
                     onToggle = { viewModel.toggleTemperatureEnabled(it) },
                     value = uiState.temperature,
@@ -114,7 +114,7 @@ fun OaiPresetSettingsScreen(
                 )
 
                 OaiParamWithInput(
-                    label = "Max Response Length",
+                    label = stringResource(R.string.max_response_length),
                     enabled = uiState.maxTokensEnabled,
                     onToggle = { viewModel.toggleMaxTokensEnabled(it) },
                     value = uiState.maxTokens,
@@ -122,7 +122,7 @@ fun OaiPresetSettingsScreen(
                 )
 
                 OaiParamWithSlider(
-                    label = "Top P",
+                    label = stringResource(R.string.top_p),
                     enabled = uiState.topPEnabled,
                     onToggle = { viewModel.toggleTopPEnabled(it) },
                     value = uiState.topP,
@@ -132,7 +132,7 @@ fun OaiPresetSettingsScreen(
                 )
 
                 OaiParamWithInput(
-                    label = "Top K",
+                    label = stringResource(R.string.top_k),
                     enabled = uiState.topKEnabled,
                     onToggle = { viewModel.toggleTopKEnabled(it) },
                     value = uiState.topK,
@@ -140,7 +140,7 @@ fun OaiPresetSettingsScreen(
                 )
 
                 OaiParamWithSlider(
-                    label = "Min P",
+                    label = stringResource(R.string.min_p),
                     enabled = uiState.minPEnabled,
                     onToggle = { viewModel.toggleMinPEnabled(it) },
                     value = uiState.minP,
@@ -150,7 +150,7 @@ fun OaiPresetSettingsScreen(
                 )
 
                 OaiParamWithSlider(
-                    label = "Top A",
+                    label = stringResource(R.string.top_a),
                     enabled = uiState.topAEnabled,
                     onToggle = { viewModel.toggleTopAEnabled(it) },
                     value = uiState.topA,
@@ -162,10 +162,10 @@ fun OaiPresetSettingsScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // ── Penalty Parameters ───────────────────────────────────────
-                OaiSectionHeader("Penalties")
+                OaiSectionHeader(stringResource(R.string.oai_section_penalties))
 
                 OaiParamWithSlider(
-                    label = "Frequency Penalty",
+                    label = stringResource(R.string.frequency_penalty),
                     enabled = uiState.frequencyPenaltyEnabled,
                     onToggle = { viewModel.toggleFrequencyPenaltyEnabled(it) },
                     value = uiState.frequencyPenalty,
@@ -175,7 +175,7 @@ fun OaiPresetSettingsScreen(
                 )
 
                 OaiParamWithSlider(
-                    label = "Presence Penalty",
+                    label = stringResource(R.string.presence_penalty),
                     enabled = uiState.presencePenaltyEnabled,
                     onToggle = { viewModel.togglePresencePenaltyEnabled(it) },
                     value = uiState.presencePenalty,
@@ -185,7 +185,7 @@ fun OaiPresetSettingsScreen(
                 )
 
                 OaiParamWithSlider(
-                    label = "Repetition Penalty",
+                    label = stringResource(R.string.repetition_penalty),
                     enabled = uiState.repetitionPenaltyEnabled,
                     onToggle = { viewModel.toggleRepetitionPenaltyEnabled(it) },
                     value = uiState.repetitionPenalty,
@@ -197,10 +197,10 @@ fun OaiPresetSettingsScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // ── Context / Misc ───────────────────────────────────────────
-                OaiSectionHeader("Context & Misc")
+                OaiSectionHeader(stringResource(R.string.oai_section_context_misc))
 
                 OaiParamWithInput(
-                    label = "Context Size (tokens)",
+                    label = stringResource(R.string.context_size_tokens),
                     enabled = uiState.contextSizeEnabled,
                     onToggle = { viewModel.toggleContextSizeEnabled(it) },
                     value = uiState.contextSize,
@@ -208,7 +208,7 @@ fun OaiPresetSettingsScreen(
                 )
 
                 OaiParamWithInput(
-                    label = "Seed (-1 = random)",
+                    label = stringResource(R.string.seed_1_random),
                     enabled = uiState.seedEnabled,
                     onToggle = { viewModel.toggleSeedEnabled(it) },
                     value = uiState.seed,
@@ -219,7 +219,7 @@ fun OaiPresetSettingsScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
                 // ── Prompt Order ─────────────────────────────────────────────
-                OaiSectionHeader("Prompt Order")
+                OaiSectionHeader(stringResource(R.string.oai_section_prompt_order))
                 Text(text = stringResource(R.string.control_which_blocks_are_included_and_their_o),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -315,7 +315,7 @@ fun OaiPresetSettingsScreen(
     if (uiState.showDeleteConfirm) {
         val name = uiState.presets.getOrNull(uiState.selectedPresetIndex)?.name ?: ""
         ConfirmDialog(
-            title = "Delete Preset",
+            title = stringResource(R.string.delete_preset),
             message = "Delete preset \"$name\"? This cannot be undone.",
             confirmText = "Delete",
             onConfirm = { viewModel.deleteCurrentPreset() },

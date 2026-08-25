@@ -263,7 +263,7 @@ fun TextGenSettingsScreen(
     if (uiState.showDeleteConfirm) {
         val presetName = uiState.presets.getOrNull(uiState.selectedPresetIndex)?.name ?: ""
         ConfirmDialog(
-            title = "Delete Preset",
+            title = stringResource(R.string.delete_preset),
             message = "Delete preset \"$presetName\"? This cannot be undone.",
             confirmText = "Delete",
             onConfirm = { viewModel.deleteCurrentPreset() },

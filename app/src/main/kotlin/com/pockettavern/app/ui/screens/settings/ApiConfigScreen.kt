@@ -103,12 +103,12 @@ fun ApiConfigScreen(
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = "API: ${uiState.config.displayName}",
+                            text = stringResource(R.string.api_label, uiState.config.displayName),
                             style = MaterialTheme.typography.bodyMedium
                         )
                         if (uiState.config.currentModel.isNotBlank()) {
                             Text(
-                                text = "Model: ${uiState.config.currentModel}",
+                                text = stringResource(R.string.model_label, uiState.config.currentModel),
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }
@@ -128,7 +128,7 @@ fun ApiConfigScreen(
                 )
 
                 DropdownSelector(
-                    label = "Main API",
+                    label = stringResource(R.string.main_api),
                     selectedValue = uiState.config.mainApi,
                     options = viewModel.mainApiOptions,
                     onValueChange = { viewModel.setMainApi(it) }
@@ -228,7 +228,7 @@ private fun TextCompletionSettings(
             )
 
             DropdownSelector(
-                label = "Backend Type",
+                label = stringResource(R.string.backend_type),
                 selectedValue = textGenType,
                 options = options,
                 onValueChange = onTextGenTypeChange
@@ -284,7 +284,7 @@ private fun ChatCompletionSettings(
             )
 
             DropdownSelector(
-                label = "Provider",
+                label = stringResource(R.string.provider),
                 selectedValue = chatCompletionSource,
                 options = sourceOptions,
                 onValueChange = onSourceChange
@@ -324,7 +324,7 @@ private fun ChatCompletionSettings(
                 ) {
                     if (availableModels.isNotEmpty()) {
                         DropdownSelector(
-                            label = "Model",
+                            label = stringResource(R.string.model),
                             selectedValue = currentModel,
                             options = availableModels.map { it.id to it.name },
                             onValueChange = onModelChange,
@@ -429,7 +429,7 @@ private fun OnDeviceModelSection(
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        text = "$sizeMb MB · ${cm.description}",
+                        text = "$sizeMb MB · ${stringResource(cm.descriptionRes)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -467,7 +467,7 @@ private fun OnDeviceModelSection(
                     )
                     Text(model.name, modifier = Modifier.weight(1f))
                     IconButton(onClick = { onDelete(model.id) }, enabled = !isDownloading) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete ${model.name}")
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_named, model.name))
                     }
                 }
             }

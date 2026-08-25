@@ -160,8 +160,8 @@ private fun MissionPicker(
                         Column(Modifier.padding(10.dp)) {
                             Text(m.name, style = MaterialTheme.typography.titleSmall)
                             Text(m.briefing, style = MaterialTheme.typography.bodySmall, maxLines = 3)
-                            val leads = if (m.cast.isEmpty()) "whole household" else m.cast.joinToString(", ") { it.substringBefore(' ') }
-                            Text("Leads: $leads", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            val leads = if (m.cast.isEmpty()) stringResource(R.string.leads_whole_household) else m.cast.joinToString(", ") { it.substringBefore(' ') }
+                            Text(stringResource(R.string.leads_count, leads), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }

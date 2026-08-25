@@ -139,11 +139,7 @@ private fun FolderImportTab(
                 .padding(12.dp)
         ) {
             Text(
-                text = "Expected folder structure:\n" +
-                        "  data/\n" +
-                        "  ├── characters/*.png\n" +
-                        "  ├── worlds/*.json\n" +
-                        "  └── chats/{character}/*.jsonl",
+                text = stringResource(R.string.expected_folder_structure),
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -320,11 +316,11 @@ private fun ResultsSummaryCard(
             Text(stringResource(R.string.import_complete), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
 
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                StatItem(label = "Characters", value = uiState.charactersImported, color = MaterialTheme.colorScheme.primary)
-                StatItem(label = "Lorebooks", value = uiState.lorebooksImported, color = MaterialTheme.colorScheme.primary)
-                StatItem(label = "Chats", value = uiState.chatsImported, color = MaterialTheme.colorScheme.primary)
+                StatItem(label = stringResource(R.string.characters), value = uiState.charactersImported, color = MaterialTheme.colorScheme.primary)
+                StatItem(label = stringResource(R.string.lorebooks), value = uiState.lorebooksImported, color = MaterialTheme.colorScheme.primary)
+                StatItem(label = stringResource(R.string.chats), value = uiState.chatsImported, color = MaterialTheme.colorScheme.primary)
                 if (uiState.errors > 0) {
-                    StatItem(label = "Errors", value = uiState.errors, color = MaterialTheme.colorScheme.error)
+                    StatItem(label = stringResource(R.string.errors), value = uiState.errors, color = MaterialTheme.colorScheme.error)
                 }
             }
 

@@ -194,7 +194,7 @@ private fun ThemeCard(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete ${entry.name}?") },
+            title = { Text(stringResource(R.string.delete_theme_confirm, entry.name)) },
             text  = { Text(stringResource(R.string.this_will_permanently_remove_the_theme_file)) },
             confirmButton = {
                 TextButton(onClick = { showDeleteDialog = false; onDelete!!() }) {

@@ -232,8 +232,8 @@ private fun BasicTab(
                     CharacterTextField(
                         value = uiState.avatarPrompt,
                         onValueChange = { viewModel.updateAvatarPrompt(it) },
-                        label = "Avatar Prompt",
-                        placeholder = "Describe appearance for AI generation...",
+                        label = stringResource(R.string.avatar_prompt),
+                        placeholder = stringResource(R.string.avatar_prompt_placeholder),
                         minLines = 2,
                         maxLines = 3
                     )
@@ -273,8 +273,8 @@ private fun BasicTab(
     CharacterTextField(
         value = uiState.name,
         onValueChange = { viewModel.updateName(it) },
-        label = "Name *",
-        placeholder = "Enter character name",
+        label = stringResource(R.string.name_required),
+        placeholder = stringResource(R.string.enter_character_name),
         singleLine = true,
         isError = uiState.name.isBlank() && uiState.error != null
     )
@@ -314,7 +314,7 @@ private fun PersonalityTab(uiState: CreateCharacterUiState, viewModel: CreateCha
     CharacterTextField(
         value = uiState.description,
         onValueChange = { viewModel.updateDescription(it) },
-        label = "Description",
+        label = stringResource(R.string.description),
         placeholder = "{{char}} is a tall woman with long black hair...",
         minLines = 4,
         maxLines = 8
@@ -328,8 +328,8 @@ private fun PersonalityTab(uiState: CreateCharacterUiState, viewModel: CreateCha
     CharacterTextField(
         value = uiState.personality,
         onValueChange = { viewModel.updatePersonality(it) },
-        label = "Personality",
-        placeholder = "Witty, sarcastic, secretly kind-hearted...",
+        label = stringResource(R.string.personality),
+        placeholder = stringResource(R.string.personality_placeholder),
         minLines = 3,
         maxLines = 6
     )
@@ -342,7 +342,7 @@ private fun PersonalityTab(uiState: CreateCharacterUiState, viewModel: CreateCha
     CharacterTextField(
         value = uiState.scenario,
         onValueChange = { viewModel.updateScenario(it) },
-        label = "Scenario",
+        label = stringResource(R.string.scenario),
         placeholder = "{{user}} meets {{char}} at a coffee shop...",
         minLines = 2,
         maxLines = 4
@@ -359,7 +359,7 @@ private fun MessagesTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
     CharacterTextField(
         value = uiState.firstMessage,
         onValueChange = { viewModel.updateFirstMessage(it) },
-        label = "First Message",
+        label = stringResource(R.string.first_message),
         placeholder = "*{{char}} looks up as you approach* \"Oh, hello there!\"",
         minLines = 4,
         maxLines = 8
@@ -381,8 +381,8 @@ private fun MessagesTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
             CharacterTextField(
                 value = greeting,
                 onValueChange = { viewModel.updateAlternateGreeting(index, it) },
-                label = "Greeting ${index + 2}",
-                placeholder = "Alternative opening...",
+                label = stringResource(R.string.greeting_n, index + 2),
+                placeholder = stringResource(R.string.alternative_opening),
                 modifier = Modifier.weight(1f),
                 minLines = 2,
                 maxLines = 4
@@ -415,7 +415,7 @@ private fun MessagesTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
     CharacterTextField(
         value = uiState.messageExample,
         onValueChange = { viewModel.updateMessageExample(it) },
-        label = "Example Dialogue",
+        label = stringResource(R.string.example_dialogue),
         placeholder = "<START>\n{{user}}: Hi!\n{{char}}: *waves* Hey there!\n<START>\n{{user}}: How are you?\n{{char}}: I'm doing great, thanks for asking!",
         minLines = 6,
         maxLines = 12
@@ -432,7 +432,7 @@ private fun AdvancedTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
     CharacterTextField(
         value = uiState.systemPrompt,
         onValueChange = { viewModel.updateSystemPrompt(it) },
-        label = "System Prompt",
+        label = stringResource(R.string.system_prompt_2),
         placeholder = "{{original}}\n\nAdditional instructions for this character...",
         minLines = 4,
         maxLines = 10
@@ -446,8 +446,8 @@ private fun AdvancedTab(uiState: CreateCharacterUiState, viewModel: CreateCharac
     CharacterTextField(
         value = uiState.postHistoryInstructions,
         onValueChange = { viewModel.updatePostHistoryInstructions(it) },
-        label = "Post-History Instructions",
-        placeholder = "Remember to stay in character...",
+        label = stringResource(R.string.post_history_instructions),
+        placeholder = stringResource(R.string.post_history_placeholder),
         minLines = 3,
         maxLines = 6
     )
@@ -484,8 +484,8 @@ private fun MetaTab(uiState: CreateCharacterUiState, viewModel: CreateCharacterV
     CharacterTextField(
         value = uiState.creator,
         onValueChange = { viewModel.updateCreator(it) },
-        label = "Creator",
-        placeholder = "Your name or username",
+        label = stringResource(R.string.creator),
+        placeholder = stringResource(R.string.your_name_or_username),
         singleLine = true
     )
 
@@ -506,7 +506,7 @@ private fun MetaTab(uiState: CreateCharacterUiState, viewModel: CreateCharacterV
         CharacterTextField(
             value = tagInput,
             onValueChange = { tagInput = it },
-            label = "Add Tag",
+            label = stringResource(R.string.add_tag),
             placeholder = "fantasy, female, elf...",
             modifier = Modifier.weight(1f),
             singleLine = true,
@@ -561,16 +561,16 @@ private fun MetaTab(uiState: CreateCharacterUiState, viewModel: CreateCharacterV
     CharacterTextField(
         value = uiState.creatorNotes,
         onValueChange = { viewModel.updateCreatorNotes(it) },
-        label = "Creator Notes",
-        placeholder = "Tips for getting the best experience with this character...",
+        label = stringResource(R.string.creator_notes),
+        placeholder = stringResource(R.string.creator_notes_placeholder),
         minLines = 3,
         maxLines = 6
     )
     CharacterTextField(
         value = uiState.loreHints,
         onValueChange = { viewModel.updateLoreHints(it) },
-        label = "Lore Tracking (PocketTavern)",
-        placeholder = "What /scanlore should watch for — e.g. Track: weight changes after digestion, villain captures (name + outcome), solo missions without partner...",
+        label = stringResource(R.string.lore_tracking_label),
+        placeholder = stringResource(R.string.lore_tracking_placeholder),
         minLines = 3,
         maxLines = 8
     )

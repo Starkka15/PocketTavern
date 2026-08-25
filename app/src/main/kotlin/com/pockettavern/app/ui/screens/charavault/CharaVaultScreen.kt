@@ -1651,7 +1651,7 @@ private fun LorebookPreviewSheet(
                             )
                             if (entry.keys.isNotEmpty()) {
                                 Text(
-                                    text = "Keys: ${entry.keys.take(5).joinToString(", ")}",
+                                    text = stringResource(R.string.keys_list, entry.keys.take(5).joinToString(", ")),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary
                                 )

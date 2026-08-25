@@ -1,24 +1,25 @@
 package com.pockettavern.app.data.local
 
 import android.content.Context
+import com.pockettavern.app.R
 import com.pockettavern.app.domain.model.QuickReplyButton
 import com.pockettavern.app.domain.model.QuickReplyPreset
 import com.pockettavern.app.domain.model.RegexRule
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import java.io.File
-import javax.inject.Inject
-import javax.inject.Singleton
 
 @Singleton
 class ExtensionStorage @Inject constructor(
@@ -93,9 +94,9 @@ class ExtensionStorage @Inject constructor(
         name = "Default",
         enabled = true,
         buttons = listOf(
-            QuickReplyButton(label = "Continue", message = "Continue."),
-            QuickReplyButton(label = "Go on", message = "Go on."),
-            QuickReplyButton(label = "Summarize", message = "Please summarize what has happened so far.")
+            QuickReplyButton(label = context.getString(R.string.action_continue), message = context.getString(R.string.quick_reply_msg_continue)),
+            QuickReplyButton(label = context.getString(R.string.quick_reply_label_go_on), message = context.getString(R.string.quick_reply_msg_go_on)),
+            QuickReplyButton(label = context.getString(R.string.quick_reply_label_summarize), message = context.getString(R.string.quick_reply_msg_summarize))
         )
     )
 

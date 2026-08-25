@@ -679,8 +679,7 @@ private fun SdxlModelSection(
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text = "Each SDXL model set is a zip of ~14 files (~3.6-3.7GB). Point this at a " +
-                "URL serving one -- e.g. a small HTTP server on your own desktop.",
+            text = stringResource(R.string.sdxl_model_set_help),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -688,7 +687,7 @@ private fun SdxlModelSection(
         OutlinedTextField(
             value = token,
             onValueChange = { token = it },
-            label = { Text("Access token (for gated URLs)") },
+            label = { Text(stringResource(R.string.access_token_for_gated_urls)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             enabled = !isDownloading,
@@ -696,9 +695,9 @@ private fun SdxlModelSection(
         )
 
         if (models.isEmpty()) {
-            Text("No model sets downloaded yet.", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.no_model_sets_downloaded_yet), style = MaterialTheme.typography.bodyMedium)
         } else {
-            Text("Downloaded model sets", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.downloaded_model_sets), style = MaterialTheme.typography.labelLarge)
             models.forEach { model ->
                 val isSelected = currentPath.isNotBlank() && currentPath.endsWith("/${model.id}")
                 Row(
@@ -714,7 +713,7 @@ private fun SdxlModelSection(
                     )
                     Text(model.name, modifier = Modifier.weight(1f))
                     IconButton(onClick = { onDelete(model.id) }, enabled = !isDownloading) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete ${model.name}")
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_named, model.name))
                     }
                 }
             }
@@ -722,11 +721,11 @@ private fun SdxlModelSection(
 
         HorizontalDivider()
 
-        Text("Download by URL (zip)", style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.download_by_url_zip), style = MaterialTheme.typography.labelLarge)
         OutlinedTextField(
             value = url,
             onValueChange = { url = it },
-            label = { Text("Model set URL") },
+            label = { Text(stringResource(R.string.model_set_url)) },
             placeholder = { Text("https://.../pureTukanoNSFW-xl.zip") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,

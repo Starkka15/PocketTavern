@@ -258,7 +258,7 @@ fun CharactersScreen(
     // Delete confirmation dialog
     if (uiState.showDeleteDialog) {
         ConfirmDialog(
-            title = "Delete Character",
+            title = stringResource(R.string.delete_character),
             message = "Delete \"${uiState.characterToDelete?.name}\"? This cannot be undone.",
             confirmText = "Delete",
             onConfirm = { viewModel.deleteCharacter() },
@@ -285,7 +285,7 @@ fun CharactersScreen(
     // Delete Group Dialog
     if (groupsState.showDeleteDialog) {
         ConfirmDialog(
-            title = "Delete Group",
+            title = stringResource(R.string.delete_group_title),
             message = "Delete \"${groupsState.groupToDelete?.name}\"? This cannot be undone.",
             confirmText = "Delete",
             onConfirm = { groupsViewModel.deleteGroup() },

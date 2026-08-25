@@ -129,7 +129,7 @@ fun TtsSettingsScreen(
                             if (config.systemEngine.isNotEmpty()) {
                                 Spacer(modifier = Modifier.height(12.dp))
                                 VoiceSelector(
-                                    label = "Default Voice",
+                                    label = stringResource(R.string.default_voice),
                                     selectedVoice = config.systemVoice,
                                     voices = uiState.systemVoices,
                                     onVoiceSelected = { viewModel.updateSystemVoice(it) },
@@ -189,7 +189,7 @@ fun TtsSettingsScreen(
 
                             // Voice selector — dynamically fetched from server
                             VoiceSelector(
-                                label = "Default Voice",
+                                label = stringResource(R.string.default_voice),
                                 selectedVoice = config.openAiVoice,
                                 voices = uiState.voices,
                                 onVoiceSelected = { viewModel.updateOpenAiVoice(it) },

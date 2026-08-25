@@ -27,10 +27,12 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import com.pockettavern.app.R
 
 private const val MIN_SCALE = 1f
 private const val MAX_SCALE = 6f
@@ -111,7 +113,7 @@ fun ImageViewerDialog(
                     .size(40.dp)
                     .background(Color.Black.copy(alpha = 0.5f), CircleShape)
             ) {
-                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White)
             }
         }
     }

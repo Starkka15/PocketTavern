@@ -13,8 +13,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.pockettavern.app.R
 import com.pockettavern.app.domain.model.Character
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -89,7 +91,7 @@ fun CharacterListItem(
             // Show World Info name if attached
             if (character.attachedWorldInfo != null) {
                 Text(
-                    text = "Lorebook: ${character.attachedWorldInfo}",
+                    text = stringResource(R.string.lorebook_label, character.attachedWorldInfo),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
                     maxLines = 1,

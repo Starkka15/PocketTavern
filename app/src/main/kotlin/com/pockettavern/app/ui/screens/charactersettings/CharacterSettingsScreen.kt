@@ -246,7 +246,7 @@ private fun CharacterHeader(
             )
             if (character.hasCharacterBook) {
                 Text(
-                    text = "Has embedded lorebook (${character.characterBookEntryCount} entries)",
+                    text = stringResource(R.string.has_embedded_lorebook_entries, character.characterBookEntryCount),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -589,7 +589,7 @@ private fun TtsVoiceSection(
                 modifier = Modifier
                     .fillMaxWidth()
                     .menuAnchor(MenuAnchorType.PrimaryNotEditable),
-                label = { Text("Provider") },
+                label = { Text(stringResource(R.string.provider)) },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = providerExpanded) },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,

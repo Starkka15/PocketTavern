@@ -510,7 +510,7 @@ private fun AvatarPickerSection(
                 ) {
                     Icon(
                         Icons.Default.RotateRight,
-                        contentDescription = "Rotate image",
+                        contentDescription = stringResource(R.string.rotate_image),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -839,7 +839,7 @@ private fun CreatePersonaDialog(
                                 ) {
                                     Icon(
                                         Icons.Default.RotateRight,
-                                        contentDescription = "Rotate image",
+                                        contentDescription = stringResource(R.string.rotate_image),
                                         tint = MaterialTheme.colorScheme.primary
                                     )
                                 }

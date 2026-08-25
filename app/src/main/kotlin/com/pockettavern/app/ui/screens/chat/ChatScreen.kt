@@ -222,7 +222,7 @@ fun ChatScreen(
                                 Text(char.name, style = MaterialTheme.typography.titleMedium)
                                 uiState.linkedGroupName?.let { groupName ->
                                     Text(
-                                        text = "Group: $groupName",
+                                        text = stringResource(R.string.group_label, groupName),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.primary
                                     )
@@ -429,7 +429,7 @@ fun ChatScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Context: ~${uiState.contextUsedTokens} tokens",
+                            text = stringResource(R.string.context_used_tokens, uiState.contextUsedTokens),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -709,7 +709,7 @@ fun ChatScreen(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Generating image... ${(progress * 100).toInt()}%",
+                                        text = stringResource(R.string.generating_image_percent, (progress * 100).toInt()),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -725,7 +725,7 @@ fun ChatScreen(
     // Delete chat confirmation
     if (uiState.showDeleteDialog) {
         ConfirmDialog(
-            title = "Delete Chat",
+            title = stringResource(R.string.delete_chat_3),
             message = "Delete this conversation? This cannot be undone.",
             confirmText = "Delete",
             onConfirm = { viewModel.deleteCurrentChat() },
@@ -737,7 +737,7 @@ fun ChatScreen(
     // Delete character confirmation
     if (showDeleteCharacterDialog) {
         ConfirmDialog(
-            title = "Delete Character",
+            title = stringResource(R.string.delete_character),
             message = "Delete \"${uiState.character?.name}\" and all their chats? This cannot be undone.",
             confirmText = "Delete",
             onConfirm = {

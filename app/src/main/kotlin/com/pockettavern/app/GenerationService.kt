@@ -55,10 +55,10 @@ class GenerationService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Generation",
+                getString(R.string.notif_channel_generation),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Shows when PocketTavern is generating a response"
+                description = getString(R.string.notif_channel_generation_desc)
                 setShowBadge(false)
             }
             val nm = getSystemService(NotificationManager::class.java)

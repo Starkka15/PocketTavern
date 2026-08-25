@@ -461,7 +461,7 @@ private fun WorldInfoEntryCard(
                     }
                     if (entry.group.isNotBlank()) {
                         Text(
-                            text = "Group: ${entry.group}",
+                            text = stringResource(R.string.group_label, entry.group),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
                         )

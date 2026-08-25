@@ -406,7 +406,7 @@ private fun BackgroundSection(
                     contentScale = ContentScale.Crop
                 )
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Opacity: ${(state.backgroundOpacity * 100).roundToInt()}%",
+                    Text(stringResource(R.string.opacity_percent, (state.backgroundOpacity * 100).roundToInt()),
                         style = MaterialTheme.typography.bodySmall)
                     Slider(
                         value = state.backgroundOpacity,

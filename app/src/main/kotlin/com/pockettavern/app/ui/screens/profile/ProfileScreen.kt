@@ -194,7 +194,7 @@ fun ProfileScreen(
     // Logout Confirmation Dialog
     if (showLogoutConfirm) {
         ConfirmDialog(
-            title = "Logout",
+            title = stringResource(R.string.logout),
             message = "Are you sure you want to logout?",
             confirmText = "Logout",
             onConfirm = {

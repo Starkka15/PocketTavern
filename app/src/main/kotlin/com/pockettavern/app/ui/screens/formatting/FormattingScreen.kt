@@ -70,8 +70,8 @@ fun FormattingScreen(
             ) {
                 // Instruct Mode Section
                 FormattingSection(
-                    title = "INSTRUCT MODE",
-                    description = "Controls how messages are formatted for the AI model",
+                    title = stringResource(R.string.instruct_mode_caps),
+                    description = stringResource(R.string.instruct_mode_desc),
                     presets = uiState.instructPresets,
                     selectedIndex = uiState.selectedInstructIndex,
                     onPresetSelected = { viewModel.selectInstructPreset(it) }
@@ -81,8 +81,8 @@ fun FormattingScreen(
 
                 // Context Template Section
                 FormattingSection(
-                    title = "CONTEXT TEMPLATE",
-                    description = "Defines how character info and chat history are structured",
+                    title = stringResource(R.string.context_template_caps),
+                    description = stringResource(R.string.context_template_desc),
                     presets = uiState.contextPresets,
                     selectedIndex = uiState.selectedContextIndex,
                     onPresetSelected = { viewModel.selectContextPreset(it) }
@@ -286,7 +286,7 @@ private fun FormattingSection(
 
         if (presets.isEmpty()) {
             Text(
-                text = "No presets available (loaded: ${presets.size})",
+                text = stringResource(R.string.no_presets_available_loaded, presets.size),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.outline
             )

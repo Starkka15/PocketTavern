@@ -182,8 +182,8 @@ fun MainScreen(
             ) {
                 NavigationCard(
                     icon = Icons.Default.People,
-                    title = "Characters",
-                    description = "Browse and chat with your characters",
+                    title = stringResource(R.string.characters),
+                    description = stringResource(R.string.browse_and_chat_with_your_characters),
                     iconColor = MaterialTheme.colorScheme.primary,
                     onClick = onNavigateToCharacters
                 )
@@ -192,8 +192,8 @@ fun MainScreen(
 
                 NavigationCard(
                     icon = Icons.Default.History,
-                    title = "Recent Chats",
-                    description = "Continue your recent conversations",
+                    title = stringResource(R.string.recent_chats),
+                    description = stringResource(R.string.continue_your_recent_conversations),
                     iconColor = MaterialTheme.colorScheme.primary,
                     onClick = onNavigateToRecentChats
                 )
@@ -202,8 +202,8 @@ fun MainScreen(
 
                 NavigationCard(
                     icon = Icons.Default.Add,
-                    title = "Create Character",
-                    description = "Design a new character from scratch",
+                    title = stringResource(R.string.create_character_card),
+                    description = stringResource(R.string.design_a_new_character_from_scratch),
                     iconColor = MaterialTheme.colorScheme.primary,
                     onClick = onNavigateToCreateCharacter
                 )
@@ -214,8 +214,8 @@ fun MainScreen(
                 if (com.pockettavern.app.BuildConfig.STORIES_ENABLED) {
                     NavigationCard(
                         icon = Icons.Default.People,
-                        title = "Stories",
-                        description = "Multi-character ensembles — director-led RP",
+                        title = stringResource(R.string.stories),
+                        description = stringResource(R.string.multi_character_ensembles_director_led_rp),
                         iconColor = MaterialTheme.colorScheme.tertiary,
                         onClick = onNavigateToStories
                     )
@@ -235,8 +235,8 @@ fun MainScreen(
 
                 NavigationCard(
                     icon = Icons.Default.Settings,
-                    title = "Settings",
-                    description = "Configure server and app preferences",
+                    title = stringResource(R.string.settings),
+                    description = stringResource(R.string.configure_server_and_app_preferences),
                     iconColor = MaterialTheme.colorScheme.primary,
                     onClick = onNavigateToSettings
                 )
@@ -247,7 +247,7 @@ fun MainScreen(
                     NavigationCard(
                         icon = Icons.Default.Extension,
                         title = panel.title,
-                        description = "Extension panel",
+                        description = stringResource(R.string.extension_panel),
                         iconColor = MaterialTheme.colorScheme.tertiary,
                         onClick = { onNavigateToExtensionPanel(panel.extensionId) }
                     )

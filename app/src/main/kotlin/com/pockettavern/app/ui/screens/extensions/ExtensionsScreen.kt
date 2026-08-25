@@ -87,8 +87,8 @@ fun ExtensionsScreen(
             item {
                 ExtensionCard(
                     icon = { Icon(Icons.Default.Chat, contentDescription = null) },
-                    title = "Quick Reply",
-                    description = "Preset message buttons shown above the chat input for quick responses.",
+                    title = stringResource(R.string.quick_reply),
+                    description = stringResource(R.string.quick_reply_desc),
                     enabled = uiState.quickReplyEnabled,
                     onEnabledChange = viewModel::setQuickReplyEnabled,
                     onSettingsClick = onNavigateToQuickReply
@@ -97,8 +97,8 @@ fun ExtensionsScreen(
             item {
                 ExtensionCard(
                     icon = { Icon(Icons.Default.Code, contentDescription = null) },
-                    title = "Regex",
-                    description = "Find-and-replace rules applied to AI output or your messages before sending.",
+                    title = stringResource(R.string.regex),
+                    description = stringResource(R.string.regex_desc),
                     enabled = uiState.regexEnabled,
                     onEnabledChange = viewModel::setRegexEnabled,
                     onSettingsClick = onNavigateToRegex
@@ -107,8 +107,8 @@ fun ExtensionsScreen(
             item {
                 ExtensionCard(
                     icon = { Icon(Icons.Default.Numbers, contentDescription = null) },
-                    title = "Token Counter",
-                    description = "Show an estimated token count while you type (approximately 4 chars per token).",
+                    title = stringResource(R.string.token_counter),
+                    description = stringResource(R.string.token_counter_desc),
                     enabled = uiState.tokenCounterEnabled,
                     onEnabledChange = viewModel::setTokenCounterEnabled,
                     onSettingsClick = null
@@ -143,7 +143,7 @@ fun ExtensionsScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "No JavaScript extensions installed.\nTap + to install from a URL or file.",
+                                text = stringResource(R.string.no_js_extensions_installed),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

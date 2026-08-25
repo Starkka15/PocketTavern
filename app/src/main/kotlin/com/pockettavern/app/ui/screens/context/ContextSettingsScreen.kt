@@ -241,7 +241,7 @@ private fun AuthorsNoteSection(
         if (position == 1) {
             Column {
                 Text(
-                    text = "Depth: $depth messages from bottom",
+                    text = stringResource(R.string.depth_messages_from_bottom, depth),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
