@@ -55,6 +55,7 @@ class SettingsDataStore @Inject constructor(
         val LLM_API_SERVER = stringPreferencesKey("llm_api_server")
         val LLM_CHAT_COMPLETION_SOURCE = stringPreferencesKey("llm_chat_completion_source")
         val LLM_CUSTOM_URL = stringPreferencesKey("llm_custom_url")
+        val LLM_CUSTOM_CHAT_COMPLETIONS_URL = stringPreferencesKey("llm_custom_chat_completions_url")
         val LLM_API_KEY = stringPreferencesKey("llm_api_key") // kept for migration reads only
         val LLM_CURRENT_MODEL = stringPreferencesKey("llm_current_model")
 
@@ -135,6 +136,7 @@ class SettingsDataStore @Inject constructor(
             apiServer = prefs[Keys.LLM_API_SERVER] ?: "http://127.0.0.1:5001",
             chatCompletionSource = prefs[Keys.LLM_CHAT_COMPLETION_SOURCE] ?: "openai",
             customUrl = prefs[Keys.LLM_CUSTOM_URL],
+            customChatCompletionsUrl = prefs[Keys.LLM_CUSTOM_CHAT_COMPLETIONS_URL],
             apiKey = encryptedPrefs.getString(SECURE_LLM_API_KEY, null)
                 ?: prefs[Keys.LLM_API_KEY] ?: "",
             currentModel = prefs[Keys.LLM_CURRENT_MODEL] ?: "",
@@ -153,6 +155,8 @@ class SettingsDataStore @Inject constructor(
             prefs[Keys.LLM_CHAT_COMPLETION_SOURCE] = config.chatCompletionSource
             if (config.customUrl != null) prefs[Keys.LLM_CUSTOM_URL] = config.customUrl
             else prefs.remove(Keys.LLM_CUSTOM_URL)
+            if (config.customChatCompletionsUrl != null) prefs[Keys.LLM_CUSTOM_CHAT_COMPLETIONS_URL] = config.customChatCompletionsUrl
+            else prefs.remove(Keys.LLM_CUSTOM_CHAT_COMPLETIONS_URL)
             prefs.remove(Keys.LLM_API_KEY)
             prefs[Keys.LLM_CURRENT_MODEL] = config.currentModel
             prefs[Keys.SHOW_THOUGHTS] = config.showThoughts

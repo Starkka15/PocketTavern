@@ -188,6 +188,8 @@
 <string name="http_127_0_0_1_5001">http://127.0.0.1:5001</string>
 <string name="custom_api_url">自定义 API 地址</string>
 <string name="https_api_example_com_v1">https://api.example.com/v1</string>
+<string name="chat_completions_url">聊天补全完整地址</string>
+<string name="https_api_example_com_v1_chat_completions">https://api.example.com/v1/chat/completions</string>
 <string name="enter_model_name">输入模型名称</string>
 <string name="huggingface_token_for_gated_models">HuggingFace 令牌（用于 🔒 受限模型）</string>
 <string name="recommended_models">推荐模型</string>

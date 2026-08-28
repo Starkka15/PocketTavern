@@ -23,6 +23,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import kotlin.math.round
 import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
@@ -46,6 +47,9 @@ class LlmRepository @Inject constructor(
         encodeDefaults = true
         explicitNulls = false
     }
+
+    private fun roundSampler(value: Float?): Float? =
+        value?.let { round(it * 100f) / 100f }
 
     /**
      * Stream text generation for a chat.
@@ -503,7 +507,7 @@ class LlmRepository @Inject constructor(
             return@flow
         }
 
-        val baseUrl = config.effectiveBaseUrl.trimEnd('/').removeSuffix("/v1")
+        val chatCompletionsUrl = config.effectiveChatCompletionsUrl
 
         // Use structured messages from PromptBuilder when available,
         // otherwise fall back to wrapping the flat prompt as a single user message.
@@ -518,20 +522,20 @@ class LlmRepository @Inject constructor(
             model = config.currentModel.ifBlank { "gpt-4o-mini" },
             messages = oaiMessages,
             stream = true,
-            temperature = if (oaiPreset != null && oaiPreset.temperatureEnabled) oaiPreset.temperature else null,
+            temperature = roundSampler(if (oaiPreset != null && oaiPreset.temperatureEnabled) oaiPreset.temperature else null),
             // Toggle off = omit; the 1024 fallback only applies when no preset exists at all
             maxTokens = when {
                 oaiPreset == null -> 1024
                 oaiPreset.maxTokensEnabled -> oaiPreset.maxTokens
                 else -> null
             },
-            topP = if (oaiPreset != null && oaiPreset.topPEnabled) oaiPreset.topP else null,
+            topP = roundSampler(if (oaiPreset != null && oaiPreset.topPEnabled) oaiPreset.topP else null),
             topK = if (oaiPreset != null && oaiPreset.topKEnabled) oaiPreset.topK else null,
-            frequencyPenalty = if (oaiPreset != null && oaiPreset.frequencyPenaltyEnabled) oaiPreset.frequencyPenalty else null,
-            presencePenalty = if (oaiPreset != null && oaiPreset.presencePenaltyEnabled) oaiPreset.presencePenalty else null,
-            repetitionPenalty = if (oaiPreset != null && oaiPreset.repetitionPenaltyEnabled) oaiPreset.repetitionPenalty else null,
-            minP = if (oaiPreset != null && oaiPreset.minPEnabled) oaiPreset.minP else null,
-            topA = if (oaiPreset != null && oaiPreset.topAEnabled) oaiPreset.topA else null,
+            frequencyPenalty = roundSampler(if (oaiPreset != null && oaiPreset.frequencyPenaltyEnabled) oaiPreset.frequencyPenalty else null),
+            presencePenalty = roundSampler(if (oaiPreset != null && oaiPreset.presencePenaltyEnabled) oaiPreset.presencePenalty else null),
+            repetitionPenalty = roundSampler(if (oaiPreset != null && oaiPreset.repetitionPenaltyEnabled) oaiPreset.repetitionPenalty else null),
+            minP = roundSampler(if (oaiPreset != null && oaiPreset.minPEnabled) oaiPreset.minP else null),
+            topA = roundSampler(if (oaiPreset != null && oaiPreset.topAEnabled) oaiPreset.topA else null),
             seed = if (oaiPreset != null && oaiPreset.seedEnabled && oaiPreset.seed >= 0) oaiPreset.seed else null,
             stop = stopSequences.ifEmpty { null }
         )
@@ -539,8 +543,9 @@ class LlmRepository @Inject constructor(
         val body = json.encodeToString(OaiChatRequest.serializer(), request)
 
         // Log the full request so the in-app Debug Log shows exactly what was sent
-        DebugLogger.logSection("Chat Completion Request → $baseUrl")
+        DebugLogger.logSection("Chat Completion Request → $chatCompletionsUrl")
         DebugLogger.logKeyValue("model", request.model)
+        DebugLogger.logKeyValue("oai_preset", oaiPreset?.name ?: "(none)")
         DebugLogger.logKeyValue("max_tokens", request.maxTokens)
         DebugLogger.logKeyValue("temperature", request.temperature)
         DebugLogger.logKeyValue("messages count", oaiMessages.size)
@@ -551,7 +556,7 @@ class LlmRepository @Inject constructor(
         }
 
         val httpReq = Request.Builder()
-            .url("$baseUrl/v1/chat/completions")
+            .url(chatCompletionsUrl)
             .post(body.toRequestBody("application/json".toMediaType()))
             .addHeader("Content-Type", "application/json")
             .also { if (apiKey.isNotBlank()) it.addHeader("Authorization", "Bearer $apiKey") }
@@ -562,10 +567,17 @@ class LlmRepository @Inject constructor(
         val accumulated = StringBuilder()
         val accumulatedThinking = StringBuilder()
         var inThinkBlock = false
+        var finalFinishReason: String? = null
+        var streamChunkCount = 0
+        val unexpectedResponseLines = mutableListOf<String>()
+        var malformedSseChunks = 0
 
         okHttpClient.newCall(httpReq).execute().use { response ->
             if (!response.isSuccessful) {
                 val errorBody = response.body?.string() ?: ""
+                DebugLogger.logSection("Chat Completion Error")
+                DebugLogger.logKeyValue("status", response.code)
+                DebugLogger.logKeyValue("body", errorBody.take(1000).ifBlank { "(empty)" })
                 val message = try {
                     val obj = json.parseToJsonElement(errorBody).jsonObject
                     val msg = (obj["error"]?.jsonPrimitive?.contentOrNull
@@ -582,12 +594,22 @@ class LlmRepository @Inject constructor(
             response.body?.source()?.let { source ->
                 while (!source.exhausted()) {
                     val line = source.readUtf8Line() ?: break
-                    if (!line.startsWith("data: ")) continue
+                    if (!line.startsWith("data: ")) {
+                        if (line.isNotBlank() && unexpectedResponseLines.size < 10) {
+                            unexpectedResponseLines += line.take(1000)
+                        }
+                        continue
+                    }
                     val data = line.removePrefix("data: ").trim()
                     if (data == "[DONE]") break
                     try {
                         val chunk = json.decodeFromString<OaiStreamChunk>(data)
-                        val delta = chunk.choices.firstOrNull()?.delta ?: continue
+                        streamChunkCount++
+                        val choice = chunk.choices.firstOrNull() ?: continue
+                        if (!choice.finishReason.isNullOrBlank()) {
+                            finalFinishReason = choice.finishReason
+                        }
+                        val delta = choice.delta ?: continue
 
                         // reasoning_content (OpenRouter/official) or reasoning (nano-gpt, some proxies)
                         val reasoningToken = delta.reasoningContent ?: delta.reasoning
@@ -612,14 +634,30 @@ class LlmRepository @Inject constructor(
                             setInThinkBlock = { inThinkBlock = it }
                         ) { event -> emit(event) }
 
-                    } catch (e: Exception) { /* skip malformed */ }
+                    } catch (e: Exception) {
+                        malformedSseChunks++
+                        if (unexpectedResponseLines.size < 10) {
+                            unexpectedResponseLines += "Malformed SSE chunk: ${data.take(1000)}"
+                        }
+                    }
                 }
             }
         }
         val result = accumulated.toString()
         DebugLogger.logSection("Chat Completion Response")
-        result.lines().take(20).forEach { DebugLogger.log("  $it") }
-        if (result.lines().size > 20) DebugLogger.log("  ... (${result.lines().size - 20} more lines)")
+        DebugLogger.logKeyValue("finish_reason", finalFinishReason ?: "(not provided)")
+        DebugLogger.logKeyValue("stream chunks", streamChunkCount)
+        DebugLogger.logKeyValue("malformed chunks", malformedSseChunks)
+        DebugLogger.logKeyValue("content chars", result.length)
+        if (unexpectedResponseLines.isNotEmpty()) {
+            DebugLogger.logSection("Unexpected Chat Completion Body")
+            unexpectedResponseLines.forEach { DebugLogger.log("  $it") }
+            if (streamChunkCount == 0 && result.isEmpty()) {
+                emit(StreamEvent.Error("${config.displayName} returned non-stream response: ${unexpectedResponseLines.joinToString(" ").take(300)}"))
+                return@flow
+            }
+        }
+        result.lines().forEach { DebugLogger.log("  $it") }
         emit(StreamEvent.Complete(result, accumulatedThinking.toString()))
     }
 

@@ -138,6 +138,16 @@ class ApiConfigViewModel @Inject constructor(
         }
     }
 
+    fun setCustomChatCompletionsUrl(url: String) {
+        _uiState.update { state ->
+            val trimmed = url.trim()
+            val override = trimmed
+                .ifBlank { null }
+                ?.takeIf { it.trimEnd('/') != state.config.defaultChatCompletionsUrl.trimEnd('/') }
+            state.copy(config = state.config.copy(customChatCompletionsUrl = override))
+        }
+    }
+
     fun setCurrentModel(model: String) {
         _uiState.update {
             it.copy(config = it.config.copy(currentModel = model))
