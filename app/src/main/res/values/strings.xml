@@ -144,6 +144,9 @@
     <string name="provider">Provider</string>
     <string name="system_tts">System TTS</string>
     <string name="openai_compatible">OpenAI-Compatible</string>
+    <string name="pocket_tts">Pocket TTS</string>
+    <string name="pocket_tts_api">Pocket TTS (On-Device)</string>
+    <string name="pocket_tts_description">Runs 100% locally and offline on your device with voice cloning</string>
     <string name="system_tts_engine">System TTS Engine</string>
     <string name="choose_which_installed_tts_engine_to_use">Choose which installed TTS engine to use</string>
     <string name="openai_compatible_api">OpenAI-Compatible API</string>

@@ -3,6 +3,7 @@ package com.pockettavern.app.ui.screens.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pockettavern.app.data.local.SettingsDataStore
+import com.pockettavern.app.data.local.inference.OnDevicePocketTtsModelManager
 import com.pockettavern.app.domain.model.TtsConfig
 import com.pockettavern.app.ui.audio.TtsEngineInfo
 import com.pockettavern.app.ui.audio.TtsManager
@@ -21,19 +22,25 @@ data class TtsSettingsUiState(
     val systemVoices: List<TtsVoice> = emptyList(),
     val availableEngines: List<TtsEngineInfo> = emptyList(),
     val isLoading: Boolean = true,
-    val isTesting: Boolean = false
+    val isTesting: Boolean = false,
+    val isPocketTtsModelDownloaded: Boolean = false,
+    val isDownloadingPocketTts: Boolean = false,
+    val pocketTtsDownloadProgress: Float? = null,
+    val pocketTtsDownloadStatus: String = ""
 )
 
 @HiltViewModel
 class TtsSettingsViewModel @Inject constructor(
     private val settingsDataStore: SettingsDataStore,
-    private val ttsManager: TtsManager
+    private val ttsManager: TtsManager,
+    private val pocketTtsModelManager: OnDevicePocketTtsModelManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TtsSettingsUiState())
     val uiState: StateFlow<TtsSettingsUiState> = _uiState.asStateFlow()
 
     init {
+        checkModelStatus()
         viewModelScope.launch {
             settingsDataStore.ttsConfigFlow.collect { config ->
                 _uiState.update { it.copy(config = config, isLoading = false) }
@@ -45,6 +52,64 @@ class TtsSettingsViewModel @Inject constructor(
         }
         loadVoices()
         loadEngines()
+    }
+
+    fun checkModelStatus() {
+        _uiState.update {
+            it.copy(isPocketTtsModelDownloaded = pocketTtsModelManager.isModelDownloaded())
+        }
+    }
+
+    fun downloadPocketTtsModel() {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isDownloadingPocketTts = true,
+                    pocketTtsDownloadProgress = 0.0f,
+                    pocketTtsDownloadStatus = "Starting download..."
+                )
+            }
+            pocketTtsModelManager.downloadModel().collect { prog ->
+                when (prog) {
+                    is OnDevicePocketTtsModelManager.DownloadProgress.Progress -> {
+                        val fraction = if (prog.totalBytes > 0) prog.bytesDownloaded.toFloat() / prog.totalBytes else 0f
+                        val percent = (fraction * 100).toInt().coerceIn(0, 100)
+                        _uiState.update {
+                            it.copy(
+                                pocketTtsDownloadProgress = fraction,
+                                pocketTtsDownloadStatus = "Downloading ${prog.currentFile} (${prog.fileIndex}/${prog.totalFiles}): $percent%"
+                            )
+                        }
+                    }
+                    is OnDevicePocketTtsModelManager.DownloadProgress.Done -> {
+                        _uiState.update {
+                            it.copy(
+                                isDownloadingPocketTts = false,
+                                isPocketTtsModelDownloaded = true,
+                                pocketTtsDownloadProgress = null,
+                                pocketTtsDownloadStatus = "Download complete!"
+                            )
+                        }
+                        loadVoices()
+                    }
+                    is OnDevicePocketTtsModelManager.DownloadProgress.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                isDownloadingPocketTts = false,
+                                pocketTtsDownloadProgress = null,
+                                pocketTtsDownloadStatus = "Error: ${prog.message}"
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun deletePocketTtsModel() {
+        pocketTtsModelManager.deleteModel()
+        checkModelStatus()
+        loadVoices()
     }
 
     private fun loadEngines() {
@@ -123,6 +188,10 @@ class TtsSettingsViewModel @Inject constructor(
 
     fun updateSystemVoice(voice: String) {
         updateConfig { it.copy(systemVoice = voice) }
+    }
+
+    fun updatePocketTtsVoice(voice: String) {
+        updateConfig { it.copy(pocketTtsVoice = voice) }
     }
 
     fun testVoice() {

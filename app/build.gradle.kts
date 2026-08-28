@@ -177,6 +177,9 @@ dependencies {
     // On-device GGUF inference via llama.cpp (Llamatik, MIT). Unlocks the GGUF ecosystem.
     implementation("com.llamatik:library:1.8.0")
 
+    // On-device TTS inference via ONNX Runtime
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
+
     // DataStore
     implementation(libs.androidx.datastore.preferences)
 

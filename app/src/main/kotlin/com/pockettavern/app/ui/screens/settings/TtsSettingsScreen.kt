@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Stop
@@ -101,6 +102,12 @@ fun TtsSettingsScreen(
                                 label = { Text(stringResource(R.string.openai_compatible)) },
                                 modifier = Modifier.weight(1f)
                             )
+                            FilterChip(
+                                selected = config.provider == "pockettts",
+                                onClick = { viewModel.updateProvider("pockettts") },
+                                label = { Text(stringResource(R.string.pocket_tts)) },
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
                 }
@@ -193,6 +200,108 @@ fun TtsSettingsScreen(
                                 selectedVoice = config.openAiVoice,
                                 voices = uiState.voices,
                                 onVoiceSelected = { viewModel.updateOpenAiVoice(it) },
+                                onRefresh = { viewModel.refreshVoices() }
+                            )
+                        }
+                    }
+                }
+
+                // ── Pocket TTS Settings (On-Device) ───────────────────
+                if (config.provider == "pockettts") {
+                    item {
+                        SectionCard {
+                            Text(
+                                "Pocket TTS (On-Device)",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "Runs Kyutai's Pocket TTS model 100% locally and offline on your phone's CPU with real-time streaming and zero-shot voice cloning.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            if (!uiState.isPocketTtsModelDownloaded) {
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Text(
+                                            "Pocket TTS Model Package (~190 MB)",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            "Download the INT8 quantized neural audio models to run voice synthesis locally without a server.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(modifier = Modifier.height(12.dp))
+
+                                        if (uiState.isDownloadingPocketTts) {
+                                            uiState.pocketTtsDownloadProgress?.let { progress ->
+                                                LinearProgressIndicator(
+                                                    progress = { progress },
+                                                    modifier = Modifier.fillMaxWidth()
+                                                )
+                                            } ?: LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                uiState.pocketTtsDownloadStatus,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        } else {
+                                            Button(
+                                                onClick = { viewModel.downloadPocketTtsModel() },
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Icon(Icons.Default.Refresh, contentDescription = null)
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text("Download On-Device Model")
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            "On-Device Model Ready",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            "INT8 ONNX model loaded locally",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    IconButton(onClick = { viewModel.deletePocketTtsModel() }) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Delete Model")
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Voice selector
+                            VoiceSelector(
+                                label = "Voice (Voice Clone)",
+                                selectedVoice = config.pocketTtsVoice,
+                                voices = uiState.voices,
+                                onVoiceSelected = { viewModel.updatePocketTtsVoice(it) },
                                 onRefresh = { viewModel.refreshVoices() }
                             )
                         }

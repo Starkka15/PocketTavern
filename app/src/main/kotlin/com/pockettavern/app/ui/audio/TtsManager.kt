@@ -24,7 +24,8 @@ class TtsManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settingsDataStore: SettingsDataStore,
     private val voiceStorage: TtsVoiceStorage,
-    @Named("LLM") private val okHttpClient: OkHttpClient
+    @Named("LLM") private val okHttpClient: OkHttpClient,
+    private val onDevicePocketTtsProvider: OnDevicePocketTtsProvider
 ) {
     private var systemProvider: SystemTtsProvider? = null
     private var systemEngine: String? = null
@@ -78,13 +79,8 @@ class TtsManager @Inject constructor(
             config.provider
         }
 
-        // Determine voice: per-character or global default
-        val voiceId = if (characterFile != null) {
-            voiceStorage.getVoiceId(characterFile) ?: 
-                if (config.systemVoice.isNotEmpty()) config.systemVoice else null
-        } else if (config.systemVoice.isNotEmpty()) {
-            config.systemVoice
-        } else null
+        // Determine voice override from character card (if set)
+        val characterVoiceId = if (characterFile != null) voiceStorage.getVoiceId(characterFile) else null
 
         _speakingState.value = true
         try {
@@ -94,13 +90,20 @@ class TtsManager @Inject constructor(
                     provider.apiUrl = config.openAiUrl
                     provider.apiKey = config.openAiKey
                     provider.model = config.openAiModel
-                    val voice = voiceId ?: config.openAiVoice
+                    val voice = characterVoiceId ?: config.openAiVoice
                     provider.speak(filteredText, voice, config.speed)
+                }
+                "pockettts" -> {
+                    // On-device local inference
+                    onDevicePocketTtsProvider.defaultVoice = config.pocketTtsVoice
+                    val voice = characterVoiceId ?: config.pocketTtsVoice
+                    onDevicePocketTtsProvider.speak(filteredText, voice, config.speed)
                 }
                 else -> {
                     val engine = if (config.systemEngine.isNotEmpty()) config.systemEngine else null
                     val provider = getSystemProvider(engine)
-                    provider.speak(filteredText, voiceId, config.speed)
+                    val voice = characterVoiceId ?: if (config.systemVoice.isNotEmpty()) config.systemVoice else null
+                    provider.speak(filteredText, voice, config.speed)
                 }
             }
         } catch (e: Exception) {
@@ -113,6 +116,7 @@ class TtsManager @Inject constructor(
     fun stop() {
         systemProvider?.stop()
         openAiProvider?.stop()
+        onDevicePocketTtsProvider.stop()
         _speakingState.value = false
     }
 
@@ -130,6 +134,9 @@ class TtsManager @Inject constructor(
                 p.apiKey = config.openAiKey
                 p.model = config.openAiModel
                 p.getVoices()
+            }
+            "pockettts" -> {
+                onDevicePocketTtsProvider.getVoices()
             }
             else -> {
                 val config = settingsDataStore.getTtsConfig()
@@ -151,11 +158,14 @@ class TtsManager @Inject constructor(
     }
 
     fun isSpeaking(): Boolean =
-        systemProvider?.isSpeaking() == true || openAiProvider?.isSpeaking() == true
+        systemProvider?.isSpeaking() == true ||
+        openAiProvider?.isSpeaking() == true ||
+        onDevicePocketTtsProvider.isSpeaking()
 
     fun shutdown() {
         systemProvider?.shutdown()
         openAiProvider?.stop()
+        onDevicePocketTtsProvider.stop()
         systemProvider = null
         openAiProvider = null
     }

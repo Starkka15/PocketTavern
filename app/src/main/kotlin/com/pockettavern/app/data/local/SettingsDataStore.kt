@@ -106,6 +106,7 @@ class SettingsDataStore @Inject constructor(
         val TTS_FILTER_MODE = stringPreferencesKey("tts_filter_mode")
         val TTS_SYSTEM_ENGINE = stringPreferencesKey("tts_system_engine")
         val TTS_SYSTEM_VOICE = stringPreferencesKey("tts_system_voice")
+        val TTS_POCKETTTS_VOICE = stringPreferencesKey("tts_pockettts_voice")
 
         // Global Author's Note (applies to all chats unless overridden per-chat)
         val GLOBAL_AUTHORS_NOTE_CONTENT = stringPreferencesKey("global_authors_note_content")
@@ -419,7 +420,8 @@ class SettingsDataStore @Inject constructor(
             speed = prefs[Keys.TTS_SPEED] ?: 1.0f,
             filterMode = prefs[Keys.TTS_FILTER_MODE] ?: "all",
             systemEngine = prefs[Keys.TTS_SYSTEM_ENGINE] ?: "",
-            systemVoice = prefs[Keys.TTS_SYSTEM_VOICE] ?: ""
+            systemVoice = prefs[Keys.TTS_SYSTEM_VOICE] ?: "",
+            pocketTtsVoice = prefs[Keys.TTS_POCKETTTS_VOICE] ?: "cosette_calm"
         )
     }
 
@@ -439,6 +441,7 @@ class SettingsDataStore @Inject constructor(
             prefs[Keys.TTS_FILTER_MODE] = config.filterMode
             prefs[Keys.TTS_SYSTEM_ENGINE] = config.systemEngine
             prefs[Keys.TTS_SYSTEM_VOICE] = config.systemVoice
+            prefs[Keys.TTS_POCKETTTS_VOICE] = config.pocketTtsVoice
             prefs[Keys.SECURE_REFRESH] = (prefs[Keys.SECURE_REFRESH] ?: 0) + 1
         }
     }

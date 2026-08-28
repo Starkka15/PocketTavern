@@ -999,4 +999,7 @@
         been moved into strings.xml and translated below.
         ================================================================
     -->
+    <string name="pocket_tts">Pocket TTS</string>
+    <string name="pocket_tts_api">Pocket TTS（端侧设备）</string>
+    <string name="pocket_tts_description">在手机端离线本地运行语音合成，支持音色克隆</string>
 </resources>

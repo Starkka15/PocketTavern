@@ -128,7 +128,7 @@ Chat with multiple AI characters simultaneously:
 <details>
 <summary><b>Text-to-Speech (TTS)</b></summary>
 
-Have AI messages read aloud using either your device's built-in speech engine or any OpenAI-compatible TTS server.
+Have AI messages read aloud using your device's built-in speech engine, any OpenAI-compatible TTS server, or Kyutai Pocket-TTS.
 
 ### Providers
 
@@ -136,12 +136,13 @@ Have AI messages read aloud using either your device's built-in speech engine or
 |----------|-------------|
 | **System TTS** | Uses Android's built-in `TextToSpeech` engine — works offline with whatever voices your device has installed |
 | **OpenAI-Compatible** | Sends text to any server implementing `POST /v1/audio/speech` — works with OpenAI, Kokoro, AllTalk, XTTS, and others |
+| **Pocket TTS (On-Device)** | Runs Kyutai Pocket-TTS 100% locally and offline on your device using ONNX Runtime CPU inference with neural audio decoding and voice cloning (`cosette_calm`, etc.) |
 
 ### Configuration
 
 Go to **Settings -> Appearance & Audio -> Text-to-Speech**:
 
-- **Provider** — System or OpenAI-Compatible
+- **Provider** — System, OpenAI-Compatible, or Pocket TTS
 - **Auto-play** — Automatically speak new AI messages as they arrive
 - **Speed** — Playback rate from 0.5x to 2.0x
 - **Voice** — Select from available voices (fetched from server for OpenAI-compatible)
