@@ -48,8 +48,14 @@ class LlmRepository @Inject constructor(
         explicitNulls = false
     }
 
+    /**
+     * Some OpenAI-compatible gateways (e.g. OpenCode Go) reject sampler floats with a long
+     * decimal tail, which Float's own repr produces readily (0.7f serializes as 0.6999999881).
+     * Round to 3 decimals: enough to kill the tail, not so coarse that small but meaningful
+     * values are destroyed -- 2 decimals would round min_p 0.002 down to 0.0 (disabled).
+     */
     private fun roundSampler(value: Float?): Float? =
-        value?.let { round(it * 100f) / 100f }
+        value?.let { round(it * 1000f) / 1000f }
 
     /**
      * Stream text generation for a chat.
@@ -657,7 +663,9 @@ class LlmRepository @Inject constructor(
                 return@flow
             }
         }
-        result.lines().forEach { DebugLogger.log("  $it") }
+        val resultLines = result.lines()
+        resultLines.take(40).forEach { DebugLogger.log("  $it") }
+        if (resultLines.size > 40) DebugLogger.log("  ... (${resultLines.size - 40} more lines)")
         emit(StreamEvent.Complete(result, accumulatedThinking.toString()))
     }
 

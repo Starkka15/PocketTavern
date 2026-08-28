@@ -239,21 +239,31 @@ class LocalRepository @Inject constructor(
 
     // ── OAI Presets ──────────────────────────────────────────────────────────
 
+    /**
+     * The selected OAI preset, falling back to the first one on disk when nothing is selected
+     * (or the selection points at a preset that no longer exists). The fallback is persisted so
+     * the request path and the Settings UI agree on which preset is actually in use -- otherwise
+     * the screen shows a preset the next save would not have written back.
+     */
     suspend fun getCurrentOaiPreset(): OaiPreset? {
         val selectedName = settingsDataStore.getSelectedOaiPreset()
         if (!selectedName.isNullOrBlank()) {
             presetStorage.loadOaiPreset(selectedName)?.let { return it }
         }
         val fallbackName = presetStorage.listOaiPresets().firstOrNull() ?: return null
-        return presetStorage.loadOaiPreset(fallbackName)
+        return presetStorage.loadOaiPreset(fallbackName)?.also {
+            settingsDataStore.setSelectedOaiPreset(fallbackName)
+        }
     }
 
     suspend fun getOaiPresetsWithSelected(): Result<Pair<List<OaiPreset>, String>> = withResult {
         val names = presetStorage.listOaiPresets()
         val presets = names.mapNotNull { name -> presetStorage.loadOaiPreset(name) }
-        val selectedName = settingsDataStore.getSelectedOaiPreset()
-            ?: presets.firstOrNull()?.name
-            ?: ""
+        val stored = settingsDataStore.getSelectedOaiPreset()
+        val selectedName = when {
+            !stored.isNullOrBlank() && presets.any { it.name == stored } -> stored
+            else -> presets.firstOrNull()?.name?.also { settingsDataStore.setSelectedOaiPreset(it) } ?: ""
+        }
         Pair(presets, selectedName)
     }
 
