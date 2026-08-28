@@ -149,11 +149,14 @@ fun ApiConfigScreen(
                     ChatCompletionSettings(
                         chatCompletionSource = uiState.config.chatCompletionSource,
                         customUrl = uiState.config.customUrl,
+                        customChatCompletionsUrl = uiState.config.customChatCompletionsUrl,
+                        defaultChatCompletionsUrl = uiState.config.defaultChatCompletionsUrl,
                         currentModel = uiState.config.currentModel,
                         availableModels = uiState.availableModels,
                         isLoadingModels = uiState.isLoadingModels,
                         onSourceChange = { viewModel.setChatCompletionSource(it) },
                         onCustomUrlChange = { viewModel.setCustomUrl(it) },
+                        onCustomChatCompletionsUrlChange = { viewModel.setCustomChatCompletionsUrl(it) },
                         onModelChange = { viewModel.setCurrentModel(it) },
                         onRefreshModels = { viewModel.fetchModels() },
                         sourceOptions = viewModel.chatCompletionSourceOptions,
@@ -255,11 +258,14 @@ private fun TextCompletionSettings(
 private fun ChatCompletionSettings(
     chatCompletionSource: String,
     customUrl: String?,
+    customChatCompletionsUrl: String?,
+    defaultChatCompletionsUrl: String,
     currentModel: String,
     availableModels: List<com.pockettavern.app.domain.model.AvailableModel>,
     isLoadingModels: Boolean,
     onSourceChange: (String) -> Unit,
     onCustomUrlChange: (String) -> Unit,
+    onCustomChatCompletionsUrlChange: (String) -> Unit,
     onModelChange: (String) -> Unit,
     onRefreshModels: () -> Unit,
     sourceOptions: List<Pair<String, String>>,
@@ -311,6 +317,14 @@ private fun ChatCompletionSettings(
                         onValueChange = onCustomUrlChange,
                         label = { Text(stringResource(R.string.custom_api_url)) },
                         placeholder = { Text(stringResource(R.string.https_api_example_com_v1)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = customChatCompletionsUrl ?: defaultChatCompletionsUrl,
+                        onValueChange = onCustomChatCompletionsUrlChange,
+                        label = { Text(stringResource(R.string.chat_completions_url)) },
+                        placeholder = { Text(stringResource(R.string.https_api_example_com_v1_chat_completions)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )

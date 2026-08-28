@@ -15,6 +15,7 @@ data class ConnectionProfile(
     val apiServer: String = "http://127.0.0.1:5001",
     val chatCompletionSource: String = "openai",
     val customUrl: String? = null,
+    val customChatCompletionsUrl: String? = null,
     val apiKey: String = "",
     val model: String = "",
     // Preset selections

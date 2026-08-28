@@ -15,6 +15,7 @@ data class ApiConfiguration(
     // For chat completion APIs (when mainApi == "openai")
     val chatCompletionSource: String,  // openai, nanogpt, claude, etc.
     val customUrl: String?,            // Custom OpenAI-compatible endpoint
+    val customChatCompletionsUrl: String? = null, // Optional full chat completions endpoint override
 
     // API key (used for cloud/authenticated backends)
     val apiKey: String = "",
@@ -86,6 +87,22 @@ data class ApiConfiguration(
                 // azure_openai and custom require customUrl — warn but don't crash
                 else           -> customUrl?.trimEnd('/') ?: ""
             }
+        }
+
+    /** Default full endpoint derived from [chatCompletionBaseUrl]. */
+    val defaultChatCompletionsUrl: String
+        get() {
+            val baseUrl = chatCompletionBaseUrl.trimEnd('/').removeSuffix("/v1")
+            return "$baseUrl/v1/chat/completions"
+        }
+
+    /** Full endpoint used for chat completion requests. */
+    val effectiveChatCompletionsUrl: String
+        get() = if (chatCompletionSource.equals("custom", ignoreCase = true)) {
+            customChatCompletionsUrl?.takeIf { it.isNotBlank() }?.trimEnd('/')
+                ?: defaultChatCompletionsUrl
+        } else {
+            defaultChatCompletionsUrl
         }
 
     /**

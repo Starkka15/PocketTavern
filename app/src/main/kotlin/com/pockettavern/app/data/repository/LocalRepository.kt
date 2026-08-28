@@ -240,14 +240,20 @@ class LocalRepository @Inject constructor(
     // ── OAI Presets ──────────────────────────────────────────────────────────
 
     suspend fun getCurrentOaiPreset(): OaiPreset? {
-        val name = settingsDataStore.getSelectedOaiPreset() ?: return null
-        return presetStorage.loadOaiPreset(name)
+        val selectedName = settingsDataStore.getSelectedOaiPreset()
+        if (!selectedName.isNullOrBlank()) {
+            presetStorage.loadOaiPreset(selectedName)?.let { return it }
+        }
+        val fallbackName = presetStorage.listOaiPresets().firstOrNull() ?: return null
+        return presetStorage.loadOaiPreset(fallbackName)
     }
 
     suspend fun getOaiPresetsWithSelected(): Result<Pair<List<OaiPreset>, String>> = withResult {
         val names = presetStorage.listOaiPresets()
         val presets = names.mapNotNull { name -> presetStorage.loadOaiPreset(name) }
-        val selectedName = settingsDataStore.getSelectedOaiPreset() ?: ""
+        val selectedName = settingsDataStore.getSelectedOaiPreset()
+            ?: presets.firstOrNull()?.name
+            ?: ""
         Pair(presets, selectedName)
     }
 
@@ -492,6 +498,7 @@ class LocalRepository @Inject constructor(
                 apiServer = profile.apiServer,
                 chatCompletionSource = profile.chatCompletionSource,
                 customUrl = profile.customUrl,
+                customChatCompletionsUrl = profile.customChatCompletionsUrl,
                 apiKey = profile.apiKey,
                 currentModel = profile.model
             )
@@ -512,6 +519,7 @@ class LocalRepository @Inject constructor(
             apiServer = config.apiServer,
             chatCompletionSource = config.chatCompletionSource,
             customUrl = config.customUrl,
+            customChatCompletionsUrl = config.customChatCompletionsUrl,
             apiKey = config.apiKey,
             model = config.currentModel,
             textGenPreset = settingsDataStore.getSelectedTextGenPreset() ?: "",

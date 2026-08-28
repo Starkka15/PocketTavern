@@ -61,6 +61,7 @@ class ConnectionProfileStorage @Inject constructor(
                     put("apiServer", p.apiServer)
                     put("chatCompletionSource", p.chatCompletionSource)
                     if (p.customUrl != null) put("customUrl", p.customUrl)
+                    if (p.customChatCompletionsUrl != null) put("customChatCompletionsUrl", p.customChatCompletionsUrl)
                     put("apiKey", p.apiKey)
                     put("model", p.model)
                     put("textGenPreset", p.textGenPreset)
@@ -85,6 +86,7 @@ class ConnectionProfileStorage @Inject constructor(
             apiServer = str("apiServer", "http://127.0.0.1:5001"),
             chatCompletionSource = str("chatCompletionSource", "openai"),
             customUrl = obj["customUrl"]?.jsonPrimitive?.content,
+            customChatCompletionsUrl = obj["customChatCompletionsUrl"]?.jsonPrimitive?.content,
             apiKey = str("apiKey"),
             model = str("model"),
             textGenPreset = str("textGenPreset"),
