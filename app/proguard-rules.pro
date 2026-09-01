@@ -43,3 +43,10 @@
 -keep interface com.llamatik.** { *; }
 -dontwarn com.google.ai.edge.litertlm.**
 -dontwarn com.llamatik.**
+
+# ONNX Runtime (Pocket TTS) — the ORT JNI layer does FindClass/NewObject on these BY NAME
+# (OrtException, TensorInfo, MapInfo, OnnxSparseTensor, OnnxJavaType ...). Without this R8
+# renamed OrtException -> b.d and dropped MapInfo/TensorInfo entirely: release-only crash.
+-keep class ai.onnxruntime.** { *; }
+-keep interface ai.onnxruntime.** { *; }
+-dontwarn ai.onnxruntime.**
