@@ -146,7 +146,7 @@
     <string name="openai_compatible">OpenAI-Compatible</string>
     <string name="pocket_tts">Pocket TTS</string>
     <string name="pocket_tts_api">Pocket TTS (On-Device)</string>
-    <string name="pocket_tts_description">Runs 100% locally and offline on your device with voice cloning</string>
+    <string name="pocket_tts_description">Pocket TTS (On-Device) — Runs 100% locally and offline on device using ONNX Runtime with neural audio decoding and voice cloning (such as cosette_calm).</string>
     <string name="system_tts_engine">System TTS Engine</string>
     <string name="choose_which_installed_tts_engine_to_use">Choose which installed TTS engine to use</string>
     <string name="openai_compatible_api">OpenAI-Compatible API</string>
@@ -662,7 +662,7 @@
     <string name="test_connection_verify_the_backend_is_reachab">Test Connection — Verify the backend is reachable.</string>
     <string name="system_tts_uses_android_s_built_in_speech_eng">System TTS — Uses Android\'s built-in speech engine. Works offline with your device\'s installed voices.</string>
     <string name="openai_compatible_sends_text_to_any_server_im">OpenAI-Compatible — Sends text to any server implementing POST /v1/audio/speech. Works with OpenAI, Kokoro, AllTalk, XTTS, and others.</string>
-    <string name="provider_choose_system_or_openai_compatible">Provider — Choose System or OpenAI-Compatible.</string>
+    <string name="provider_choose_system_or_openai_compatible">Provider — Choose System, OpenAI-Compatible, or Pocket TTS.</string>
     <string name="auto_play_automatically_speak_new_ai_messages">Auto-play — Automatically speak new AI messages as they arrive.</string>
     <string name="speed_playback_rate_from_0_5x_to_2_0x">Speed — Playback rate from 0.5x to 2.0x.</string>
     <string name="voice_select_from_available_voices_fetched_fr">Voice — Select from available voices (fetched from server for OpenAI-compatible).</string>
@@ -990,4 +990,12 @@
     <string name="model_desc_huihui_abliterated">Refusals removed (huihui abliterated). Solid all-rounder (~2.1GB Q4_K_M).</string>
     <string name="model_desc_uncensored_qwen25_3b">Uncensored Qwen2.5 3B (~2.0GB Q4_K_M).</string>
     <string name="model_desc_small_aligned">Small, aligned (will refuse NSFW). Fast baseline (~1.1GB Q4_K_M). Apache-2.0.</string>
+    <string name="pocket_tts_engine_description">Runs Kyutai\'s Pocket TTS model 100% locally and offline on your phone\'s CPU with real-time streaming and zero-shot voice cloning.</string>
+    <string name="pocket_tts_model_package">Pocket TTS Model Package (~190 MB)</string>
+    <string name="pocket_tts_model_package_desc">Download the INT8 quantized neural audio models to run voice synthesis locally without a server.</string>
+    <string name="pocket_tts_download_model">Download On-Device Model</string>
+    <string name="pocket_tts_model_ready">On-Device Model Ready</string>
+    <string name="pocket_tts_model_loaded">INT8 ONNX model loaded locally</string>
+    <string name="pocket_tts_delete_model">Delete Model</string>
+    <string name="pocket_tts_voice_clone">Voice (Voice Clone)</string>
 </resources>

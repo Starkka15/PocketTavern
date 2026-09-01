@@ -665,7 +665,7 @@
 <string name="test_connection_verify_the_backend_is_reachab">测试连接——验证后端是否可达。</string>
 <string name="system_tts_uses_android_s_built_in_speech_eng">系统语音——使用 Android 内置的语音引擎。可离线工作，使用你设备已安装的音色。</string>
 <string name="openai_compatible_sends_text_to_any_server_im">OpenAI 兼容——将文本发送到任何实现了 POST /v1/audio/speech 的服务器。兼容 OpenAI、Kokoro、AllTalk、XTTS 等。</string>
-<string name="provider_choose_system_or_openai_compatible">提供方——选择系统或 OpenAI 兼容。</string>
+<string name="provider_choose_system_or_openai_compatible">提供方——选择 System、OpenAI 兼容 或 Pocket TTS。</string>
 <string name="auto_play_automatically_speak_new_ai_messages">自动播放——自动朗读到达的新 AI 消息。</string>
 <string name="speed_playback_rate_from_0_5x_to_2_0x">速度——播放倍速从 0.5x 到 2.0x。</string>
 <string name="voice_select_from_available_voices_fetched_fr">语音——从可用音色中选择（对于 OpenAI 兼容，从服务器获取）。</string>
@@ -1001,5 +1001,13 @@
     -->
     <string name="pocket_tts">Pocket TTS</string>
     <string name="pocket_tts_api">Pocket TTS（端侧设备）</string>
-    <string name="pocket_tts_description">在手机端离线本地运行语音合成，支持音色克隆</string>
+    <string name="pocket_tts_description">Pocket TTS（端侧设备）——使用 ONNX Runtime 在设备上 100% 本地离线运行，含神经音频解码与音色克隆（如 cosette_calm）。</string>
+    <string name="pocket_tts_engine_description">在手机 CPU 上 100% 本地离线运行 Kyutai Pocket TTS 模型，支持实时流式合成与零样本音色克隆。</string>
+    <string name="pocket_tts_model_package">Pocket TTS 模型包（约 190 MB）</string>
+    <string name="pocket_tts_model_package_desc">下载 INT8 量化神经音频模型，无需服务器即可在本地合成语音。</string>
+    <string name="pocket_tts_download_model">下载端侧模型</string>
+    <string name="pocket_tts_model_ready">端侧模型已就绪</string>
+    <string name="pocket_tts_model_loaded">已在本地加载 INT8 ONNX 模型</string>
+    <string name="pocket_tts_delete_model">删除模型</string>
+    <string name="pocket_tts_voice_clone">音色（音色克隆）</string>
 </resources>

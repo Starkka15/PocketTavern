@@ -211,13 +211,13 @@ fun TtsSettingsScreen(
                     item {
                         SectionCard {
                             Text(
-                                "Pocket TTS (On-Device)",
+                                stringResource(R.string.pocket_tts_api),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                "Runs Kyutai's Pocket TTS model 100% locally and offline on your phone's CPU with real-time streaming and zero-shot voice cloning.",
+                                stringResource(R.string.pocket_tts_engine_description),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -232,13 +232,13 @@ fun TtsSettingsScreen(
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
                                         Text(
-                                            "Pocket TTS Model Package (~190 MB)",
+                                            stringResource(R.string.pocket_tts_model_package),
                                             style = MaterialTheme.typography.titleSmall,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            "Download the INT8 quantized neural audio models to run voice synthesis locally without a server.",
+                                            stringResource(R.string.pocket_tts_model_package_desc),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -264,7 +264,7 @@ fun TtsSettingsScreen(
                                             ) {
                                                 Icon(Icons.Default.Refresh, contentDescription = null)
                                                 Spacer(modifier = Modifier.width(8.dp))
-                                                Text("Download On-Device Model")
+                                                Text(stringResource(R.string.pocket_tts_download_model))
                                             }
                                         }
                                     }
@@ -277,19 +277,19 @@ fun TtsSettingsScreen(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            "On-Device Model Ready",
+                                            stringResource(R.string.pocket_tts_model_ready),
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary
                                         )
                                         Text(
-                                            "INT8 ONNX model loaded locally",
+                                            stringResource(R.string.pocket_tts_model_loaded),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                     IconButton(onClick = { viewModel.deletePocketTtsModel() }) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Delete Model")
+                                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.pocket_tts_delete_model))
                                     }
                                 }
                             }
@@ -298,7 +298,7 @@ fun TtsSettingsScreen(
 
                             // Voice selector
                             VoiceSelector(
-                                label = "Voice (Voice Clone)",
+                                label = stringResource(R.string.pocket_tts_voice_clone),
                                 selectedVoice = config.pocketTtsVoice,
                                 voices = uiState.voices,
                                 onVoiceSelected = { viewModel.updatePocketTtsVoice(it) },
