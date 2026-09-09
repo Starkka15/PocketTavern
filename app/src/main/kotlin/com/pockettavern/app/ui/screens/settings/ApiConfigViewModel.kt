@@ -6,6 +6,8 @@ import com.pockettavern.app.data.remote.dto.st.ChatCompletionSources
 import com.pockettavern.app.data.remote.dto.st.MainApiTypes
 import com.pockettavern.app.data.remote.dto.st.TextGenTypes
 import com.pockettavern.app.data.local.inference.OnDeviceModelManager
+import com.pockettavern.app.data.remote.auth.ServiceAccount
+import com.pockettavern.app.data.remote.auth.VertexAuthProvider
 import com.pockettavern.app.data.repository.LocalRepository
 import com.pockettavern.app.data.repository.LlmRepository
 import com.pockettavern.app.domain.model.ApiConfiguration
@@ -40,7 +42,8 @@ data class ApiConfigUiState(
 class ApiConfigViewModel @Inject constructor(
     private val localRepository: LocalRepository,
     private val llmRepository: LlmRepository,
-    private val onDeviceModels: OnDeviceModelManager
+    private val onDeviceModels: OnDeviceModelManager,
+    private val vertexAuth: VertexAuthProvider
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ApiConfigUiState())
@@ -162,6 +165,51 @@ class ApiConfigViewModel @Inject constructor(
             )
         }
     }
+
+    /**
+     * Load a Google service account key file. The project id comes from the file so the
+     * user need not copy it by hand, but stays editable — one key can serve a different
+     * project where permissions allow.
+     */
+    fun setVertexServiceAccountJson(json: String) {
+        val account = ServiceAccount.parse(json)
+        if (account == null) {
+            _uiState.update {
+                it.copy(error = "That file is not a Google service account key — no client_email or private_key found.")
+            }
+            return
+        }
+        _uiState.update {
+            it.copy(
+                error = null,
+                config = it.config.copy(
+                    vertexServiceAccountJson = json,
+                    vertexProjectId = account.projectId.ifBlank { it.config.vertexProjectId }
+                )
+            )
+        }
+        // Any cached token belongs to the key that was just replaced.
+        viewModelScope.launch { vertexAuth.invalidate() }
+    }
+
+    fun clearVertexServiceAccount() {
+        _uiState.update {
+            it.copy(config = it.config.copy(vertexServiceAccountJson = "", vertexProjectId = ""))
+        }
+        viewModelScope.launch { vertexAuth.invalidate() }
+    }
+
+    fun setVertexProjectId(id: String) {
+        _uiState.update { it.copy(config = it.config.copy(vertexProjectId = id.trim())) }
+    }
+
+    fun setVertexRegion(region: String) {
+        _uiState.update { it.copy(config = it.config.copy(vertexRegion = region.trim())) }
+    }
+
+    /** Email of the loaded service account, for display. Null when none is loaded. */
+    val loadedServiceAccountEmail: String?
+        get() = ServiceAccount.parse(_uiState.value.config.vertexServiceAccountJson)?.clientEmail
 
     fun setShowThoughts(enabled: Boolean) {
         _uiState.update { it.copy(config = it.config.copy(showThoughts = enabled)) }

@@ -6,6 +6,8 @@ import com.pockettavern.app.data.local.inference.GgufEngine
 import com.pockettavern.app.data.local.inference.OnDeviceEngine
 import com.pockettavern.app.data.local.inference.OnDeviceModelManager
 import com.pockettavern.app.data.remote.api.*
+import com.pockettavern.app.data.remote.auth.ServiceAccount
+import com.pockettavern.app.data.remote.auth.VertexAuthProvider
 import com.pockettavern.app.domain.model.*
 import com.pockettavern.app.domain.model.OaiPreset
 import com.pockettavern.app.domain.model.PromptMessage
@@ -39,8 +41,34 @@ class LlmRepository @Inject constructor(
     @Named("LLM") private val okHttpClient: OkHttpClient,
     private val onDeviceEngine: OnDeviceEngine,
     private val ggufEngine: GgufEngine,
-    private val onDeviceModels: OnDeviceModelManager
+    private val onDeviceModels: OnDeviceModelManager,
+    private val vertexAuth: VertexAuthProvider
 ) {
+    /**
+     * Bearer credential for a request. Every provider but Vertex uses a static API key;
+     * Vertex needs a short-lived OAuth token minted from its service account key, which
+     * is cached and reused until close to expiry.
+     */
+    private suspend fun bearerFor(config: ApiConfiguration): String {
+        if (!config.isVertexAi) return config.apiKey
+        val account = ServiceAccount.parse(config.vertexServiceAccountJson)
+            ?: throw IllegalStateException(
+                "Vertex AI needs a service account key. Add one under API Configuration."
+            )
+        return vertexAuth.accessToken(account)
+    }
+
+    private companion object {
+        /** Gemini publisher models available through Vertex, newest first. */
+        val VERTEX_MODELS = listOf(
+            "google/gemini-2.5-pro",
+            "google/gemini-2.5-flash",
+            "google/gemini-2.5-flash-lite",
+            "google/gemini-2.0-flash",
+            "google/gemini-2.0-flash-lite"
+        )
+    }
+
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -75,7 +103,7 @@ class LlmRepository @Inject constructor(
         DebugLogger.log("LlmRepository: generating with ${config.displayName} ($endpoint)")
         DebugLogger.logApiRequest(endpoint, prompt.take(200))
 
-        val apiKey = config.apiKey
+        val apiKey = bearerFor(config)
 
         try {
             when {
@@ -143,11 +171,16 @@ class LlmRepository @Inject constructor(
                     val resp = okHttpClient.newCall(Request.Builder().url(url).build()).execute()
                     resp.isSuccessful
                 }
+                // Vertex has no /v1/models on its OpenAI-compatible endpoint, and the
+                // thing most likely to be wrong is the credentials. Minting a token
+                // exercises exactly that, and fails with a message worth showing.
+                config.isVertexAi -> bearerFor(config).isNotBlank()
                 else -> {
                     val baseUrl = config.effectiveBaseUrl
                     val url = "$baseUrl/v1/models"
+                    val token = bearerFor(config)
                     val req = Request.Builder().url(url)
-                        .also { b -> if (config.apiKey.isNotBlank()) b.addHeader("Authorization", "Bearer ${config.apiKey}") }
+                        .also { b -> if (token.isNotBlank()) b.addHeader("Authorization", "Bearer $token") }
                         .build()
                     val resp = okHttpClient.newCall(req).execute()
                     resp.isSuccessful || resp.code == 404 // 404 means server is alive, just no /models
@@ -735,6 +768,11 @@ class LlmRepository @Inject constructor(
     // ── Model Listing Helpers ─────────────────────────────────────────────────
 
     private suspend fun fetchOaiModels(config: ApiConfiguration): List<AvailableModel> {
+        // Vertex's OpenAI-compatible endpoint serves chat completions only — there is no
+        // model listing to call. Publisher model IDs are well known, so offer them
+        // directly rather than leaving the picker empty.
+        if (config.isVertexAi) return VERTEX_MODELS.map { AvailableModel(it) }
+
         // Strip trailing /v1 — we always append it ourselves, so users entering
         // "http://ip:4141/v1" as customUrl don't get "…/v1/v1/models".
         val baseUrl = config.effectiveBaseUrl.trimEnd('/').removeSuffix("/v1")

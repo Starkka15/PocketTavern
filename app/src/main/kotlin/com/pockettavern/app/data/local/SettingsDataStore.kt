@@ -43,6 +43,9 @@ class SettingsDataStore @Inject constructor(
 
     private companion object {
         const val SECURE_LLM_API_KEY = "llm_api_key"
+        // Service account key file. It contains an RSA private key granting access to the
+        // user's GCP project, so it belongs in encrypted storage, never in DataStore.
+        const val SECURE_VERTEX_SERVICE_ACCOUNT = "vertex_service_account_json"
         const val SECURE_CHARAVAULT_TOKEN = "charavault_token"
         const val SECURE_TTS_OPENAI_KEY = "tts_openai_key"
     }
@@ -56,6 +59,8 @@ class SettingsDataStore @Inject constructor(
         val LLM_CHAT_COMPLETION_SOURCE = stringPreferencesKey("llm_chat_completion_source")
         val LLM_CUSTOM_URL = stringPreferencesKey("llm_custom_url")
         val LLM_CUSTOM_CHAT_COMPLETIONS_URL = stringPreferencesKey("llm_custom_chat_completions_url")
+        val LLM_VERTEX_PROJECT_ID = stringPreferencesKey("llm_vertex_project_id")
+        val LLM_VERTEX_REGION = stringPreferencesKey("llm_vertex_region")
         val LLM_API_KEY = stringPreferencesKey("llm_api_key") // kept for migration reads only
         val LLM_CURRENT_MODEL = stringPreferencesKey("llm_current_model")
 
@@ -139,6 +144,9 @@ class SettingsDataStore @Inject constructor(
             customChatCompletionsUrl = prefs[Keys.LLM_CUSTOM_CHAT_COMPLETIONS_URL],
             apiKey = encryptedPrefs.getString(SECURE_LLM_API_KEY, null)
                 ?: prefs[Keys.LLM_API_KEY] ?: "",
+            vertexServiceAccountJson = encryptedPrefs.getString(SECURE_VERTEX_SERVICE_ACCOUNT, null) ?: "",
+            vertexProjectId = prefs[Keys.LLM_VERTEX_PROJECT_ID] ?: "",
+            vertexRegion = prefs[Keys.LLM_VERTEX_REGION] ?: ApiConfiguration.DEFAULT_VERTEX_REGION,
             currentModel = prefs[Keys.LLM_CURRENT_MODEL] ?: "",
             showThoughts = prefs[Keys.SHOW_THOUGHTS] ?: false
         )
@@ -147,7 +155,10 @@ class SettingsDataStore @Inject constructor(
     suspend fun getLlmConfig(): ApiConfiguration = llmConfigFlow.first()
 
     suspend fun saveLlmConfig(config: ApiConfiguration) {
-        encryptedPrefs.edit().putString(SECURE_LLM_API_KEY, config.apiKey).apply()
+        encryptedPrefs.edit()
+            .putString(SECURE_LLM_API_KEY, config.apiKey)
+            .putString(SECURE_VERTEX_SERVICE_ACCOUNT, config.vertexServiceAccountJson)
+            .apply()
         context.dataStore.edit { prefs ->
             prefs[Keys.LLM_MAIN_API] = config.mainApi
             prefs[Keys.LLM_TEXT_GEN_TYPE] = config.textGenType
@@ -158,6 +169,8 @@ class SettingsDataStore @Inject constructor(
             if (config.customChatCompletionsUrl != null) prefs[Keys.LLM_CUSTOM_CHAT_COMPLETIONS_URL] = config.customChatCompletionsUrl
             else prefs.remove(Keys.LLM_CUSTOM_CHAT_COMPLETIONS_URL)
             prefs.remove(Keys.LLM_API_KEY)
+            prefs[Keys.LLM_VERTEX_PROJECT_ID] = config.vertexProjectId
+            prefs[Keys.LLM_VERTEX_REGION] = config.vertexRegion
             prefs[Keys.LLM_CURRENT_MODEL] = config.currentModel
             prefs[Keys.SHOW_THOUGHTS] = config.showThoughts
             prefs[Keys.SECURE_REFRESH] = (prefs[Keys.SECURE_REFRESH] ?: 0) + 1

@@ -76,8 +76,9 @@ object NetworkModule {
         @Named("LLM") okHttpClient: OkHttpClient,
         onDeviceEngine: com.pockettavern.app.data.local.inference.OnDeviceEngine,
         ggufEngine: com.pockettavern.app.data.local.inference.GgufEngine,
-        onDeviceModels: com.pockettavern.app.data.local.inference.OnDeviceModelManager
-    ): LlmRepository = LlmRepository(settingsDataStore, okHttpClient, onDeviceEngine, ggufEngine, onDeviceModels)
+        onDeviceModels: com.pockettavern.app.data.local.inference.OnDeviceModelManager,
+        vertexAuth: com.pockettavern.app.data.remote.auth.VertexAuthProvider
+    ): LlmRepository = LlmRepository(settingsDataStore, okHttpClient, onDeviceEngine, ggufEngine, onDeviceModels, vertexAuth)
 
     // ── Forge (Stable Diffusion) ─────────────────────────────────────────────
 
