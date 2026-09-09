@@ -501,6 +501,7 @@
     <string name="add_background_image">Add Background Image</string>
     <string name="s_06x">#%06X</string>
     <string name="brightness">Brightness</string>
+    <string name="opacity">Opacity</string>
     <string name="name_your_theme">Name Your Theme</string>
     <string name="theme_name">Theme name</string>
     <string name="remove_background">Remove background</string>

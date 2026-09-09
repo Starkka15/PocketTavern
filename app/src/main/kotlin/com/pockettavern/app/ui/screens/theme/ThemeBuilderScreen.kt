@@ -50,6 +50,7 @@ import com.pockettavern.app.ui.theme.AvatarShape
 import com.pockettavern.app.ui.theme.BackgroundScaleMode
 import com.pockettavern.app.ui.theme.PocketTavernColors
 import kotlinx.coroutines.flow.collectLatest
+import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -226,26 +227,26 @@ fun ThemeBuilderScreen(
             // ── User Bubble ──────────────────────────────────────────────────
             item { SectionHeader(stringResource(R.string.user_bubble)) }
             item {
-                ColorPickerRow("Bubble Color", state.colors.userBubble) { c ->
+                ColorPickerRow("Bubble Color", state.colors.userBubble, showOpacity = true) { c ->
                     viewModel.updateColors { it.copy(userBubble = c) }
                 }
             }
             item {
                 ColorPickerRow("Bubble Text", state.colors.userBubbleText) { c ->
-                    viewModel.updateColors { it.copy(userBubbleText = c) }
+                    viewModel.setUserBubbleText(c)
                 }
             }
 
             // ── Assistant Bubble ─────────────────────────────────────────────
             item { SectionHeader(stringResource(R.string.assistant_bubble)) }
             item {
-                ColorPickerRow("Bubble Color", state.colors.assistantBubble) { c ->
+                ColorPickerRow("Bubble Color", state.colors.assistantBubble, showOpacity = true) { c ->
                     viewModel.updateColors { it.copy(assistantBubble = c) }
                 }
             }
             item {
                 ColorPickerRow("Bubble Text", state.colors.assistantBubbleText) { c ->
-                    viewModel.updateColors { it.copy(assistantBubbleText = c) }
+                    viewModel.setAssistantBubbleText(c)
                 }
             }
 
@@ -458,10 +459,22 @@ private fun SectionHeader(title: String) {
     )
 }
 
+/**
+ * Hex label for a swatch: `#RRGGBB`, widening to `#RRGGBBAA` once the colour is
+ * translucent. Trailing alpha matches what [StThemeParser] reads back, so a value
+ * shown here can be typed straight into a theme JSON.
+ */
+private fun Color.toHexLabel(): String {
+    val argb = toArgb()
+    return if (alpha >= 1f) "#%06X".format(Locale.US, argb and 0xFFFFFF)
+    else "#%08X".format(Locale.US, ((argb and 0xFFFFFF) shl 8) or ((argb ushr 24) and 0xFF))
+}
+
 @Composable
 private fun ColorPickerRow(
     label: String,
     color: Color,
+    showOpacity: Boolean = false,
     onColorChanged: (Color) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -488,7 +501,7 @@ private fun ColorPickerRow(
                 )
                 Spacer(Modifier.width(12.dp))
                 Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                Text(stringResource(R.string.s_06x).format(color.toArgb() and 0xFFFFFF),
+                Text(color.toHexLabel(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -501,7 +514,11 @@ private fun ColorPickerRow(
             }
             AnimatedVisibility(visible = expanded) {
                 Box(modifier = Modifier.padding(12.dp)) {
-                    HsvColorPicker(color = color, onColorChanged = onColorChanged)
+                    HsvColorPicker(
+                        color = color,
+                        showOpacity = showOpacity,
+                        onColorChanged = onColorChanged
+                    )
                 }
             }
         }
@@ -534,7 +551,11 @@ private val colorWheelBitmap: Bitmap by lazy {
 }
 
 @Composable
-private fun HsvColorPicker(color: Color, onColorChanged: (Color) -> Unit) {
+private fun HsvColorPicker(
+    color: Color,
+    showOpacity: Boolean = false,
+    onColorChanged: (Color) -> Unit
+) {
     // Initialize from current color once on entry — no key so recomposition from
     // parent (caused by our own onColorChanged calls) doesn't re-derive and jump.
     val initHsv = remember {
@@ -543,6 +564,18 @@ private fun HsvColorPicker(color: Color, onColorChanged: (Color) -> Unit) {
     var hue by remember { mutableFloatStateOf(initHsv[0]) }
     var sat by remember { mutableFloatStateOf(initHsv[1]) }
     var value by remember { mutableFloatStateOf(initHsv[2]) }
+    var alpha by remember { mutableFloatStateOf(color.alpha) }
+
+    // Every control edits one component of the same colour, so they all emit through
+    // here — otherwise adjusting hue would silently reset the opacity to opaque.
+    fun emit() = onColorChanged(
+        Color(
+            android.graphics.Color.HSVToColor(
+                (alpha * 255).roundToInt().coerceIn(0, 255),
+                floatArrayOf(hue, sat, value)
+            )
+        )
+    )
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -560,7 +593,7 @@ private fun HsvColorPicker(color: Color, onColorChanged: (Color) -> Unit) {
                     detectTapGestures { offset ->
                         processWheelTouch(offset, size.width.toFloat(), size.height.toFloat()) { h, s ->
                             hue = h; sat = s
-                            onColorChanged(Color(android.graphics.Color.HSVToColor(floatArrayOf(h, s, value))))
+                            emit()
                         }
                     }
                 }
@@ -569,14 +602,14 @@ private fun HsvColorPicker(color: Color, onColorChanged: (Color) -> Unit) {
                         onDragStart = { offset ->
                             processWheelTouch(offset, size.width.toFloat(), size.height.toFloat()) { h, s ->
                                 hue = h; sat = s
-                                onColorChanged(Color(android.graphics.Color.HSVToColor(floatArrayOf(h, s, value))))
+                                emit()
                             }
                         },
                         onDrag = { change, _ ->
                             change.consume()
                             processWheelTouch(change.position, size.width.toFloat(), size.height.toFloat()) { h, s ->
                                 hue = h; sat = s
-                                onColorChanged(Color(android.graphics.Color.HSVToColor(floatArrayOf(h, s, value))))
+                                emit()
                             }
                         }
                     )
@@ -613,10 +646,7 @@ private fun HsvColorPicker(color: Color, onColorChanged: (Color) -> Unit) {
                 modifier = Modifier.width(70.dp))
             Slider(
                 value = value,
-                onValueChange = { v ->
-                    value = v
-                    onColorChanged(Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, sat, v))))
-                },
+                onValueChange = { v -> value = v; emit() },
                 modifier = Modifier.weight(1f)
             )
             Text(
@@ -625,6 +655,31 @@ private fun HsvColorPicker(color: Color, onColorChanged: (Color) -> Unit) {
                 modifier = Modifier.width(36.dp),
                 textAlign = TextAlign.End
             )
+        }
+
+        // Opacity slider — only where translucency is meaningful (message bubbles).
+        // Floored at 10% rather than 0: a fully invisible bubble reads as a bug, and
+        // the parser treats alpha 0 as "unset" anyway.
+        if (showOpacity) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(stringResource(R.string.opacity), style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.width(70.dp))
+                Slider(
+                    value = alpha,
+                    onValueChange = { a -> alpha = a; emit() },
+                    valueRange = 0.1f..1f,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "${(alpha * 100).roundToInt()}%",
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.width(36.dp),
+                    textAlign = TextAlign.End
+                )
+            }
         }
 
         // Color swatch preview
@@ -640,7 +695,7 @@ private fun HsvColorPicker(color: Color, onColorChanged: (Color) -> Unit) {
                     .background(color)
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp))
             )
-            Text(stringResource(R.string.s_06x).format(color.toArgb() and 0xFFFFFF),
+            Text(color.toHexLabel(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

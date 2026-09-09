@@ -507,6 +507,7 @@
 <string name="add_background_image">添加背景图片</string>
 <string name="s_06x">#%06X</string>
 <string name="brightness">亮度</string>
+<string name="opacity">不透明度</string>
 <string name="name_your_theme">为你的主题命名</string>
 <string name="theme_name">主题名称</string>
 <string name="remove_background">移除背景</string>
