@@ -36,6 +36,14 @@ interface CharacterDao {
     @Query("UPDATE characters SET useAvatarForImageGen = :useAvatar WHERE fileName = :fileName")
     suspend fun setUseAvatarForImageGen(fileName: String, useAvatar: Boolean)
 
+    /**
+     * Detach a lorebook from every character referencing it. Called when the lorebook is
+     * deleted — otherwise the link survives the file and characters keep showing the
+     * "has lorebook" badge for a book that no longer exists.
+     */
+    @Query("UPDATE characters SET attachedWorldInfo = NULL WHERE attachedWorldInfo = :name")
+    suspend fun clearAttachedWorldInfo(name: String)
+
     @Query("SELECT useAvatarForImageGen FROM characters WHERE fileName = :fileName")
     suspend fun getUseAvatarForImageGen(fileName: String): Boolean?
 

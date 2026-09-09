@@ -149,6 +149,10 @@ class LocalRepository @Inject constructor(
 
     suspend fun deleteWorldInfo(name: String): Result<Unit> = withResult {
         loreBookStorage.deleteLorebook(name)
+        // The attachment lives in the character index, not in the lorebook file, so
+        // deleting the file alone leaves a dangling link: the character list keeps
+        // drawing the "has lorebook" badge and prompt building keeps trying to load it.
+        characterStorage.clearAttachedWorldInfo(name)
     }
 
     suspend fun importWorldInfoJson(name: String, bytes: ByteArray): Result<Unit> = withResult {

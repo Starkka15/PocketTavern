@@ -298,6 +298,14 @@ class CharacterStorage @Inject constructor(
     fun getAvatarUri(fileName: String): Uri =
         Uri.fromFile(File(charactersDir, fileName))
 
+    /**
+     * Detach a deleted lorebook from every character that referenced it.
+     * Returns nothing — a character with no such link is simply unaffected.
+     */
+    suspend fun clearAttachedWorldInfo(name: String) = withContext(Dispatchers.IO) {
+        characterDao.clearAttachedWorldInfo(name)
+    }
+
     /** Rebuild the Room index from disk. Preserves existing isFavorite/useAvatarForImageGen/notes. */
     suspend fun rebuildIndex() = withContext(Dispatchers.IO) {
         val files = charactersDir.listFiles { f -> f.extension == "png" } ?: emptyArray()
