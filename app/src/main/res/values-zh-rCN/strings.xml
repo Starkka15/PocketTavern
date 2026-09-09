@@ -508,6 +508,8 @@
 <string name="s_06x">#%06X</string>
 <string name="brightness">亮度</string>
 <string name="opacity">不透明度</string>
+<string name="enable_debug_logging">启用调试日志</string>
+<string name="debug_log_subtitle">收集诊断日志以便反馈问题</string>
 <string name="name_your_theme">为你的主题命名</string>
 <string name="theme_name">主题名称</string>
 <string name="remove_background">移除背景</string>

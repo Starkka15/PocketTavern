@@ -65,6 +65,7 @@ fun SettingsHubScreen(
     onNavigateToImageGen: () -> Unit = {},
     onNavigateToBackup: () -> Unit = {},
     onNavigateToStorageBrowser: () -> Unit = {},
+    onNavigateToDebugLog: () -> Unit = {},
     viewModel: SettingsHubViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -191,7 +192,7 @@ fun SettingsHubScreen(
     }
 
     // ── Utilities ──────────────────────────────────────────────────
-    val utilityItems = remember(onNavigateToExtensions, onNavigateToStImport, onNavigateToSetupGuide, onNavigateToBackup, onNavigateToStorageBrowser) {
+    val utilityItems = remember(onNavigateToExtensions, onNavigateToStImport, onNavigateToSetupGuide, onNavigateToBackup, onNavigateToStorageBrowser, onNavigateToDebugLog) {
         listOf(
             SettingsItem(
                 title = R.string.extensions,
@@ -219,6 +220,13 @@ fun SettingsHubScreen(
                 subtitle = R.string.export_restore_zip,
                 icon = Icons.Default.Save,
                 onClick = onNavigateToBackup,
+                requiresConnection = false
+            ),
+            SettingsItem(
+                title = R.string.debug_log,
+                subtitle = R.string.debug_log_subtitle,
+                icon = Icons.Default.BugReport,
+                onClick = onNavigateToDebugLog,
                 requiresConnection = false
             ),
             SettingsItem(

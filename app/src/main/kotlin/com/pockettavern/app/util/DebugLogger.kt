@@ -16,39 +16,92 @@ import java.util.Locale
 object DebugLogger {
     private const val TAG = "STDebug"
     private const val LOG_FILE = "debug_log.txt"
+    private const val PREFS = "debug_prefs"
+    private const val KEY_ENABLED = "logging_enabled"
+
+    /**
+     * Hard cap on the log file. Logging is opt-in, but a session left running with it on
+     * must not quietly eat storage — past this the file is restarted from a fresh header.
+     */
+    private const val MAX_LOG_BYTES = 2L * 1024 * 1024
+
     private var logFile: File? = null
-    private var enabled = true
+    private var appContext: Context? = null
+    private var enabled = false
+
+    /** Whether file logging is currently on. Backs the Debug Log screen's toggle. */
+    val isEnabled: Boolean get() = enabled
 
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
 
     fun init(context: Context) {
-        if (!com.pockettavern.app.BuildConfig.DEBUG) {
-            enabled = false
-            return
-        }
-        // Use Downloads folder for easy access without root
-        val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(
-            android.os.Environment.DIRECTORY_DOWNLOADS
-        )
-        logFile = File(downloadsDir, LOG_FILE)
-        // Clear old log on init
-        try {
-            logFile?.writeText("=== SillyTavern Debug Log Started ${dateFormat.format(Date())} ===\n\n")
-            log("DebugLogger initialized")
-            log("Log file location: ${logFile?.absolutePath}")
-            Log.i(TAG, "Debug log file: ${logFile?.absolutePath}")
-        } catch (e: Exception) {
-            // Fallback to app-private storage if external fails
-            Log.e(TAG, "Failed to write to Downloads, falling back to app storage", e)
-            logFile = File(context.filesDir, LOG_FILE)
-            logFile?.writeText("=== SillyTavern Debug Log Started ${dateFormat.format(Date())} ===\n\n")
-            log("DebugLogger initialized (fallback location)")
-            log("Log file location: ${logFile?.absolutePath}")
+        appContext = context.applicationContext
+        // The stored preference wins; the default follows the build type, so debug builds
+        // keep logging out of the box while release users pay no storage cost until they
+        // deliberately turn it on.
+        enabled = prefs()?.getBoolean(KEY_ENABLED, com.pockettavern.app.BuildConfig.DEBUG)
+            ?: com.pockettavern.app.BuildConfig.DEBUG
+        if (enabled) openLogFile()
+    }
+
+    /** Turn file logging on or off and remember the choice across launches. */
+    fun setEnabled(enabled: Boolean) {
+        this.enabled = enabled
+        prefs()?.edit()?.putBoolean(KEY_ENABLED, enabled)?.apply()
+        if (enabled) {
+            openLogFile()
+        } else {
+            // Reclaim the space now — leaving the old file on disk would defeat the toggle.
+            try {
+                logFile?.delete()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to delete log file: ${e.message}")
+            }
+            logFile = null
         }
     }
 
-    fun setEnabled(enabled: Boolean) {
-        this.enabled = enabled
+    private fun prefs() = appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    private fun header() = "=== PocketTavern Debug Log Started ${dateFormat.format(Date())} ===\n\n"
+
+    /**
+     * Opens (and truncates) the log file. Downloads is preferred so the file can be pulled
+     * off the device without root, but scoped storage blocks that on API 29+, so fall back
+     * to app-private storage — which the in-app viewer reads either way.
+     */
+    private fun openLogFile() {
+        val context = appContext ?: return
+        try {
+            val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(
+                android.os.Environment.DIRECTORY_DOWNLOADS
+            )
+            logFile = File(downloadsDir, LOG_FILE).also { it.writeText(header()) }
+            log("DebugLogger initialized")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to write to Downloads, falling back to app storage", e)
+            try {
+                logFile = File(context.filesDir, LOG_FILE).also { it.writeText(header()) }
+                log("DebugLogger initialized (fallback location)")
+            } catch (e2: Exception) {
+                Log.e(TAG, "Failed to open any log file: ${e2.message}", e2)
+                logFile = null
+                return
+            }
+        }
+        log("Log file location: ${logFile?.absolutePath}")
+        Log.i(TAG, "Debug log file: ${logFile?.absolutePath}")
+    }
+
+    /** Appends one line, restarting the file if it has outgrown [MAX_LOG_BYTES]. */
+    private fun appendCapped(line: String) {
+        val f = logFile ?: return
+        try {
+            if (f.length() > MAX_LOG_BYTES) f.writeText(header())
+            f.appendText(line)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to write to log file: ${e.message}")
+        }
     }
 
     fun log(message: String) {
@@ -60,12 +113,7 @@ object DebugLogger {
         // Log to Android logcat
         Log.d(TAG, message)
 
-        // Append to file
-        try {
-            logFile?.appendText(logLine)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to write to log file: ${e.message}")
-        }
+        appendCapped(logLine)
     }
 
     fun logSection(title: String) {
@@ -111,6 +159,7 @@ object DebugLogger {
     }
 
     fun getLogContents(): String {
+        if (!enabled) return "Debug logging is off. Turn it on above to start collecting a log."
         return try {
             logFile?.readText() ?: "Log file not initialized"
         } catch (e: Exception) {
@@ -137,10 +186,6 @@ object DebugLogger {
 
         Log.e(tag, message, throwable)
 
-        try {
-            logFile?.appendText(logLine)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to write error to log file: ${e.message}")
-        }
+        appendCapped(logLine)
     }
 }

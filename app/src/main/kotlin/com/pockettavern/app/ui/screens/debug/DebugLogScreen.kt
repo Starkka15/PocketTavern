@@ -26,6 +26,7 @@ import com.pockettavern.app.util.DebugLogger
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DebugLogScreen(onBack: () -> Unit) {
+    var loggingEnabled by remember { mutableStateOf(DebugLogger.isEnabled) }
     var logContent by remember { mutableStateOf(DebugLogger.getLogContents()) }
     val clipboard = LocalClipboardManager.current
     val verticalScroll = rememberScrollState()
@@ -70,22 +71,39 @@ fun DebugLogScreen(onBack: () -> Unit) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Refresh button
+            // Logging toggle — off by default in release builds so the log file costs
+            // storage only for people who actually want to collect one.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                    .padding(start = 12.dp, end = 12.dp, top = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(stringResource(R.string.tap_refresh_after_generating_to_see_the_lates),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(
+                        checked = loggingEnabled,
+                        onCheckedChange = { on ->
+                            DebugLogger.setEnabled(on)
+                            loggingEnabled = on
+                            logContent = DebugLogger.getLogContents()
+                        }
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(stringResource(R.string.enable_debug_logging),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
                 TextButton(onClick = { logContent = DebugLogger.getLogContents() }) {
                     Text(stringResource(R.string.refresh))
                 }
             }
+
+            Text(stringResource(R.string.tap_refresh_after_generating_to_see_the_lates),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+            )
 
             HorizontalDivider()
 

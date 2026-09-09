@@ -165,7 +165,8 @@ fun SillyTavernNavGraph(
                 onNavigateToTtsSettings = { navController.navigate(Route.TtsSettings) },
                 onNavigateToImageGen = { navController.navigate(Route.ImageGenSettings) },
                 onNavigateToBackup = { navController.navigate(Route.Backup) },
-                onNavigateToStorageBrowser = { navController.navigate(Route.StorageBrowser) }
+                onNavigateToStorageBrowser = { navController.navigate(Route.StorageBrowser) },
+                onNavigateToDebugLog = { navController.navigate(Route.DebugLog) }
             )
         }
 
