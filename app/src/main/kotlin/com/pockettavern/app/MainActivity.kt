@@ -5,8 +5,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -42,7 +46,13 @@ class MainActivity : ComponentActivity() {
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()
-                        .safeDrawingPadding()
+                        // System bars and cutout only — deliberately NOT safeDrawing,
+                        // which also folds in the IME. Applying keyboard insets here,
+                        // above the NavHost, meant one padding node was shared by every
+                        // screen: the reserved space outlived the screen that opened the
+                        // keyboard and persisted across navigation. Each screen now
+                        // applies imePadding() on its own Scaffold instead.
+                        .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))
                 ) {
                     SillyTavernNavGraph(themeAudioManager = themeAudioManager)
                 }
