@@ -53,7 +53,7 @@ sealed class Route {
     data object Personas : Route()
 
     @Serializable
-    data object CharaVault : Route()
+    data object Chub : Route()
 
     @Serializable
     data object SetupGuide : Route()
