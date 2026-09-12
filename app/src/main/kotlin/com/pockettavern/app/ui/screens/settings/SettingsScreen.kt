@@ -101,43 +101,6 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-
-                // CharaVault Server Section
-                Text(text = stringResource(R.string.card_server_optional),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Text(
-                    text = if (uiState.charavaultMode == "charavault") "Mode: CharaVault.net" else "Mode: Local CharaVault",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                if (uiState.charavaultMode == "local") {
-                    OutlinedTextField(
-                        value = uiState.charaVaultUrl,
-                        onValueChange = { viewModel.updateCharaVaultUrl(it) },
-                        label = { Text(stringResource(R.string.charavault_url)) },
-                        placeholder = { Text(stringResource(R.string.http_192_168_1_100_8787)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                        colors = settingsTextFieldColors()
-                    )
-
-                    Text(text = stringResource(R.string.your_local_character_card_index_server),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    Text(text = stringResource(R.string.configure_login_via_the_charavault_screen),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Save Button

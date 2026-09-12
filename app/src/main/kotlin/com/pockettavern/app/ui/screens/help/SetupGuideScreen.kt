@@ -78,7 +78,7 @@ fun SetupGuideScreen(
                 SectionHeading(stringResource(R.string.step_1_get_some_characters))
                 BulletItem(stringResource(R.string.import_a_png_card_go_to_characters_tap_the_im))
                 BulletItem(stringResource(R.string.create_a_character_tap_create_character_on_th))
-                BulletItem(stringResource(R.string.browse_charavault_tap_charavault_on_the_home))
+                BulletItem(stringResource(R.string.browse_chub_tap_chub_on_the_home))
 
                 VerticalSpacer()
                 SectionHeading(stringResource(R.string.step_2_connect_an_llm_backend))
@@ -100,7 +100,7 @@ fun SetupGuideScreen(
                 BulletItem(stringResource(R.string.characters_browse_import_and_manage_your_char))
                 BulletItem(stringResource(R.string.recent_chats_shows_your_latest_conversations))
                 BulletItem(stringResource(R.string.create_character_jumps_directly_to_the_charac))
-                BulletItem(stringResource(R.string.charavault_browse_and_import_community_charac))
+                BulletItem(stringResource(R.string.chub_browse_and_import_community_charac))
                 BulletItem(stringResource(R.string.settings_access_all_app_settings_and_configur))
                 VerticalSpacer()
                 HelpText(stringResource(R.string.the_bottom_of_the_screen_shows_your_current_c))
@@ -331,7 +331,6 @@ fun SetupGuideScreen(
                 BulletItem(stringResource(R.string.per_character_go_to_character_settings_attach))
                 BulletItem(stringResource(R.string.per_persona_edit_a_persona_and_attach_a_loreb))
                 BulletItem(stringResource(R.string.embedded_character_cards_with_embedded_charac))
-                BulletItem(stringResource(R.string.from_charavault_browse_and_import_community_l))
             }
 
             // ── Personas ────────────────────────────────────────────
@@ -413,13 +412,10 @@ fun SetupGuideScreen(
                 BulletItem(stringResource(R.string.role_system_user_or_assistant))
             }
 
-            // ── CharaVault ──────────────────────────────────────────
-            HelpDropdown(title = stringResource(R.string.help_charavault)) {
+            // ── Card browsers ───────────────────────────────────────
+            HelpDropdown(title = stringResource(R.string.help_card_browsers)) {
                 HelpText(stringResource(R.string.browse_and_import_community_characters_and_lo))
                 VerticalSpacer()
-                SectionHeading(stringResource(R.string.modes))
-                BulletItem(stringResource(R.string.charavault_net_browse_the_public_catalog_gues))
-                BulletItem(stringResource(R.string.self_hosted_connect_to_your_own_charavault_se))
 
                 VerticalSpacer()
                 SectionHeading(stringResource(R.string.browsing))
@@ -435,9 +431,6 @@ fun SetupGuideScreen(
                 BulletItem(stringResource(R.string.tap_import_to_pockettavern_to_download_and_sa))
                 BulletItem(stringResource(R.string.tap_tags_in_the_preview_to_add_them_to_your_s))
 
-                VerticalSpacer()
-                SectionHeading(stringResource(R.string.uploading))
-                HelpText(stringResource(R.string.long_press_a_character_in_the_characters_list))
             }
 
             // ── Extensions ──────────────────────────────────────────
@@ -549,7 +542,7 @@ fun SetupGuideScreen(
                 )
                 FaqItem(
                     question = "What character card formats are supported?",
-                    answer = "PocketTavern uses PNG character cards with embedded metadata (V2 spec) — the same format SillyTavern uses. Any .png card exported from SillyTavern, CharaVault, Chub.ai, or similar tools will work."
+                    answer = "PocketTavern uses PNG character cards with embedded metadata (V2 spec) — the same format SillyTavern uses. Any .png card exported from SillyTavern, Chub.ai, or similar tools will work."
                 )
                 FaqItem(
                     question = "Can I use a local AI model on my phone?",

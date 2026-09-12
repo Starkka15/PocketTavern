@@ -126,15 +126,10 @@
     <string name="advanced">Advanced</string>
     <string name="stable_diffusion_forge_optional">Stable Diffusion Forge (optional)</string>
     <string name="used_for_generating_character_avatars">Used for generating character avatars</string>
-    <string name="card_server_optional">Card Server (optional)</string>
-    <string name="your_local_character_card_index_server">Your local character card index server</string>
-    <string name="configure_login_via_the_charavault_screen">Configure login via the CharaVault screen</string>
     <string name="debugging">Debugging</string>
     <string name="share_debug_logs_to_help_diagnose_issues_with">Share debug logs to help diagnose issues with prompt building, World Info, and API requests.</string>
     <string name="settings">Settings</string>
     <string name="forge_url">Forge URL</string>
-    <string name="charavault_url">CharaVault URL</string>
-    <string name="http_192_168_1_100_8787">http://192.168.1.100:8787</string>
     <string name="save_settings">Save Settings</string>
     <string name="share_debug_log">Share Debug Log</string>
     <string name="clear_log">Clear Log</string>
@@ -225,8 +220,6 @@
     <string name="no_characters_found">No characters found</string>
     <string name="characters">Characters</string>
     <string name="translate_to_language">Translate to %1$s</string>
-    <string name="upload_to_charavault">Upload to CharaVault</string>
-    <string name="uploading_to_charavault">Uploading to CharaVault</string>
     <string name="please_wait">Please wait...</string>
     <string name="success">Success</string>
     <string name="ok">OK</string>
@@ -314,11 +307,8 @@
     <string name="no_recent_chats">No recent chats</string>
     <string name="start_chatting_with_a_character_to_see_them_h">Start chatting with a character to see them here</string>
     <string name="recent_chats">Recent Chats</string>
-    <string name="browse_charavault">Browse CharaVault</string>
     <string name="login">Login</string>
     <string name="content_filter">Content Filter</string>
-    <string name="charavault_server_not_configured">CharaVault Server Not Configured</string>
-    <string name="enter_your_charavault_server_url_to_browse_ca">Enter your CharaVault server URL to browse cards</string>
     <string name="configure_server">Configure Server</string>
     <string name="clear_all">Clear all</string>
     <string name="search_cards">Search cards...</string>
@@ -332,12 +322,7 @@
     <string name="import_to_pockettavern">Import to PocketTavern</string>
     <string name="card_server">Card Server</string>
     <string name="source">Source</string>
-    <string name="charavault_local">CharaVault (Local)</string>
-    <string name="charavault_net">CharaVault.net</string>
-    <string name="enter_your_local_charavault_server_url">Enter your local CharaVault server URL</string>
     <string name="verify_age_18_for_nsfw">Verify Age (18+) for NSFW</string>
-    <string name="login_to_charavault_net_to_access_the_full_ca">Login to CharaVault.net to access the full card library including NSFW content.</string>
-    <string name="login_to_charavault_net">Login to CharaVault.net</string>
     <string name="browsing_without_login_shows_sfw_cards_only">Browsing without login shows SFW cards only.</string>
     <string name="enter_the_6_digit_code_from_your_authenticato">Enter the 6-digit code from your authenticator app.</string>
     <string name="s_2fa_code">2FA Code</string>
@@ -508,6 +493,10 @@
     <string name="theme_name">Theme name</string>
     <string name="remove_background">Remove background</string>
     <string name="botbooru">BotBooru</string>
+    <string name="chub">Chub</string>
+    <string name="help_card_browsers">Card Browsers</string>
+    <string name="browse_chub_tap_chub_on_the_home">Browse Chub — Tap Chub on the home screen to search and import community characters.</string>
+    <string name="chub_browse_and_import_community_charac">Chub — Browse and import community characters.</string>
     <string name="reasoning">Reasoning</string>
     <string name="reasoning_2">Reasoning...</string>
     <string name="image_actions">Image actions</string>
@@ -556,8 +545,7 @@
     <string name="settings_text_generation_key_parameters">Settings → Text Generation. Key parameters:</string>
     <string name="settings_chat_completion_presets_key_paramete">Settings → Chat Completion Presets. Key parameters:</string>
     <string name="settings_context_settings_inject_custom_text">Settings → Context Settings. Inject custom text into every conversation:</string>
-    <string name="browse_and_import_community_characters_and_lo">Browse and import community characters and lorebooks from within the app.</string>
-    <string name="long_press_a_character_in_the_characters_list">Long-press a character in the Characters list → Upload to CharaVault to share your character with the community.</string>
+    <string name="browse_and_import_community_characters_and_lo">Browse and import community characters from within the app.</string>
     <string name="go_to_settings_extensions_to_enable_disable">Go to Settings → Extensions to enable/disable:</string>
     <string name="install_third_party_extensions_that_run_in_a">Install third-party extensions that run in a sandboxed WebView:</string>
     <string name="migrate_your_characters_chats_and_lorebooks_f">Migrate your characters, chats, and lorebooks from SillyTavern.</string>
@@ -565,7 +553,6 @@
     <string name="settings_are_organized_into_five_groups">Settings are organized into five groups:</string>
     <string name="a_connection_status_indicator_at_the_bottom_s">A connection status indicator at the bottom shows whether you\'re currently connected to your LLM backend.</string>
     <string name="import_a_png_card_go_to_characters_tap_the_im">Import a PNG card — Go to Characters, tap the import button, and select a .png character card from your device.</string>
-    <string name="browse_charavault_tap_charavault_on_the_home">Browse CharaVault — Tap CharaVault on the home screen to search and import community characters. Supports both CharaVault.net (public catalog) and self-hosted servers.</string>
     <string name="open_settings_api_configuration_select_your_a">Open Settings → API Configuration. Select your API type from the dropdown.</string>
     <string name="local_backends_koboldcpp_ollama_lm_studio_etc">Local backends (KoboldCpp, Ollama, LM Studio, etc.): Enter your PC\'s local IP address and port (e.g. http://192.168.1.100:5001). Your phone must be on the same Wi-Fi network.</string>
     <string name="cloud_apis_openai_anthropic_groq_etc_select_c">Cloud APIs (OpenAI, Anthropic, Groq, etc.): Select Chat Completion, enter the API URL and your API key, then tap the refresh button to load models.</string>
@@ -575,7 +562,6 @@
     <string name="characters_browse_import_and_manage_your_char">Characters — Browse, import, and manage your character cards.</string>
     <string name="recent_chats_shows_your_latest_conversations">Recent Chats — Shows your latest conversations sorted by most recently active, with a preview of the last message. Tap any chat to jump back in.</string>
     <string name="create_character_jumps_directly_to_the_charac">Create Character — Jumps directly to the character creation form.</string>
-    <string name="charavault_browse_and_import_community_charac">CharaVault — Browse and import community characters and lorebooks.</string>
     <string name="settings_access_all_app_settings_and_configur">Settings — Access all app settings and configuration.</string>
     <string name="type_in_the_message_box_at_the_bottom_and_tap">Type in the message box at the bottom and tap the Send button (arrow icon). The AI response streams in word-by-word with a live cursor.</string>
     <string name="you_can_also_use_the_keyboard_s_send_done_act">You can also use the keyboard\'s Send/Done action to send.</string>
@@ -601,7 +587,7 @@
     <string name="debug_log_view_the_app_s_debug_log_for_troubl">Debug Log — View the app\'s debug log for troubleshooting.</string>
     <string name="delete_chat_delete_character_destructive_acti">Delete Chat / Delete Character — Destructive actions (with confirmation).</string>
     <string name="tap_a_character_to_start_or_resume_a_chat">Tap a character to start or resume a chat.</string>
-    <string name="long_press_a_character_to_open_the_action_men">Long-press a character to open the action menu: Edit, Character Settings, Upload to CharaVault, or Delete.</string>
+    <string name="long_press_a_character_to_open_the_action_men">Long-press a character to open the action menu: Edit, Character Settings, or Delete.</string>
     <string name="tap_the_button_top_right_to_create_a_new_char">Tap the + button (top right) to create a new character.</string>
     <string name="tap_the_import_button_to_import_a_png_charact">Tap the import button to import a .png character card from your device.</string>
     <string name="switch_between_characters_and_groups_using_th">Switch between Characters and Groups using the title dropdown.</string>
@@ -680,7 +666,6 @@
     <string name="per_character_go_to_character_settings_attach">Per-character — Go to Character Settings → Attached Lorebook.</string>
     <string name="per_persona_edit_a_persona_and_attach_a_loreb">Per-persona — Edit a persona and attach a lorebook.</string>
     <string name="embedded_character_cards_with_embedded_charac">Embedded — Character cards with embedded character_book entries are loaded automatically.</string>
-    <string name="from_charavault_browse_and_import_community_l">From CharaVault — Browse and import community lorebooks directly from the CharaVault screen.</string>
     <string name="go_to_settings_personas_and_tap_the_button">Go to Settings → Personas and tap the + button.</string>
     <string name="choose_an_avatar_pick_from_gallery_or_generat">Choose an avatar (pick from gallery or generate with AI).</string>
     <string name="enter_a_display_name_and_optional_description">Enter a display name and optional description.</string>
@@ -704,8 +689,6 @@
     <string name="depth_how_many_messages_from_the_end_to_place">Depth — How many messages from the end to place it (lower = more influential).</string>
     <string name="interval_how_often_to_inject_every_n_messages">Interval — How often to inject (every N messages).</string>
     <string name="position_before_char_after_char_top_bottom_of">Position — Before Char, After Char, Top/Bottom of Author\'s Note, At Depth.</string>
-    <string name="charavault_net_browse_the_public_catalog_gues">CharaVault.net — Browse the public catalog. Guest browsing shows SFW content only. Log in with email/password for full access. NSFW content requires age verification (18+). 2FA/TOTP is supported.</string>
-    <string name="self_hosted_connect_to_your_own_charavault_se">Self-hosted — Connect to your own CharaVault server by entering its URL.</string>
     <string name="search_by_name_or_description_using_the_searc">Search by name or description using the search bar.</string>
     <string name="filter_by_tags_tap_the_tag_icon_to_open_the_t">Filter by tags — Tap the tag icon to open the tag selector. Selected tags appear as chips above the results.</string>
     <string name="content_filter_tap_the_filter_icon_to_toggle">Content filter — Tap the filter icon to toggle SFW/NSFW filtering.</string>
@@ -900,7 +883,6 @@
     <string name="help_user_personas">User Personas</string>
     <string name="help_prompt_building_templates">Prompt Building &amp; Templates</string>
     <string name="help_text_generation_settings">Text Generation Settings</string>
-    <string name="help_charavault">CharaVault</string>
     <string name="help_extensions">Extensions</string>
     <string name="help_themes_appearance">Themes &amp; Appearance</string>
     <string name="help_sillytavern_import">SillyTavern Import</string>
@@ -971,8 +953,6 @@
     <string name="oai_section_penalties">Penalties</string>
     <string name="oai_section_context_misc">Context &amp; Misc</string>
     <string name="oai_section_prompt_order">Prompt Order</string>
-    <string name="model_desc_pt_rp">Our own RP-tuned model — lean prompt, stays in character, doesn\'t ramble. Apache-2.0.</string>
-    <string name="model_desc_pt_rp_tiny">Tiny RP-tuned model for low-end devices. Lean prompt. Apache-2.0.</string>
     <string name="model_desc_balanced">Balanced quality/size. Apache-2.0.</string>
     <string name="model_desc_small_npu">Small, capable. NPU-optimized on recent flagships. Gemma license.</string>
     <string name="model_desc_tiny_anything">Tiny — runs on almost anything. Limited quality. Gemma license.</string>
@@ -982,8 +962,6 @@
     <string name="model_desc_reasoning">Shows reasoning/thinking tokens. MIT.</string>
     <string name="model_desc_community_uncensored">Community uncensored build for unfiltered RP (~2.4GB). Unofficial — quality varies.</string>
     <string name="model_desc_community_abliterated">Community abliterated build, refusals removed (~4.8GB). Unofficial.</string>
-    <string name="model_desc_pt_rp_gguf">Our RP-tuned model, GGUF (repetition penalty available). Apache-2.0.</string>
-    <string name="model_desc_pt_rp_tiny_gguf">Tiny RP-tuned model for low-end devices, GGUF. Apache-2.0.</string>
     <string name="model_desc_tiny_uncensored_1b">Tiny uncensored 1B — best for budget/4GB phones (~770MB Q4_K_M). Won\'t refuse.</string>
     <string name="model_desc_uncensored_15b">Uncensored 1.5B — small but more capable than 1B (~940MB Q4_K_M).</string>
     <string name="model_desc_rp_uncensored_3b">RP-tuned, uncensored 3B. Great for character chat (~1.9GB Q4_K_M).</string>
