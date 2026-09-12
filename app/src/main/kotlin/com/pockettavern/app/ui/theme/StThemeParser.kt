@@ -1,6 +1,7 @@
 package com.pockettavern.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.lerp
 import java.io.File
 import com.pockettavern.app.util.DebugLogger
@@ -16,9 +17,15 @@ import kotlinx.serialization.json.*
  *   blur_tint_color          → surface
  *   shadow_color             → background
  *   border_color             → borderColor  (falls back to derived surface+6% when transparent)
- *   user_mes_blur_tint_color → userBubble  (falls back to accentPrimary when transparent)
+ *   user_mes_blur_tint_color → userBubble  (falls back to accentPrimary when absent)
  *   bot_mes_blur_tint_color  → assistantBubble (falls back to chat_tint_color, then default)
  *   chat_tint_color          → assistantBubble fallback
+ *   user_mes_text_color      → userBubbleText (PocketTavern extension; derived when absent)
+ *   bot_mes_text_color       → assistantBubbleText (PocketTavern extension; main_text_color when absent)
+ *
+ * Colour values may be given as `rgb()`/`rgba()` or as CSS hex (`#RGB`, `#RGBA`,
+ * `#RRGGBB`, `#RRGGBBAA`). Bubble colours keep their alpha so a theme can let the
+ * chat background image show through; see the alpha note on the bubble parsing below.
  *
  * Intentionally ignored (web/CSS-only, no Android equivalent):
  *   italics_text_color, font_scale, blur_strength, chat_display, avatar_style,
@@ -29,7 +36,7 @@ object StThemeParser {
 
     fun parse(json: String): PocketTavernColors {
         val fields = extractStringFields(json)
-        fun color(key: String) = parseRgba(fields[key])
+        fun color(key: String) = parseColor(fields[key])
         fun intField(key: String) = extractIntField(json, key)
 
         val accentPrimary = color("underline_text_color") ?: FireOrange
@@ -58,24 +65,24 @@ object StThemeParser {
         else
             lerp(surface, Color.White, 0.12f)
 
-        // User bubble: if transparent / absent → use accent colour
-        val userBubbleRaw = color("user_mes_blur_tint_color")
-        val userBubble = if (userBubbleRaw == null || userBubbleRaw.alpha < 0.1f)
-            accentPrimary
-        else
-            userBubbleRaw.opaque()
+        // Bubble colours keep their alpha: a partly transparent bubble is a deliberate
+        // choice that lets the chat background image show through, and forcing it opaque
+        // was what made bubbles solid regardless of the theme.
+        //
+        // Alpha 0 exactly is still treated as "unset" rather than "invisible" — that is
+        // SillyTavern's idiom for "no tint, use default styling", and a fully invisible
+        // bubble is never a useful result. Anything above 0 is honoured as written.
+        val userBubble = color("user_mes_blur_tint_color")?.takeIf { it.alpha > 0f }
+            ?: accentPrimary
 
         // Assistant bubble: bot_mes → chat_tint → default
-        val assistantBubble = run {
-            val bot = color("bot_mes_blur_tint_color")
-            when {
-                bot != null && bot.alpha > 0.1f -> bot.opaque()
-                else -> color("chat_tint_color")?.opaque() ?: AssistantBubble
-            }
-        }
+        val assistantBubble = color("bot_mes_blur_tint_color")?.takeIf { it.alpha > 0f }
+            ?: color("chat_tint_color")?.takeIf { it.alpha > 0f }
+            ?: AssistantBubble
 
-        // User bubble text: black on light backgrounds, white on dark
-        val userBubbleText = if (userBubble.perceivedLuminance() > 0.4f) Color.Black else Color.White
+        // Bubble text colours are explicit if the theme sets them, otherwise derived.
+        val userBubbleText = color("user_mes_text_color")?.takeIf { it.alpha > 0f }
+            ?: autoBubbleTextColor(userBubble, background)
 
         return PocketTavernColors(
             background          = background,
@@ -91,12 +98,27 @@ object StThemeParser {
             userBubble          = userBubble,
             userBubbleText      = userBubbleText,
             assistantBubble     = assistantBubble,
-            assistantBubbleText = textPrimary,
+            assistantBubbleText = color("bot_mes_text_color")?.takeIf { it.alpha > 0f } ?: textPrimary,
             quoteTextColor      = color("quote_text_color") ?: QuoteTextColor,
-            italicTextColor     = color("italic_text_color") ?: ItalicTextColor,
+            // A fully transparent italic colour is never a deliberate choice — it would
+            // render italics invisible. Treat it as "inherit", which also heals themes
+            // already saved with the zeroed-out Unspecified value.
+            italicTextColor     = color("italic_text_color")?.takeIf { it.alpha > 0f } ?: ItalicTextColor,
             codeBackgroundColor = color("code_background_color") ?: CodeBackgroundColor
         )
     }
+
+    /**
+     * Legible text colour for [bubble] once it is composited over [background]:
+     * black on light, white on dark.
+     *
+     * A translucent bubble shows the background through it, so contrast has to be judged
+     * against what actually reaches the screen rather than the bubble colour alone. Shared
+     * with the theme builder so its live preview matches what the parser will produce.
+     */
+    fun autoBubbleTextColor(bubble: Color, background: Color): Color =
+        if (bubble.compositeOver(background).perceivedLuminance() > 0.4f) Color.Black
+        else Color.White
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -110,8 +132,33 @@ object StThemeParser {
         return m.groupValues[1].toIntOrNull()
     }
 
-    private fun parseRgba(s: String?): Color? {
-        s ?: return null
+    /** Accepts either `rgb()`/`rgba()` or CSS hex. Returns null if neither form matches. */
+    private fun parseColor(s: String?): Color? {
+        val raw = s?.trim() ?: return null
+        return if (raw.startsWith("#")) parseHex(raw) else parseRgba(raw)
+    }
+
+    /**
+     * Parses `#RGB`, `#RGBA`, `#RRGGBB` and `#RRGGBBAA`.
+     *
+     * Alpha is the *trailing* component, following CSS Color 4 — which is what a theme
+     * author writing hex will expect. This is deliberately not Android's leading-alpha
+     * `#AARRGGBB`; an 8-digit value here means RGBA, not ARGB.
+     */
+    private fun parseHex(s: String): Color? {
+        val hex = s.removePrefix("#")
+        if (hex.isEmpty() || hex.any { it !in "0123456789abcdefABCDEF" }) return null
+        // Expand shorthand: #RGB → #RRGGBB, #RGBA → #RRGGBBAA
+        val full = when (hex.length) {
+            3, 4 -> hex.map { "$it$it" }.joinToString("")
+            6, 8 -> hex
+            else -> return null
+        }
+        fun byte(i: Int) = full.substring(i, i + 2).toInt(16) / 255f
+        return Color(byte(0), byte(2), byte(4), if (full.length == 8) byte(6) else 1f)
+    }
+
+    private fun parseRgba(s: String): Color? {
         val m = Regex("""rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)""")
             .find(s) ?: return null
         val r = m.groupValues[1].toFloatOrNull() ?: return null
@@ -186,7 +233,7 @@ object StThemeParser {
                     ?.absolutePath
             } else null
 
-            val logoTint = if (logoPath != null) null else parseRgba(fields["logo_tint"])
+            val logoTint = if (logoPath != null) null else parseColor(fields["logo_tint"])
 
             // Audio
             val hasAudio = root["theme_audio"]?.jsonPrimitive?.booleanOrNull == true

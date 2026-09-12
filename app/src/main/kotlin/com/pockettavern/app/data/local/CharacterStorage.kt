@@ -284,7 +284,7 @@ class CharacterStorage @Inject constructor(
         if (file.exists()) file.readBytes() else null
     }
 
-    /** Save raw PNG bytes to the characters directory (used by CharaVault/Chub importers). */
+    /** Save raw PNG bytes to the characters directory (used by the card browser importers). */
     suspend fun saveRawPng(bytes: ByteArray, fileName: String): String = withContext(Dispatchers.IO) {
         val safeFileName = if (fileName.endsWith(".png")) fileName else "$fileName.png"
         val file = File(charactersDir, safeFileName)
@@ -297,6 +297,14 @@ class CharacterStorage @Inject constructor(
     /** Build local file:// URI for a character's avatar PNG. */
     fun getAvatarUri(fileName: String): Uri =
         Uri.fromFile(File(charactersDir, fileName))
+
+    /**
+     * Detach a deleted lorebook from every character that referenced it.
+     * Returns nothing — a character with no such link is simply unaffected.
+     */
+    suspend fun clearAttachedWorldInfo(name: String) = withContext(Dispatchers.IO) {
+        characterDao.clearAttachedWorldInfo(name)
+    }
 
     /** Rebuild the Room index from disk. Preserves existing isFavorite/useAvatarForImageGen/notes. */
     suspend fun rebuildIndex() = withContext(Dispatchers.IO) {

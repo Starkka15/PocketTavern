@@ -132,15 +132,10 @@
 <string name="advanced">高级</string>
 <string name="stable_diffusion_forge_optional">Stable Diffusion Forge（可选）</string>
 <string name="used_for_generating_character_avatars">用于生成角色头像</string>
-<string name="card_server_optional">卡片服务器（可选）</string>
-<string name="your_local_character_card_index_server">你的本地角色卡索引服务器</string>
-<string name="configure_login_via_the_charavault_screen">通过 CharaVault 界面配置登录</string>
 <string name="debugging">调试</string>
 <string name="share_debug_logs_to_help_diagnose_issues_with">共享调试日志，以帮助诊断提示词构建、世界书和 API 请求方面的问题。</string>
 <string name="settings">设置</string>
 <string name="forge_url">Forge 地址</string>
-<string name="charavault_url">CharaVault 地址</string>
-<string name="http_192_168_1_100_8787">http://192.168.1.100:8787</string>
 <string name="save_settings">保存设置</string>
 <string name="share_debug_log">共享调试日志</string>
 <string name="clear_log">清除日志</string>
@@ -231,8 +226,6 @@
 <string name="no_characters_found">未找到角色</string>
 <string name="characters">角色</string>
 <string name="translate_to_language">翻译为 %1$s</string>
-<string name="upload_to_charavault">上传到 CharaVault</string>
-<string name="uploading_to_charavault">正在上传到 CharaVault</string>
 <string name="please_wait">请稍候…</string>
 <string name="success">成功</string>
 <string name="ok">确定</string>
@@ -320,11 +313,8 @@
 <string name="no_recent_chats">暂无最近聊天</string>
 <string name="start_chatting_with_a_character_to_see_them_h">开始与一个角色聊天，即可在此看到他们</string>
 <string name="recent_chats">最近聊天</string>
-<string name="browse_charavault">浏览 CharaVault</string>
 <string name="login">登录</string>
 <string name="content_filter">内容过滤</string>
-<string name="charavault_server_not_configured">CharaVault 服务器未配置</string>
-<string name="enter_your_charavault_server_url_to_browse_ca">输入你的 CharaVault 服务器地址以浏览卡片</string>
 <string name="configure_server">配置服务器</string>
 <string name="clear_all">清空</string>
 <string name="search_cards">搜索卡片…</string>
@@ -338,12 +328,7 @@
 <string name="import_to_pockettavern">导入到 PocketTavern</string>
 <string name="card_server">卡片服务器</string>
 <string name="source">来源</string>
-<string name="charavault_local">CharaVault（本地）</string>
-<string name="charavault_net">CharaVault.net</string>
-<string name="enter_your_local_charavault_server_url">输入你的本地 CharaVault 服务器地址</string>
 <string name="verify_age_18_for_nsfw">验证年龄（18 岁以上）以访问 NSFW</string>
-<string name="login_to_charavault_net_to_access_the_full_ca">登录 CharaVault.net 以访问包括 NSFW 内容在内的完整卡片库。</string>
-<string name="login_to_charavault_net">登录 CharaVault.net</string>
 <string name="browsing_without_login_shows_sfw_cards_only">未登录浏览时仅显示 SFW 卡片。</string>
 <string name="enter_the_6_digit_code_from_your_authenticato">输入来自你验证器应用的 6 位验证码。</string>
 <string name="s_2fa_code">2FA 验证码</string>
@@ -507,10 +492,17 @@
 <string name="add_background_image">添加背景图片</string>
 <string name="s_06x">#%06X</string>
 <string name="brightness">亮度</string>
+<string name="opacity">不透明度</string>
+<string name="enable_debug_logging">启用调试日志</string>
+<string name="debug_log_subtitle">收集诊断日志以便反馈问题</string>
 <string name="name_your_theme">为你的主题命名</string>
 <string name="theme_name">主题名称</string>
 <string name="remove_background">移除背景</string>
 <string name="botbooru">BotBooru</string>
+<string name="chub">Chub</string>
+<string name="help_card_browsers">角色卡浏览器</string>
+<string name="browse_chub_tap_chub_on_the_home">浏览 Chub — 点击主屏幕上的 Chub，搜索并导入社区角色。</string>
+<string name="chub_browse_and_import_community_charac">Chub — 浏览并导入社区角色。</string>
 <string name="reasoning">推理</string>
 <string name="reasoning_2">推理中…</string>
 <string name="image_actions">图片操作</string>
@@ -560,7 +552,6 @@
 <string name="settings_chat_completion_presets_key_paramete">设置 → 聊天补全预设。关键参数：</string>
 <string name="settings_context_settings_inject_custom_text">设置 → 上下文设置。向每次对话注入自定义文本：</string>
 <string name="browse_and_import_community_characters_and_lo">在应用内浏览并导入社区角色和知识库。</string>
-<string name="long_press_a_character_in_the_characters_list">长按角色列表中的某个角色 → 上传到 CharaVault 以与社区分享你的角色。</string>
 <string name="go_to_settings_extensions_to_enable_disable">前往 设置 → 扩展 以启用/禁用：</string>
 <string name="install_third_party_extensions_that_run_in_a">安装运行在沙盒 WebView 中的第三方扩展：</string>
 <string name="migrate_your_characters_chats_and_lorebooks_f">从 SillyTavern 迁移你的角色、聊天和知识库。</string>
@@ -568,7 +559,6 @@
 <string name="settings_are_organized_into_five_groups">设置分为五组：</string>
 <string name="a_connection_status_indicator_at_the_bottom_s">底部的连接状态指示器显示你当前是否已连接到你的 LLM 后端。</string>
 <string name="import_a_png_card_go_to_characters_tap_the_im">导入 PNG 卡——前往 角色，点击导入按钮，然后从你的设备中选择一张 .png 角色卡。</string>
-<string name="browse_charavault_tap_charavault_on_the_home">浏览 CharaVault——在主屏幕上点击 CharaVault 以搜索并导入社区角色。同时支持 CharaVault.net（公共目录）和自托管服务器。</string>
 <string name="open_settings_api_configuration_select_your_a">打开 设置 → API 配置。从下拉菜单中选择你的 API 类型。</string>
 <string name="local_backends_koboldcpp_ollama_lm_studio_etc">本地后端（KoboldCpp、Ollama、LM Studio 等）：输入你电脑的局域网 IP 地址和端口（例如 http://192.168.1.100:5001）。你的手机必须与电脑在同一 Wi-Fi 网络下。</string>
 <string name="cloud_apis_openai_anthropic_groq_etc_select_c">云端 API（OpenAI、Anthropic、Groq 等）：选择聊天补全，输入 API 地址和密钥，然后点击刷新按钮以加载模型。</string>
@@ -578,7 +568,6 @@
 <string name="characters_browse_import_and_manage_your_char">角色——浏览、导入和管理你的角色卡。</string>
 <string name="recent_chats_shows_your_latest_conversations">最近聊天——按最近活跃排序显示你的最新会话，并附带最后一条消息的预览。点击任意聊天即可跳回。</string>
 <string name="create_character_jumps_directly_to_the_charac">创建角色——直接跳转到角色创建表单。</string>
-<string name="charavault_browse_and_import_community_charac">CharaVault——浏览并导入社区角色和知识库。</string>
 <string name="settings_access_all_app_settings_and_configur">设置——访问所有应用设置和配置。</string>
 <string name="type_in_the_message_box_at_the_bottom_and_tap">在底部的消息框中输入，然后点击发送按钮（箭头图标）。AI 回应会逐字实时流式显示并带有活动光标。</string>
 <string name="you_can_also_use_the_keyboard_s_send_done_act">你也可以使用键盘的发送/完成操作来发送。</string>
@@ -604,7 +593,7 @@
 <string name="debug_log_view_the_app_s_debug_log_for_troubl">调试日志——查看应用的调试日志以进行故障排除。</string>
 <string name="delete_chat_delete_character_destructive_acti">删除聊天 / 删除角色——破坏性操作（带确认）。</string>
 <string name="tap_a_character_to_start_or_resume_a_chat">点击某个角色以开始或继续聊天。</string>
-<string name="long_press_a_character_to_open_the_action_men">长按某个角色以打开操作菜单：编辑、角色设置、上传到 CharaVault 或删除。</string>
+<string name="long_press_a_character_to_open_the_action_men">长按某个角色以打开操作菜单：编辑、角色设置或删除。</string>
 <string name="tap_the_button_top_right_to_create_a_new_char">点击右上角的 + 按钮以创建新角色。</string>
 <string name="tap_the_import_button_to_import_a_png_charact">点击导入按钮以从你的设备导入一张 .png 角色卡。</string>
 <string name="switch_between_characters_and_groups_using_th">使用标题下拉菜单在\'角色\'和\'群组\'之间切换。</string>
@@ -683,7 +672,6 @@
 <string name="per_character_go_to_character_settings_attach">按角色——前往 角色设置 → 附加知识库。</string>
 <string name="per_persona_edit_a_persona_and_attach_a_loreb">按人设——编辑一个人设并附加一个知识库。</string>
 <string name="embedded_character_cards_with_embedded_charac">内嵌——带有内嵌 character_book 条目的角色卡会自动加载。</string>
-<string name="from_charavault_browse_and_import_community_l">来自 CharaVault——直接从 CharaVault 界面浏览并导入社区知识库。</string>
 <string name="go_to_settings_personas_and_tap_the_button">前往 设置 → 人设 并点击 + 按钮。</string>
 <string name="choose_an_avatar_pick_from_gallery_or_generat">选择一个头像（从相册选择或用 AI 生成）。</string>
 <string name="enter_a_display_name_and_optional_description">输入一个显示名称和可选的描述。</string>
@@ -707,8 +695,6 @@
 <string name="depth_how_many_messages_from_the_end_to_place">深度——从末尾数起多少条消息处放置（越小越有影响力）。</string>
 <string name="interval_how_often_to_inject_every_n_messages">间隔——多久注入一次（每 N 条消息）。</string>
 <string name="position_before_char_after_char_top_bottom_of">位置——角色前、角色后、作者注顶部/底部、指定深度。</string>
-<string name="charavault_net_browse_the_public_catalog_gues">CharaVault.net——浏览公共目录。访客浏览仅显示 SFW 内容。使用邮箱/密码登录以获得完整访问权限。NSFW 内容需要年龄验证（18 岁以上）。支持 2FA/TOTP。</string>
-<string name="self_hosted_connect_to_your_own_charavault_se">自托管——通过输入地址连接你自己的 CharaVault 服务器。</string>
 <string name="search_by_name_or_description_using_the_searc">使用搜索栏按名称或描述搜索。</string>
 <string name="filter_by_tags_tap_the_tag_icon_to_open_the_t">按标签过滤——点击标签图标打开标签选择器。所选标签会以标签形式显示在结果上方。</string>
 <string name="content_filter_tap_the_filter_icon_to_toggle">内容过滤——点击过滤图标以切换 SFW/NSFW 过滤。</string>
@@ -901,7 +887,6 @@
 <string name="help_user_personas">用户人设</string>
 <string name="help_prompt_building_templates">提示词构建与模板</string>
 <string name="help_text_generation_settings">文本生成设置</string>
-<string name="help_charavault">CharaVault</string>
 <string name="help_extensions">扩展</string>
 <string name="help_themes_appearance">主题与外观</string>
 <string name="help_sillytavern_import">SillyTavern 导入</string>
@@ -972,8 +957,6 @@
 <string name="oai_section_penalties">惩罚</string>
 <string name="oai_section_context_misc">上下文与其它</string>
 <string name="oai_section_prompt_order">提示词顺序</string>
-<string name="model_desc_pt_rp">我们自己的 RP 调优模型——提示词精简、忠于角色、不啰嗦。Apache-2.0。</string>
-<string name="model_desc_pt_rp_tiny">面向低端设备的微型 RP 调优模型。提示词精简。Apache-2.0。</string>
 <string name="model_desc_balanced">质量与体积平衡。Apache-2.0。</string>
 <string name="model_desc_small_npu">小巧而强大。在较新旗舰机上针对 NPU 优化。Gemma 许可。</string>
 <string name="model_desc_tiny_anything">微型——几乎任何设备都能跑。质量有限。Gemma 许可。</string>
@@ -983,8 +966,6 @@
 <string name="model_desc_reasoning">显示推理/思考 token。MIT。</string>
 <string name="model_desc_community_uncensored">社区无审查构建，用于无过滤的角色扮演（约 2.4GB）。非官方——质量不一。</string>
 <string name="model_desc_community_abliterated">社区 ablitated 构建，已去除拒绝内容（约 4.8GB）。非官方。</string>
-<string name="model_desc_pt_rp_gguf">我们的 RP 调优模型，GGUF（可使用重复惩罚）。Apache-2.0。</string>
-<string name="model_desc_pt_rp_tiny_gguf">面向低端设备的微型 RP 调优模型，GGUF。Apache-2.0。</string>
 <string name="model_desc_tiny_uncensored_1b">微型无审查 1B——最适合预算/4GB 手机（约 770MB Q4_K_M）。不会拒绝。</string>
 <string name="model_desc_uncensored_15b">无审查 1.5B——小巧但比 1B 更强（约 940MB Q4_K_M）。</string>
 <string name="model_desc_rp_uncensored_3b">RP 调优、无审查 3B。非常适合角色聊天（约 1.9GB Q4_K_M）。</string>

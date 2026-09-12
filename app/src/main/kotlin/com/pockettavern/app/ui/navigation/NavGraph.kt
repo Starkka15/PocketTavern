@@ -13,7 +13,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.pockettavern.app.ui.screens.characters.CharactersScreen
 import com.pockettavern.app.ui.screens.chat.ChatScreen
-import com.pockettavern.app.ui.screens.charavault.CharaVaultScreen
+import com.pockettavern.app.ui.screens.chub.ChubBrowserScreen
 import com.pockettavern.app.ui.screens.createcharacter.CreateCharacterScreen
 import com.pockettavern.app.ui.screens.formatting.FormattingScreen
 import com.pockettavern.app.ui.screens.main.MainScreen
@@ -74,8 +74,8 @@ fun SillyTavernNavGraph(
                 onNavigateToCreateCharacter = {
                     navController.navigate(Route.CreateCharacter)
                 },
-                onNavigateToCharaVault = {
-                    navController.navigate(Route.CharaVault)
+                onNavigateToChub = {
+                    navController.navigate(Route.Chub)
                 },
                 onNavigateToRisuRealm = {
                     navController.navigate(Route.RisuRealm)
@@ -165,7 +165,8 @@ fun SillyTavernNavGraph(
                 onNavigateToTtsSettings = { navController.navigate(Route.TtsSettings) },
                 onNavigateToImageGen = { navController.navigate(Route.ImageGenSettings) },
                 onNavigateToBackup = { navController.navigate(Route.Backup) },
-                onNavigateToStorageBrowser = { navController.navigate(Route.StorageBrowser) }
+                onNavigateToStorageBrowser = { navController.navigate(Route.StorageBrowser) },
+                onNavigateToDebugLog = { navController.navigate(Route.DebugLog) }
             )
         }
 
@@ -223,9 +224,9 @@ fun SillyTavernNavGraph(
             )
         }
 
-        composable<Route.CharaVault> {
-            CharaVaultScreen(
-                onNavigateBack = {
+        composable<Route.Chub> {
+            ChubBrowserScreen(
+                onBack = {
                     shouldRefreshCharacters = true
                     navController.popBackStack()
                 }

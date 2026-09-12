@@ -1,6 +1,8 @@
 package com.pockettavern.app.ui.screens.settings
 
 import com.pockettavern.app.R
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,12 +19,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pockettavern.app.data.remote.dto.st.MainApiTypes
+import com.pockettavern.app.domain.model.ApiConfiguration
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -201,11 +205,24 @@ fun ApiConfigScreen(
                     HorizontalDivider()
                 }
 
-                // API Key
-                ApiKeySection(
-                    apiKey = uiState.apiKey,
-                    onApiKeyChange = { viewModel.setApiKey(it) }
-                )
+                // Credentials. Vertex authenticates with a service account key rather
+                // than an API key, so it gets its own section instead.
+                if (uiState.config.isVertexAi) {
+                    VertexSection(
+                        serviceAccountEmail = viewModel.loadedServiceAccountEmail,
+                        projectId = uiState.config.vertexProjectId,
+                        region = uiState.config.vertexRegion,
+                        onJsonLoaded = { viewModel.setVertexServiceAccountJson(it) },
+                        onClear = { viewModel.clearVertexServiceAccount() },
+                        onProjectIdChange = { viewModel.setVertexProjectId(it) },
+                        onRegionChange = { viewModel.setVertexRegion(it) }
+                    )
+                } else {
+                    ApiKeySection(
+                        apiKey = uiState.apiKey,
+                        onApiKeyChange = { viewModel.setApiKey(it) }
+                    )
+                }
             }
         }
     }
@@ -527,6 +544,106 @@ private fun OnDeviceModelSection(
             )
         }
     }
+}
+
+/**
+ * Vertex AI credentials. Google does not issue a static API key for Vertex the way the
+ * other providers do — access is granted by a service account key file, which the user
+ * downloads from the GCP console and loads here.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VertexSection(
+    serviceAccountEmail: String?,
+    projectId: String,
+    region: String,
+    onJsonLoaded: (String) -> Unit,
+    onClear: () -> Unit,
+    onProjectIdChange: (String) -> Unit,
+    onRegionChange: (String) -> Unit
+) {
+    val context = LocalContext.current
+    var regionExpanded by remember { mutableStateOf(false) }
+
+    // Key files are .json; some file providers report no MIME type at all, so accept
+    // anything rather than hiding the file the user is looking straight at.
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        val text = try {
+            context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
+        } catch (e: Exception) {
+            null
+        }
+        if (text != null) onJsonLoaded(text)
+    }
+
+    Text(text = "Service Account", style = MaterialTheme.typography.titleMedium)
+
+    if (serviceAccountEmail != null) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(serviceAccountEmail, style = MaterialTheme.typography.bodyMedium)
+                Text("Key loaded", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary)
+            }
+            TextButton(onClick = onClear) { Text("Remove") }
+        }
+    } else {
+        OutlinedButton(onClick = { picker.launch("*/*") }, modifier = Modifier.fillMaxWidth()) {
+            Text("Load service account JSON")
+        }
+        Text(
+            "GCP Console → IAM & Admin → Service Accounts → Keys → Add key → JSON. " +
+                "The account needs the Vertex AI User role.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+
+    OutlinedTextField(
+        value = projectId,
+        onValueChange = onProjectIdChange,
+        label = { Text("Project ID") },
+        placeholder = { Text("my-gcp-project") },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true
+    )
+
+    ExposedDropdownMenuBox(
+        expanded = regionExpanded,
+        onExpandedChange = { regionExpanded = !regionExpanded }
+    ) {
+        OutlinedTextField(
+            value = region,
+            onValueChange = onRegionChange,
+            label = { Text("Region") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(),
+            singleLine = true,
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = regionExpanded) }
+        )
+        ExposedDropdownMenu(
+            expanded = regionExpanded,
+            onDismissRequest = { regionExpanded = false }
+        ) {
+            ApiConfiguration.VERTEX_REGIONS.forEach { r ->
+                DropdownMenuItem(
+                    text = { Text(r) },
+                    onClick = { onRegionChange(r); regionExpanded = false }
+                )
+            }
+        }
+    }
+
+    Text(
+        "The model must be available in this region, and billing must be enabled on the project.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 }
 
 @Composable

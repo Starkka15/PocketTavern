@@ -149,6 +149,10 @@ class LocalRepository @Inject constructor(
 
     suspend fun deleteWorldInfo(name: String): Result<Unit> = withResult {
         loreBookStorage.deleteLorebook(name)
+        // The attachment lives in the character index, not in the lorebook file, so
+        // deleting the file alone leaves a dangling link: the character list keeps
+        // drawing the "has lorebook" badge and prompt building keeps trying to load it.
+        characterStorage.clearAttachedWorldInfo(name)
     }
 
     suspend fun importWorldInfoJson(name: String, bytes: ByteArray): Result<Unit> = withResult {
@@ -285,7 +289,7 @@ class LocalRepository @Inject constructor(
         presetStorage.saveOaiPreset(name, preset)
     }
 
-    /** Import a character card from raw PNG bytes (e.g., from CharaVault/Chub download). */
+    /** Import a character card from raw PNG bytes (e.g., from a Chub download). */
     suspend fun importCharacterCardBytes(bytes: ByteArray, fileName: String): Result<String> = withResult {
         characterStorage.saveRawPng(bytes, fileName)
     }

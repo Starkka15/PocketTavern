@@ -20,6 +20,14 @@ data class ApiConfiguration(
     // API key (used for cloud/authenticated backends)
     val apiKey: String = "",
 
+    // Vertex AI. Unlike every other provider, Vertex is not addressed by a fixed host and
+    // is not authenticated with a static key: the endpoint embeds the GCP project and
+    // region, and requests carry a short-lived OAuth token minted from a service account
+    // key file. The JSON is held in encrypted storage alongside apiKey.
+    val vertexServiceAccountJson: String = "",
+    val vertexProjectId: String = "",
+    val vertexRegion: String = DEFAULT_VERTEX_REGION,
+
     // Current model
     val currentModel: String,
 
@@ -53,6 +61,15 @@ data class ApiConfiguration(
     /** Either on-device backend. */
     val isAnyOnDevice: Boolean get() = isOnDevice || isOnDeviceGguf
 
+    /** Google Vertex AI, which authenticates with a service account rather than a key. */
+    val isVertexAi: Boolean
+        get() = chatCompletionSource.equals("vertexai", ignoreCase = true)
+
+    /** True once Vertex has everything it needs to build a request. */
+    val isVertexConfigured: Boolean
+        get() = isVertexAi && vertexServiceAccountJson.isNotBlank() &&
+            vertexProjectId.isNotBlank() && vertexRegion.isNotBlank()
+
     /**
      * Canonical base URL for chat completion providers.
      * Cloud providers have hardcoded endpoints — they must never fall back to apiServer (a local IP).
@@ -84,6 +101,8 @@ data class ApiConfiguration(
                 "siliconflow"  -> "https://api.siliconflow.cn"
                 "zai"          -> "https://api.z.ai"
                 "claude"       -> "https://api.anthropic.com"
+                // Vertex is region-scoped: the host itself varies with the location.
+                "vertexai"     -> "https://$vertexRegion-aiplatform.googleapis.com"
                 // azure_openai and custom require customUrl — warn but don't crash
                 else           -> customUrl?.trimEnd('/') ?: ""
             }
@@ -96,13 +115,22 @@ data class ApiConfiguration(
             return "$baseUrl/v1/chat/completions"
         }
 
+    /**
+     * Vertex's OpenAI-compatible endpoint. The project and region are part of the path
+     * rather than headers, so this cannot be expressed as base + /v1/chat/completions.
+     */
+    val vertexChatCompletionsUrl: String
+        get() = "https://$vertexRegion-aiplatform.googleapis.com/v1beta1/projects/" +
+            "$vertexProjectId/locations/$vertexRegion/endpoints/openapi/chat/completions"
+
     /** Full endpoint used for chat completion requests. */
     val effectiveChatCompletionsUrl: String
-        get() = if (chatCompletionSource.equals("custom", ignoreCase = true)) {
-            customChatCompletionsUrl?.takeIf { it.isNotBlank() }?.trimEnd('/')
-                ?: defaultChatCompletionsUrl
-        } else {
-            defaultChatCompletionsUrl
+        get() = when {
+            isVertexAi -> vertexChatCompletionsUrl
+            chatCompletionSource.equals("custom", ignoreCase = true) ->
+                customChatCompletionsUrl?.takeIf { it.isNotBlank() }?.trimEnd('/')
+                    ?: defaultChatCompletionsUrl
+            else -> defaultChatCompletionsUrl
         }
 
     /**
@@ -116,6 +144,17 @@ data class ApiConfiguration(
         }
 
     companion object {
+        /** Vertex's most widely enabled region; also the one Google's own docs default to. */
+        const val DEFAULT_VERTEX_REGION = "us-central1"
+
+        /** Regions that serve Gemini models. Offered in the picker; any value is accepted. */
+        val VERTEX_REGIONS = listOf(
+            "us-central1", "us-east1", "us-east4", "us-west1", "us-west4",
+            "europe-west1", "europe-west2", "europe-west3", "europe-west4", "europe-west9",
+            "asia-east1", "asia-northeast1", "asia-northeast3", "asia-south1", "asia-southeast1",
+            "australia-southeast1", "northamerica-northeast1", "southamerica-east1", "global"
+        )
+
         fun textGenTypeDisplayName(type: String): String = when (type.lowercase()) {
             "koboldcpp" -> "KoboldCpp"
             "llamacpp" -> "llama.cpp"

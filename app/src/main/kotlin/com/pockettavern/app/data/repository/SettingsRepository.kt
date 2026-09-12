@@ -16,14 +16,10 @@ class SettingsRepository @Inject constructor(
 ) {
     val settingsFlow: Flow<ServerSettings> = combine(
         dataStore.forgeUrlFlow,
-        dataStore.charaVaultUrlFlow,
-        dataStore.charavaultModeFlow,
         dataStore.imageGenConfigFlow
-    ) { forgeUrl, charaVaultUrl, charavaultMode, imageGenConfig ->
+    ) { forgeUrl, imageGenConfig ->
         ServerSettings(
             forgeUrl = forgeUrl,
-            charaVaultUrl = charaVaultUrl,
-            charavaultMode = charavaultMode,
             imageGenBackendConfigured = imageGenConfig.isActiveBackendConfigured
         )
     }
@@ -32,13 +28,9 @@ class SettingsRepository @Inject constructor(
 
     suspend fun saveSettings(settings: ServerSettings) {
         dataStore.saveForgeUrl(settings.forgeUrl)
-        dataStore.saveCharaVaultUrl(settings.charaVaultUrl)
-        dataStore.saveCharaVaultMode(settings.charavaultMode)
     }
 
     suspend fun getForgeUrl(): String = dataStore.getForgeUrl()
-
-    suspend fun getCharaVaultUrl(): String = dataStore.getCharaVaultUrl()
 
     // LLM config delegation
     val llmConfigFlow: Flow<ApiConfiguration> = dataStore.llmConfigFlow
