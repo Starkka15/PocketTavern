@@ -145,6 +145,9 @@ data class ChatUiState(
     val generatingFirstMessage: Boolean = false,
     val generatedFirstMessage: String = "",
     val generateFirstMessageError: String? = null,
+    // Long-term memory editor (per-chat): View / Edit / Clear the stored memory block
+    val showMemoryDialog: Boolean = false,
+    val memoryDialogText: String = "",
 )
 
 data class GalleryImage(
@@ -258,6 +261,9 @@ class ChatViewModel @Inject constructor(
         extensionManager.jsHost.setCurrentModelCallback = { modelName, callbackId ->
             viewModelScope.launch { doExtensionSetModel(modelName, callbackId) }
         }
+        // Publish the active image backend's capabilities to JS extensions so they can tell
+        // whether img2img options are honoured before bothering to send an avatar.
+        viewModelScope.launch { refreshImageCaps() }
         // Wire hidden generate callback so PT.generateHidden() works
         extensionManager.jsHost.hiddenGenerateCallback = { prompt, callbackId ->
             viewModelScope.launch { doHiddenGenerate(prompt, callbackId) }
@@ -1103,7 +1109,12 @@ No preamble, no explanation. Just the numbered list."""
         // baked into the weights, so use the lean prompt (skip preset prose). All other models
         // are unaffected.
         val leanMode = config.currentModel.startsWith("pockettavern", ignoreCase = true)
-        val builder = PromptBuilder(character, chatContext, userName, mainPromptOverride, extensionInjections, _currentMemoryBlock, _currentWorldBook, leanMode,
+        // Long-term memory: when the toggle is off, stop injecting the stored block too
+        // (not just new summaries). The block stays saved on the chat, so flipping the
+        // toggle back on restores it. Without this gate, disabling LTM still leaks an
+        // existing [Memory] preamble into every prompt.
+        val effectiveMemory = if (memoryEnabled) _currentMemoryBlock else ""
+        val builder = PromptBuilder(character, chatContext, userName, mainPromptOverride, extensionInjections, effectiveMemory, _currentWorldBook, leanMode,
             languageDirective = com.pockettavern.app.util.LocaleHelper.responseLanguageDirective(context))
         // Context Size budget (issue #8): total prompt budget = configured context size minus
         // room reserved for the response. PromptBuilder drops oldest history to fit.
@@ -1487,6 +1498,45 @@ No preamble, no explanation. Just the numbered list."""
         const val MEMORY_BLOCK_COMPACT_CHARS = 4_000
     }
 
+    // --- Long-term memory editor (per-chat) -------------------------------------
+    // The memory block lives on the chat (chat.memoryBlock) and is normally written
+    // only by the auto-summarizer. These let the user View / Edit / Clear it so a
+    // wrong summary can be corrected instead of being re-injected on every prompt.
+
+    fun openMemoryDialog() {
+        _uiState.update { it.copy(showMemoryDialog = true, memoryDialogText = _currentMemoryBlock) }
+    }
+
+    fun updateMemoryDialogText(text: String) {
+        _uiState.update { it.copy(memoryDialogText = text) }
+    }
+
+    fun dismissMemoryDialog() {
+        _uiState.update { it.copy(showMemoryDialog = false) }
+    }
+
+    fun saveMemoryBlock() {
+        persistMemoryBlock(_uiState.value.memoryDialogText)
+        _uiState.update { it.copy(showMemoryDialog = false) }
+    }
+
+    fun clearMemoryBlock() {
+        persistMemoryBlock("")
+        _uiState.update { it.copy(showMemoryDialog = false, memoryDialogText = "") }
+    }
+
+    /** Update the in-memory block and persist it to the chat. The summarized-turn
+     *  count is left as-is, so editing or clearing won't force a full re-summarization
+     *  of past turns — future turns simply continue folding in from where they were. */
+    private fun persistMemoryBlock(block: String) {
+        _currentMemoryBlock = block
+        val character = _uiState.value.character ?: return
+        val fileName = _uiState.value.currentChatFileName ?: return
+        viewModelScope.launch {
+            localRepository.updateChatMemoryBlock(character.name, fileName, block, _currentSummarizedTurnCount)
+        }
+    }
+
     private fun triggerMemorySummarizationIfNeeded() {
         if (!memoryEnabled) return
         val character = _uiState.value.character ?: return
@@ -1619,18 +1669,34 @@ No preamble, no explanation. Just the numbered list."""
             val messages = _uiState.value.messages
             val character = _uiState.value.character
             val contextPrompt = buildString {
+                // World book first: lorebook entries commonly hold the appearance details
+                // that extensions (e.g. Scene Painter) need, and they live nowhere in the
+                // card fields below.
+                if (_currentWorldBook.isNotBlank()) {
+                    append("[Shared World Book]\n").append(_currentWorldBook).append("\n\n")
+                }
+                if (memoryEnabled && _currentMemoryBlock.isNotBlank()) {
+                    append("[Memory]\n").append(_currentMemoryBlock).append("\n\n")
+                }
                 if (character != null) {
                     append("Character: ").append(character.name).append("\n")
+                    // Untruncated: detailed cards put the appearance block at the END of a long
+                    // description, so head-truncation silently dropped exactly what an image
+                    // prompt needs. The backend's own context budget still bounds the request.
                     if (character.description.isNotBlank()) {
-                        append("Description: ").append(character.description.take(1000)).append("\n")
+                        append("Description: ").append(character.description).append("\n")
                     }
                     if (character.personality.isNotBlank()) {
-                        append("Personality: ").append(character.personality.take(500)).append("\n")
+                        append("Personality: ").append(character.personality).append("\n")
                     }
                     if (character.scenario.isNotBlank()) {
-                        append("Scenario: ").append(character.scenario.take(500)).append("\n")
+                        append("Scenario: ").append(character.scenario).append("\n")
                     }
                     append("\n")
+                }
+                if (_currentPersonaDescription.isNotBlank()) {
+                    append(_currentUserName).append(" (user): ")
+                        .append(_currentPersonaDescription).append("\n\n")
                 }
                 // Include recent messages for context (up to 20, 2000 chars each)
                 val recent = if (messages.size > 20) messages.takeLast(20) else messages
@@ -1692,6 +1758,24 @@ No preamble, no explanation. Just the numbered list."""
 
     // ── Image generation (JS extension) ──────────────────────────────────
 
+    /** Push the active image backend's capability flags to the JS sandbox. */
+    private suspend fun refreshImageCaps() {
+        try {
+            val caps = imageGenRepository.getCapabilities()
+            val json = org.json.JSONObject()
+                .put("supportsImg2Img", caps.supportsImg2Img)
+                .put("supportsNegativePrompt", caps.supportsNegativePrompt)
+                .put("supportsSeed", caps.supportsSeed)
+                .put("supportsSteps", caps.supportsSteps)
+                .put("supportsCfgScale", caps.supportsCfgScale)
+                .put("supportsResolutionPresets", caps.supportsResolutionPresets)
+                .toString()
+            extensionManager.jsHost.updateImageCaps(json)
+        } catch (e: Exception) {
+            com.pockettavern.app.util.DebugLogger.log("[ImageCaps] refresh failed: ${e.message}")
+        }
+    }
+
     private suspend fun doExtensionImageGenerate(prompt: String, optionsJson: String, callbackId: String) {
         try {
             val imageGenConfig = settingsDataStore.getImageGenConfig()
@@ -1702,7 +1786,15 @@ No preamble, no explanation. Just the numbered list."""
             val height = options.optInt("height", imageGenConfig.height)
             val negativePrompt = options.optString("negativePrompt", imageGenConfig.negativePrompt)
             val seed = options.optInt("seed", imageGenConfig.seed)
-            val sourceImageBase64 = options.optString("sourceImageBase64").ifEmpty { null }
+            // Only SD WebUI/Forge implement img2img. Every other backend ignores init images
+            // entirely, which used to fail silently and look like "img2img did nothing".
+            val requestedSource = options.optString("sourceImageBase64").ifEmpty { null }
+            val backendSupportsImg2Img = imageGenRepository.getCapabilities().supportsImg2Img
+            if (requestedSource != null && !backendSupportsImg2Img) {
+                com.pockettavern.app.util.DebugLogger.log("[ImageGen] img2img requested but ${imageGenConfig.activeBackend} " +
+                    "does not support it -- falling back to txt2img")
+            }
+            val sourceImageBase64 = if (backendSupportsImg2Img) requestedSource else null
             val denoisingStrength = options.optDouble("denoisingStrength", 0.55).toFloat()
 
             val params = ForgeGenerationParams(

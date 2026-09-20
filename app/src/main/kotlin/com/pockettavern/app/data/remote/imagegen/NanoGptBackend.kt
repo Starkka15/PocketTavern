@@ -26,7 +26,22 @@ private const val BASE_URL = "https://nano-gpt.com"
 @Serializable
 private data class NanoGptGenerateRequest(
     val prompt: String,
-    val model: String
+    val model: String,
+    // Image-to-image. Omitted entirely for txt2img so the request shape is unchanged there.
+    @SerialName("input_references")
+    val inputReferences: List<NanoGptInputReference>? = null
+)
+
+@Serializable
+private data class NanoGptInputReference(
+    val type: String = "image_url",
+    @SerialName("image_url")
+    val imageUrl: NanoGptImageUrl
+)
+
+@Serializable
+private data class NanoGptImageUrl(
+    val url: String
 )
 
 @Serializable
@@ -52,6 +67,7 @@ class NanoGptBackend(
 
     override val capabilities = ImageGenCapabilities(
         supportsResolutionPresets = false,
+        supportsImg2Img = true,
         requiresApiKey = true
     )
 
@@ -122,11 +138,31 @@ class NanoGptBackend(
             DebugLogger.logKeyValue("apiKeyPrefix", config.nanoGptApiKey.take(12) + "...")
             DebugLogger.logKeyValue("prompt", params.prompt.take(80))
 
+            // img2img: nano-gpt takes reference images as input_references[].image_url.url.
+            // The documented example uses a public https URL; we only ever have local bytes,
+            // so we send a data: URL. If a model rejects that, the call fails loudly with the
+            // API's own error rather than silently producing an unrelated txt2img result.
+            val references = params.sourceImageBase64?.let { b64 ->
+                listOf(
+                    NanoGptInputReference(
+                        imageUrl = NanoGptImageUrl("data:image/png;base64,$b64")
+                    )
+                )
+            }
+            if (references != null) {
+                DebugLogger.logKeyValue("img2img", "1 reference image (data URL)")
+            }
+
             val reqBody = json.encodeToString(
                 NanoGptGenerateRequest.serializer(),
-                NanoGptGenerateRequest(prompt = params.prompt, model = model)
+                NanoGptGenerateRequest(
+                    prompt = params.prompt,
+                    model = model,
+                    inputReferences = references
+                )
             )
-            DebugLogger.logKeyValue("requestBody", reqBody)
+            // Truncated: a data URL reference would otherwise dump ~1MB of base64 into the log.
+            DebugLogger.logKeyValue("requestBody", reqBody.take(500))
 
             val request = Request.Builder()
                 .url("$BASE_URL/v1/images/generations")

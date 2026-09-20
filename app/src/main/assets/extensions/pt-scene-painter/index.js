@@ -31,7 +31,9 @@
         promptPrefix:      '',     // prepended to every prompt (e.g. Pony XL quality tags)
         artStyleByChar:    {},
         portraitImg2Img:   true,   // use character avatar as img2img source for portraits
-        denoisingStrength: 0.55    // 0.0 = identical, 1.0 = ignore source image
+        sceneImg2Img:      true,   // ...and for character-in-scene shots
+        denoisingStrength: 0.55,   // 0.0 = identical, 1.0 = ignore source image
+        sceneDenoising:    0.72    // scenes must move further from the avatar than portraits
     };
 
     function getSettings() {
@@ -45,7 +47,9 @@
         if (s.promptPrefix        === undefined) s.promptPrefix        = DEFAULT_SETTINGS.promptPrefix;
         if (!s.artStyleByChar)                   s.artStyleByChar      = {};
         if (s.portraitImg2Img     === undefined) s.portraitImg2Img     = DEFAULT_SETTINGS.portraitImg2Img;
+        if (s.sceneImg2Img        === undefined) s.sceneImg2Img        = DEFAULT_SETTINGS.sceneImg2Img;
         if (s.denoisingStrength   === undefined) s.denoisingStrength   = DEFAULT_SETTINGS.denoisingStrength;
+        if (s.sceneDenoising      === undefined) s.sceneDenoising      = DEFAULT_SETTINGS.sceneDenoising;
         return s;
     }
 
@@ -78,6 +82,7 @@
         PT.registerMessageActions(EXT_ID, [
             { label: 'Send background image in chat',       action: 'sp_background' },
             { label: 'Send a picture of yourself in chat',  action: 'sp_portrait' },
+            { label: 'Send this scene in chat',             action: 'sp_scene' },
             { label: 'Set art style...',                    action: 'sp_style' }
         ]);
     }
@@ -89,6 +94,8 @@
             paintScene(_lastLongPressedIndex, 'background');
         } else if (data.action === 'sp_portrait') {
             paintScene(_lastLongPressedIndex, 'portrait');
+        } else if (data.action === 'sp_scene') {
+            paintScene(_lastLongPressedIndex, 'scene');
         } else if (data.action === 'sp_style') {
             handleSetStyle();
         }
@@ -144,6 +151,22 @@
                 '- Then: setting (brief)\n\n' +
                 'Rules: comma-separated tags only, no prose, no art style tags (added separately), no explanations.\n' +
                 'Output ONLY the single prompt line.]';
+        } else if (mode === 'scene') {
+            analysisPrompt =
+                '[OOC: Do NOT continue the story. Do NOT write any narrative.\n' +
+                'Task: Generate a Stable Diffusion image prompt showing ' + charName + ' in this scene.\n\n' +
+                'Your context contains the character description, the world book and the ' +
+                'conversation so far. Use them for exact physical appearance -- prefer details ' +
+                'established there over anything you invent.\n\n' +
+                'Message (for pose/action/setting):\n' +
+                '\"\"\"' + messageText + '\"\"\"\n\n' +
+                'Output a single line of comma-separated SD tags:\n' +
+                '- Physical appearance FIRST: hair color, hair style, eye color, skin tone, body type, distinguishing features\n' +
+                '- Then: current clothing or state of undress as established\n' +
+                '- Then: pose, expression, action\n' +
+                '- Then: full setting -- location, time of day, lighting, atmosphere\n\n' +
+                'Rules: comma-separated tags only, no prose, no art style tags (added separately), no explanations.\n' +
+                'Output ONLY the single prompt line.]';
         } else {
             analysisPrompt =
                 '[OOC: Do NOT continue the story. Do NOT write any narrative.\n' +
@@ -165,8 +188,21 @@
             }
 
             // LLM may output reasoning steps — take the last non-empty line as the actual prompt
-            var lines = sdPrompt.trim().split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
-            sdPrompt = lines[lines.length - 1];
+            // The model may prepend reasoning. This previously took only the LAST non-empty
+            // line, which silently gutted any prompt the model wrapped across several lines --
+            // a major cause of generated images missing established details.
+            // Instead: drop obvious reasoning/preamble lines, then keep everything else.
+            var lines = sdPrompt.trim().split('\n').map(function (l) { return l.trim(); })
+                .filter(function (l) { return l.length > 0; });
+            lines = lines.filter(function (l) {
+                // Markdown fences, headings, think-tags, or a lead-in sentence ending in a colon.
+                if (/^(```|#|\*\*|<think|<\/think)/i.test(l)) return false;
+                if (/^(okay|sure|here|alright|thought|reasoning|prompt)\b[^,]*:$/i.test(l)) return false;
+                return true;
+            });
+            // Prefer comma-separated tag lines; fall back to all of them if none look like tags.
+            var tagLines = lines.filter(function (l) { return l.indexOf(',') !== -1; });
+            sdPrompt = (tagLines.length ? tagLines : lines).join(', ');
 
             // Strip surrounding quotes
             if ((sdPrompt.charAt(0) === '"' && sdPrompt.charAt(sdPrompt.length - 1) === '"') ||
@@ -186,16 +222,28 @@
             if (s.negativePrompt) {
                 options.negativePrompt = s.negativePrompt;
             }
-            // Portrait mode: taller aspect ratio + optional img2img from character avatar
+            // Portrait is a tall crop; scenes keep the configured default aspect.
             if (mode === 'portrait') {
                 options.width = 512;
                 options.height = 768;
-                if (s.portraitImg2Img) {
+            }
+            var wantsAvatar = (mode === 'portrait' && s.portraitImg2Img) ||
+                              (mode === 'scene'    && s.sceneImg2Img);
+            if (wantsAvatar) {
+                // Only SD WebUI/Forge honour init images; every other backend drops them
+                // silently, so don't claim img2img when the backend will ignore it.
+                var caps = PT.getImageBackendCapabilities();
+                if (!caps.supportsImg2Img) {
+                    PT.log('[ScenePainter] Backend has no img2img support; likeness will come ' +
+                           'from the prompt text only');
+                } else {
                     var avatarBase64 = PT.getCharacterAvatar();
                     if (avatarBase64) {
                         options.sourceImageBase64 = avatarBase64;
-                        options.denoisingStrength = s.denoisingStrength;
-                        PT.log('[ScenePainter] Using img2img with avatar, denoising=' + s.denoisingStrength);
+                        options.denoisingStrength = (mode === 'scene') ? s.sceneDenoising
+                                                                      : s.denoisingStrength;
+                        PT.log('[ScenePainter] Using img2img with avatar, denoising=' +
+                               options.denoisingStrength);
                     } else {
                         PT.log('[ScenePainter] No avatar found, falling back to txt2img');
                     }
@@ -339,6 +387,7 @@
         PT.registerMessageActions(EXT_ID, [
             { label: 'Send background image in chat',       action: 'sp_background' },
             { label: 'Send a picture of yourself in chat',  action: 'sp_portrait' },
+            { label: 'Send this scene in chat',             action: 'sp_scene' },
             { label: 'Set art style...',                    action: 'sp_style' }
         ]);
 

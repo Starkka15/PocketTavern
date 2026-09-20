@@ -558,6 +558,34 @@
         },
 
         /**
+         * Capability flags for the *currently configured* image backend.
+         *
+         * Check this before sending options the backend cannot honour. In particular,
+         * only SD WebUI and Forge implement img2img -- ComfyUI, DALL-E, HuggingFace,
+         * Stability, NanoGPT, Pollinations and the on-device MNN backend ignore
+         * sourceImageBase64 entirely, so an avatar sent to them is silently discarded.
+         *
+         * @returns {{supportsImg2Img:boolean, supportsNegativePrompt:boolean,
+         *           supportsSeed:boolean, supportsSteps:boolean,
+         *           supportsCfgScale:boolean, supportsResolutionPresets:boolean}}
+         *
+         * @example
+         *   if (PT.getImageBackendCapabilities().supportsImg2Img) {
+         *       opts.sourceImageBase64 = PT.getCharacterAvatar();
+         *   }
+         */
+        getImageBackendCapabilities: function () {
+            if (window.PtBridge && PtBridge.getImageBackendCapabilities) {
+                try {
+                    return JSON.parse(PtBridge.getImageBackendCapabilities() || '{}');
+                } catch (e) {
+                    return {};
+                }
+            }
+            return {};
+        },
+
+        /**
          * Fetch the list of models available from the configured image generation backend.
          * @returns {Promise<string[]>}  Resolves with array of model name strings, or [] on error.
          */

@@ -55,6 +55,13 @@ class JsExtensionHost @Inject constructor(
     // Context JSON updated before each generation by ExtensionManager.updateContext()
     @Volatile private var _contextJson: String = "{}"
 
+    // Active image backend capabilities, pushed by ChatViewModel. Extensions need this to know
+    // whether options like sourceImageBase64 will actually be honoured -- only SD WebUI/Forge
+    // implement img2img, and every other backend drops the field silently.
+    @Volatile private var _imageCapsJson: String = "{}"
+
+    fun updateImageCaps(json: String) { _imageCapsJson = json }
+
     // Message headers: messageIndex → list of headers (multiple extensions can each set one)
     private val _messageHeaders = MutableStateFlow<Map<Int, List<MessageHeaderEntry>>>(emptyMap())
     val messageHeaders: StateFlow<Map<Int, List<MessageHeaderEntry>>> = _messageHeaders.asStateFlow()
@@ -1076,6 +1083,13 @@ class JsExtensionHost @Inject constructor(
                 ""
             }
         }
+
+        /**
+         * Called by PT.getImageBackendCapabilities().
+         * Returns the active image backend's capability flags as a JSON object.
+         */
+        @JavascriptInterface
+        fun getImageBackendCapabilities(): String = _imageCapsJson
 
         // ── Model list / selector ─────────────────────────────────────────────
 

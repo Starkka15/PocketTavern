@@ -15,6 +15,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -65,6 +66,7 @@ class StabilityBackend(
         supportsCfgScale = true,
         supportsSeed = true,
         supportsNegativePrompt = true,
+        supportsImg2Img = true,
         supportsResolutionPresets = true,
         requiresApiKey = true
     )
@@ -118,24 +120,62 @@ class StabilityBackend(
                 prompts.add(StabilityPrompt(text = params.negativePrompt, weight = -1f))
             }
 
-            val body = json.encodeToString(StabilityRequest.serializer(), StabilityRequest(
-                textPrompts = prompts,
-                width = width.coerceIn(512, 1024),
-                height = height.coerceIn(512, 1024),
-                steps = params.steps,
-                cfgScale = params.cfgScale,
-                seed = if (params.seed == -1) 0 else params.seed.toLong(),
-                samples = 1
-            ))
-
             val engineId = "stable-diffusion-xl-1024-v1-0"
-            val request = Request.Builder()
-                .url("https://api.stability.ai/v1/generation/$engineId/text-to-image")
-                .addHeader("Authorization", "Bearer ${config.stabilityApiKey}")
-                .addHeader("Content-Type", "application/json")
-                .addHeader("Accept", "application/json")
-                .post(body.toRequestBody("application/json".toMediaType()))
-                .build()
+
+            // image-to-image is a *different* endpoint with a multipart body -- it takes the
+            // init image as binary and rejects the JSON text-to-image shape, so the two paths
+            // cannot share a request builder. image_strength is the inverse of A1111's
+            // denoising_strength: 1.0 keeps the source, 0.0 discards it.
+            val request = if (params.sourceImageBase64 != null) {
+                val initBytes = Base64.decode(params.sourceImageBase64, Base64.DEFAULT)
+                val imageStrength = (1f - params.denoisingStrength).coerceIn(0f, 1f)
+
+                val multipart = MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart(
+                        "init_image", "init.png",
+                        initBytes.toRequestBody("image/png".toMediaType())
+                    )
+                    .addFormDataPart("init_image_mode", "IMAGE_STRENGTH")
+                    .addFormDataPart("image_strength", imageStrength.toString())
+                    .addFormDataPart("cfg_scale", params.cfgScale.toString())
+                    .addFormDataPart("steps", params.steps.toString())
+                    .addFormDataPart("samples", "1")
+                    .addFormDataPart("seed", (if (params.seed == -1) 0 else params.seed).toString())
+                    .apply {
+                        // Prompts are indexed form fields here, not a JSON array.
+                        prompts.forEachIndexed { i, p ->
+                            addFormDataPart("text_prompts[$i][text]", p.text)
+                            addFormDataPart("text_prompts[$i][weight]", p.weight.toString())
+                        }
+                    }
+                    .build()
+
+                Request.Builder()
+                    .url("https://api.stability.ai/v1/generation/$engineId/image-to-image")
+                    .addHeader("Authorization", "Bearer ${config.stabilityApiKey}")
+                    .addHeader("Accept", "application/json")
+                    .post(multipart)
+                    .build()
+            } else {
+                val body = json.encodeToString(StabilityRequest.serializer(), StabilityRequest(
+                    textPrompts = prompts,
+                    width = width.coerceIn(512, 1024),
+                    height = height.coerceIn(512, 1024),
+                    steps = params.steps,
+                    cfgScale = params.cfgScale,
+                    seed = if (params.seed == -1) 0 else params.seed.toLong(),
+                    samples = 1
+                ))
+
+                Request.Builder()
+                    .url("https://api.stability.ai/v1/generation/$engineId/text-to-image")
+                    .addHeader("Authorization", "Bearer ${config.stabilityApiKey}")
+                    .addHeader("Content-Type", "application/json")
+                    .addHeader("Accept", "application/json")
+                    .post(body.toRequestBody("application/json".toMediaType()))
+                    .build()
+            }
 
             val responseBody = withContext(Dispatchers.IO) {
                 httpClient.newCall(request).execute().use { response ->
