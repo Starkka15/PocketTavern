@@ -105,12 +105,17 @@ class ExtensionManager @Inject constructor(
 
     /** Update the per-character extension filter. Call when the active character changes. */
     fun updateCharacterFilter(characterFile: String) {
+        // Also record the file itself: PT.getCharacterAvatar(), getCharacterFace() and
+        // getCharacterSetting() all resolve against it. Without this it stayed blank forever,
+        // so avatar img2img silently fell back to txt2img on every generation.
+        jsHost.updateCurrentCharacterFile(characterFile)
         val disabled = jsStorage.getDisabledExtensionsForCharacter(characterFile)
         jsHost.updateDisabledExtensions(disabled)
     }
 
     /** Clear per-character filter (e.g. when leaving a chat). */
     fun clearCharacterFilter() {
+        jsHost.updateCurrentCharacterFile("")
         jsHost.updateDisabledExtensions(emptyList())
     }
 
