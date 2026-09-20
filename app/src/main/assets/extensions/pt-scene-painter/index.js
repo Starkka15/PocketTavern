@@ -181,8 +181,12 @@
 
         PT.generateHidden(analysisPrompt).then(function (sdPrompt) {
             if (!sdPrompt || !sdPrompt.trim()) {
-                PT.log('[ScenePainter] Empty prompt from analysis');
-                PT.setStatus('');
+                // Usually a reasoning model that spent its whole token budget thinking and
+                // returned no content. Say so rather than failing silently -- previously this
+                // just stopped and the user saw nothing happen at all.
+                PT.log('[ScenePainter] Empty prompt from analysis (model returned no content)');
+                PT.setStatus('Image prompt came back empty - try again or use a non-reasoning model');
+                setTimeout(function () { PT.setStatus(''); }, 6000);
                 _isGenerating = false;
                 return;
             }

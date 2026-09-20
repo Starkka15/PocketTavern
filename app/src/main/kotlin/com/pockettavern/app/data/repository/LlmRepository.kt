@@ -97,7 +97,11 @@ class LlmRepository @Inject constructor(
         stopSequences: List<String> = emptyList(),
         messages: List<PromptMessage>? = null,
         oaiPreset: OaiPreset? = null,
-        showThoughts: Boolean = false
+        showThoughts: Boolean = false,
+        // One-off override for utility calls (e.g. PT.generateHidden). Reasoning models spend
+        // their budget on thinking tokens before emitting any content, so the 1024 fallback can
+        // be consumed entirely and return an empty completion with finish_reason=length.
+        maxTokensOverride: Int? = null
     ): Flow<StreamEvent> = flow {
         val endpoint = config.effectiveBaseUrl
         DebugLogger.log("LlmRepository: generating with ${config.displayName} ($endpoint)")
@@ -115,7 +119,8 @@ class LlmRepository @Inject constructor(
                     oaiPreset = oaiPreset,
                     stopSequences = stopSequences,
                     apiKey = apiKey,
-                    showThoughts = showThoughts
+                    showThoughts = showThoughts,
+                    maxTokensOverride = maxTokensOverride
                 ).collect { emit(it) }
 
                 config.textGenType == "koboldcpp" || config.mainApi == "kobold" ->
@@ -534,7 +539,8 @@ class LlmRepository @Inject constructor(
         oaiPreset: OaiPreset?,
         stopSequences: List<String>,
         apiKey: String,
-        showThoughts: Boolean = false
+        showThoughts: Boolean = false,
+        maxTokensOverride: Int? = null
     ): Flow<StreamEvent> = flow {
         // On-device: run locally instead of an HTTP chat-completion call.
         if (config.isOnDevice) {
@@ -564,6 +570,7 @@ class LlmRepository @Inject constructor(
             temperature = roundSampler(if (oaiPreset != null && oaiPreset.temperatureEnabled) oaiPreset.temperature else null),
             // Toggle off = omit; the 1024 fallback only applies when no preset exists at all
             maxTokens = when {
+                maxTokensOverride != null -> maxTokensOverride
                 oaiPreset == null -> 1024
                 oaiPreset.maxTokensEnabled -> oaiPreset.maxTokens
                 else -> null

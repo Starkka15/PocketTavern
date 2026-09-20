@@ -1496,6 +1496,9 @@ No preamble, no explanation. Just the numbered list."""
     private companion object {
         // Compact the accumulated memory block once it exceeds ~4000 chars (~1300 tokens)
         const val MEMORY_BLOCK_COMPACT_CHARS = 4_000
+
+        /** Token budget for PT.generateHidden(). Sized for reasoning models, not chat replies. */
+        const val HIDDEN_GENERATE_MAX_TOKENS = 4096
     }
 
     // --- Long-term memory editor (per-chat) -------------------------------------
@@ -1742,13 +1745,27 @@ No preamble, no explanation. Just the numbered list."""
             }
 
             var resultText = ""
-            llmRepository.generate(finalPrompt, config, preset).collect { event ->
+            var sawThinking = false
+            // Reasoning models (DeepSeek-R1 and friends) emit thinking tokens first and only
+            // then the answer. With the default 1024 budget a long card can burn the whole
+            // allowance on reasoning, ending at finish_reason=length with zero content -- the
+            // caller just sees an empty string. Hidden requests are short by nature, so give
+            // them room rather than making the user raise the chat preset's limit.
+            llmRepository.generate(
+                finalPrompt, config, preset, maxTokensOverride = HIDDEN_GENERATE_MAX_TOKENS
+            ).collect { event ->
                 when (event) {
                     is StreamEvent.Complete -> resultText = event.fullText
                     is StreamEvent.Error -> resultText = ""
                     is StreamEvent.Token -> { /* ignore */ }
-                    is StreamEvent.ThinkingToken -> { /* ignore */ }
+                    is StreamEvent.ThinkingToken -> { sawThinking = true }
                 }
+            }
+            if (resultText.isBlank() && sawThinking) {
+                com.pockettavern.app.util.DebugLogger.log(
+                    "[HiddenGenerate] model produced only reasoning tokens and no content -- " +
+                    "the ${HIDDEN_GENERATE_MAX_TOKENS}-token budget was exhausted before the answer"
+                )
             }
             extensionManager.jsHost.completeHiddenGenerate(callbackId, resultText)
         } catch (e: Exception) {
