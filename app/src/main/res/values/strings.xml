@@ -243,6 +243,11 @@
     <string name="long_term_memory">Long-Term Memory</string>
     <string name="summarize_old_messages_so_the_ai_remembers_pa">Summarize old messages so the AI remembers past sessions. </string>
     <string name="enable_long_term_memory">Enable Long-Term Memory</string>
+    <string name="memory">Memory</string>
+    <string name="memory_editor_title">Long-Term Memory</string>
+    <string name="memory_editor_hint">This is the running summary the AI is given as context. Edit it to correct anything the summarizer got wrong, or clear it to start fresh.</string>
+    <string name="memory_editor_empty">No memory yet. It fills in automatically as the chat grows.</string>
+    <string name="memory_char_count">%1$d characters</string>
     <string name="roleplay_behavior">Roleplay Behavior</string>
     <string name="don_t_speak_or_act_for_user">Don\'t speak or act for user</string>
     <string name="instructs_the_ai_to_never_write_dialogue_or_a">Instructs the AI to never write dialogue or actions on behalf of your character.</string>

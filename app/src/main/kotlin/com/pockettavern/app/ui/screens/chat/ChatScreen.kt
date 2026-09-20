@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Settings
@@ -328,6 +329,14 @@ fun ChatScreen(
                                     viewModel.showGallery()
                                 },
                                 leadingIcon = { Icon(Icons.Default.Collections, null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.memory)) },
+                                onClick = {
+                                    showSettingsMenu = false
+                                    viewModel.openMemoryDialog()
+                                },
+                                leadingIcon = { Icon(Icons.Default.Psychology, null) }
                             )
                             HorizontalDivider()
                             if (uiState.apiShowThoughtsEnabled) {
@@ -837,6 +846,16 @@ fun ChatScreen(
             error = uiState.scanloreError,
             onConfirm = { viewModel.confirmScanlore(it) },
             onDismiss = { viewModel.dismissScanlore() }
+        )
+    }
+
+    if (uiState.showMemoryDialog) {
+        MemoryDialog(
+            memoryText = uiState.memoryDialogText,
+            onTextChange = { viewModel.updateMemoryDialogText(it) },
+            onSave = { viewModel.saveMemoryBlock() },
+            onClear = { viewModel.clearMemoryBlock() },
+            onDismiss = { viewModel.dismissMemoryDialog() }
         )
     }
 
@@ -1362,6 +1381,65 @@ private fun EditMessageDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+@Composable
+private fun MemoryDialog(
+    memoryText: String,
+    onTextChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onClear: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.memory_editor_title)) },
+        text = {
+            Column {
+                Text(
+                    stringResource(R.string.memory_editor_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = memoryText,
+                    onValueChange = onTextChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 160.dp, max = 320.dp),
+                    placeholder = { Text(stringResource(R.string.memory_editor_empty)) },
+                    textStyle = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    stringResource(R.string.memory_char_count, memoryText.length),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onSave) {
+                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onClear, enabled = memoryText.isNotBlank()) {
+                    Text(
+                        stringResource(R.string.clear),
+                        color = if (memoryText.isNotBlank()) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                    )
+                }
+                Spacer(modifier = Modifier.width(4.dp))
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
             }
         }
     )
