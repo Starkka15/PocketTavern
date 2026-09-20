@@ -56,6 +56,7 @@ fun MainScreen(
     onNavigateToRecentChats: () -> Unit,
     onNavigateToCreateCharacter: () -> Unit,
     onNavigateToStories: () -> Unit = {},   // V12: always visible; empty-state prompts import
+    onNavigateToCharaVault: () -> Unit,
     onNavigateToChub: () -> Unit,
     onNavigateToRisuRealm: () -> Unit = {},
     onNavigateToBotBooru: () -> Unit = {},
@@ -223,9 +224,10 @@ fun MainScreen(
                     Spacer(modifier = Modifier.height(20.dp))
                 }
 
-                // Card search — Chub, RisuRealm or BotBooru
+                // Card search — CharaVault, Chub, RisuRealm or BotBooru
                 SearchCardsCard(
                     iconColor = MaterialTheme.colorScheme.primary,
+                    onNavigateToCharaVault = onNavigateToCharaVault,
                     onNavigateToChub = onNavigateToChub,
                     onNavigateToRisuRealm = onNavigateToRisuRealm,
                     onNavigateToBotBooru = onNavigateToBotBooru
@@ -318,18 +320,20 @@ fun MainScreen(
 @Composable
 private fun SearchCardsCard(
     iconColor: Color,
+    onNavigateToCharaVault: () -> Unit,
     onNavigateToChub: () -> Unit,
     onNavigateToRisuRealm: () -> Unit,
     onNavigateToBotBooru: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     var selectedIndex by remember { mutableStateOf(0) }
-    val options = listOf("Chub", "RisuRealm", "BotBooru")
+    val options = listOf("CharaVault", "Chub", "RisuRealm", "BotBooru")
 
     val onNavigate = when (selectedIndex) {
-        1    -> onNavigateToRisuRealm
-        2    -> onNavigateToBotBooru
-        else -> onNavigateToChub
+        1    -> onNavigateToChub
+        2    -> onNavigateToRisuRealm
+        3    -> onNavigateToBotBooru
+        else -> onNavigateToCharaVault
     }
 
     Surface(

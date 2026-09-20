@@ -980,4 +980,32 @@
         been moved into strings.xml and translated below.
         ================================================================
     -->
+
+    <!-- CharaVault -->
+<string name="card_server_optional">卡片服务器（可选）</string>
+<string name="your_local_character_card_index_server">你的本地角色卡索引服务器</string>
+<string name="configure_login_via_the_charavault_screen">通过 CharaVault 界面配置登录</string>
+<string name="charavault_url">CharaVault 地址</string>
+<string name="http_192_168_1_100_8787">http://192.168.1.100:8787</string>
+<string name="upload_to_charavault">上传到 CharaVault</string>
+<string name="uploading_to_charavault">正在上传到 CharaVault</string>
+<string name="browse_charavault">浏览 CharaVault</string>
+<string name="charavault_server_not_configured">CharaVault 服务器未配置</string>
+<string name="enter_your_charavault_server_url_to_browse_ca">输入你的 CharaVault 服务器地址以浏览卡片</string>
+<string name="charavault_local">CharaVault（本地）</string>
+<string name="charavault_net">CharaVault.net</string>
+<string name="enter_your_local_charavault_server_url">输入你的本地 CharaVault 服务器地址</string>
+<string name="login_to_charavault_net_to_access_the_full_ca">登录 CharaVault.net 以访问包括 NSFW 内容在内的完整卡片库。</string>
+<string name="login_to_charavault_net">登录 CharaVault.net</string>
+<string name="long_press_a_character_in_the_characters_list">长按角色列表中的某个角色 → 上传到 CharaVault 以与社区分享你的角色。</string>
+<string name="browse_charavault_tap_charavault_on_the_home">浏览 CharaVault——在主屏幕上点击 CharaVault 以搜索并导入社区角色。同时支持 CharaVault.net（公共目录）和自托管服务器。</string>
+<string name="charavault_browse_and_import_community_charac">CharaVault——浏览并导入社区角色和知识库。</string>
+<string name="from_charavault_browse_and_import_community_l">来自 CharaVault——直接从 CharaVault 界面浏览并导入社区知识库。</string>
+<string name="charavault_net_browse_the_public_catalog_gues">CharaVault.net——浏览公共目录。访客浏览仅显示 SFW 内容。使用邮箱/密码登录以获得完整访问权限。NSFW 内容需要年龄验证（18 岁以上）。支持 2FA/TOTP。</string>
+<string name="self_hosted_connect_to_your_own_charavault_se">自托管——通过输入地址连接你自己的 CharaVault 服务器。</string>
+<string name="help_charavault">CharaVault</string>
+<string name="model_desc_pt_rp">我们自己的 RP 调优模型——提示词精简、忠于角色、不啰嗦。Apache-2.0。</string>
+<string name="model_desc_pt_rp_tiny">面向低端设备的微型 RP 调优模型。提示词精简。Apache-2.0。</string>
+<string name="model_desc_pt_rp_gguf">我们的 RP 调优模型，GGUF（可使用重复惩罚）。Apache-2.0。</string>
+<string name="model_desc_pt_rp_tiny_gguf">面向低端设备的微型 RP 调优模型，GGUF。Apache-2.0。</string>
 </resources>

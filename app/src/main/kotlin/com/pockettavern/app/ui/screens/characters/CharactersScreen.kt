@@ -224,6 +224,16 @@ fun CharactersScreen(
                         }
                         TextButton(
                             onClick = {
+                                viewModel.uploadToCharaVault(character)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.CloudUpload, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.upload_to_charavault))
+                        }
+                        TextButton(
+                            onClick = {
                                 viewModel.showDeleteConfirmation(character)
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -300,6 +310,37 @@ fun CharactersScreen(
         )
     }
 
+    // Upload progress dialog
+    if (uiState.isUploading) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text(stringResource(R.string.uploading_to_charavault)) },
+            text = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    Text(stringResource(R.string.please_wait))
+                }
+            },
+            confirmButton = {}
+        )
+    }
+
+    // Upload success snackbar
+    uiState.uploadSuccess?.let { message ->
+        AlertDialog(
+            onDismissRequest = { viewModel.clearUploadSuccess() },
+            title = { Text(stringResource(R.string.success)) },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearUploadSuccess() }) {
+                    Text(stringResource(R.string.ok))
+                }
+            }
+        )
+    }
 
     // Import progress indicator
     if (uiState.isImportingLocal) {

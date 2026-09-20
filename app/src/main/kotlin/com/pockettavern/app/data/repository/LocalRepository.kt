@@ -289,7 +289,7 @@ class LocalRepository @Inject constructor(
         presetStorage.saveOaiPreset(name, preset)
     }
 
-    /** Import a character card from raw PNG bytes (e.g., from a Chub download). */
+    /** Import a character card from raw PNG bytes (e.g., from CharaVault/Chub download). */
     suspend fun importCharacterCardBytes(bytes: ByteArray, fileName: String): Result<String> = withResult {
         characterStorage.saveRawPng(bytes, fileName)
     }

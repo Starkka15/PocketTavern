@@ -13,6 +13,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.pockettavern.app.ui.screens.characters.CharactersScreen
 import com.pockettavern.app.ui.screens.chat.ChatScreen
+import com.pockettavern.app.ui.screens.charavault.CharaVaultScreen
 import com.pockettavern.app.ui.screens.chub.ChubBrowserScreen
 import com.pockettavern.app.ui.screens.createcharacter.CreateCharacterScreen
 import com.pockettavern.app.ui.screens.formatting.FormattingScreen
@@ -73,6 +74,9 @@ fun SillyTavernNavGraph(
                 },
                 onNavigateToCreateCharacter = {
                     navController.navigate(Route.CreateCharacter)
+                },
+                onNavigateToCharaVault = {
+                    navController.navigate(Route.CharaVault)
                 },
                 onNavigateToChub = {
                     navController.navigate(Route.Chub)
@@ -221,6 +225,15 @@ fun SillyTavernNavGraph(
         composable<Route.ConnectionSettings> {
             SettingsScreen(
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable<Route.CharaVault> {
+            CharaVaultScreen(
+                onNavigateBack = {
+                    shouldRefreshCharacters = true
+                    navController.popBackStack()
+                }
             )
         }
 

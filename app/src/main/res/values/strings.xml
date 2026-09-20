@@ -968,4 +968,32 @@
     <string name="model_desc_huihui_abliterated">Refusals removed (huihui abliterated). Solid all-rounder (~2.1GB Q4_K_M).</string>
     <string name="model_desc_uncensored_qwen25_3b">Uncensored Qwen2.5 3B (~2.0GB Q4_K_M).</string>
     <string name="model_desc_small_aligned">Small, aligned (will refuse NSFW). Fast baseline (~1.1GB Q4_K_M). Apache-2.0.</string>
+
+    <!-- CharaVault -->
+    <string name="card_server_optional">Card Server (optional)</string>
+    <string name="your_local_character_card_index_server">Your local character card index server</string>
+    <string name="configure_login_via_the_charavault_screen">Configure login via the CharaVault screen</string>
+    <string name="charavault_url">CharaVault URL</string>
+    <string name="http_192_168_1_100_8787">http://192.168.1.100:8787</string>
+    <string name="upload_to_charavault">Upload to CharaVault</string>
+    <string name="uploading_to_charavault">Uploading to CharaVault</string>
+    <string name="browse_charavault">Browse CharaVault</string>
+    <string name="charavault_server_not_configured">CharaVault Server Not Configured</string>
+    <string name="enter_your_charavault_server_url_to_browse_ca">Enter your CharaVault server URL to browse cards</string>
+    <string name="charavault_local">CharaVault (Local)</string>
+    <string name="charavault_net">CharaVault.net</string>
+    <string name="enter_your_local_charavault_server_url">Enter your local CharaVault server URL</string>
+    <string name="login_to_charavault_net_to_access_the_full_ca">Login to CharaVault.net to access the full card library including NSFW content.</string>
+    <string name="login_to_charavault_net">Login to CharaVault.net</string>
+    <string name="long_press_a_character_in_the_characters_list">Long-press a character in the Characters list → Upload to CharaVault to share your character with the community.</string>
+    <string name="browse_charavault_tap_charavault_on_the_home">Browse CharaVault — Tap CharaVault on the home screen to search and import community characters. Supports both CharaVault.net (public catalog) and self-hosted servers.</string>
+    <string name="charavault_browse_and_import_community_charac">CharaVault — Browse and import community characters and lorebooks.</string>
+    <string name="from_charavault_browse_and_import_community_l">From CharaVault — Browse and import community lorebooks directly from the CharaVault screen.</string>
+    <string name="charavault_net_browse_the_public_catalog_gues">CharaVault.net — Browse the public catalog. Guest browsing shows SFW content only. Log in with email/password for full access. NSFW content requires age verification (18+). 2FA/TOTP is supported.</string>
+    <string name="self_hosted_connect_to_your_own_charavault_se">Self-hosted — Connect to your own CharaVault server by entering its URL.</string>
+    <string name="help_charavault">CharaVault</string>
+    <string name="model_desc_pt_rp">Our own RP-tuned model — lean prompt, stays in character, doesn\'t ramble. Apache-2.0.</string>
+    <string name="model_desc_pt_rp_tiny">Tiny RP-tuned model for low-end devices. Lean prompt. Apache-2.0.</string>
+    <string name="model_desc_pt_rp_gguf">Our RP-tuned model, GGUF (repetition penalty available). Apache-2.0.</string>
+    <string name="model_desc_pt_rp_tiny_gguf">Tiny RP-tuned model for low-end devices, GGUF. Apache-2.0.</string>
 </resources>

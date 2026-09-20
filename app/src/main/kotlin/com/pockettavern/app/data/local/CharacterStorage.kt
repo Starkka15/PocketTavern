@@ -284,7 +284,7 @@ class CharacterStorage @Inject constructor(
         if (file.exists()) file.readBytes() else null
     }
 
-    /** Save raw PNG bytes to the characters directory (used by the card browser importers). */
+    /** Save raw PNG bytes to the characters directory (used by CharaVault/Chub importers). */
     suspend fun saveRawPng(bytes: ByteArray, fileName: String): String = withContext(Dispatchers.IO) {
         val safeFileName = if (fileName.endsWith(".png")) fileName else "$fileName.png"
         val file = File(charactersDir, safeFileName)

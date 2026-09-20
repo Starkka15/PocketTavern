@@ -16,6 +16,8 @@ import javax.inject.Inject
 
 data class SettingsUiState(
     val forgeUrl: String = "",
+    val charaVaultUrl: String = "",
+    val charavaultMode: String = "local",
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val isTesting: Boolean = false,
@@ -45,6 +47,8 @@ class SettingsViewModel @Inject constructor(
             val settings = settingsRepository.getSettings()
             _uiState.update {
                 it.copy(
+                    charaVaultUrl = settings.charaVaultUrl,
+                    charavaultMode = settings.charavaultMode,
                     forgeUrl = settings.forgeUrl,
                     isLoading = false
                 )
@@ -54,6 +58,10 @@ class SettingsViewModel @Inject constructor(
 
     fun updateForgeUrl(value: String) {
         _uiState.update { it.copy(forgeUrl = value) }
+    }
+
+    fun updateCharaVaultUrl(value: String) {
+        _uiState.update { it.copy(charaVaultUrl = value) }
     }
 
     fun testConnection() {
@@ -98,7 +106,9 @@ class SettingsViewModel @Inject constructor(
 
     private suspend fun saveSettingsInternal() {
         val settings = ServerSettings(
-            forgeUrl = _uiState.value.forgeUrl.trim()
+            forgeUrl = _uiState.value.forgeUrl.trim(),
+            charaVaultUrl = _uiState.value.charaVaultUrl.trim(),
+            charavaultMode = _uiState.value.charavaultMode
         )
         settingsRepository.saveSettings(settings)
     }

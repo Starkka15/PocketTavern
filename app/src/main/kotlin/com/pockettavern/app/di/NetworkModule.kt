@@ -4,8 +4,10 @@ import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFact
 import com.pockettavern.app.data.local.CharacterStorage
 import com.pockettavern.app.data.local.LoreBookStorage
 import com.pockettavern.app.data.local.SettingsDataStore
+import com.pockettavern.app.data.remote.api.CharaVaultApi
 import com.pockettavern.app.data.remote.api.ForgeApi
 import com.pockettavern.app.data.remote.api.GitHubApi
+import com.pockettavern.app.data.repository.CharaVaultRepository
 import com.pockettavern.app.data.remote.imagegen.*
 import com.pockettavern.app.data.repository.ForgeRepository
 import com.pockettavern.app.data.repository.ImageGenRepository
@@ -30,6 +32,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
 import javax.inject.Named
 import javax.inject.Singleton
+
+private const val CHARAVAULT_NET_URL = "https://charavault.net"
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -138,6 +142,59 @@ object NetworkModule {
         settingsDataStore: SettingsDataStore
     ): ImageGenRepository = ImageGenRepository(backends, settingsDataStore)
 
+    // ── CharaVault ────────────────────────────────────────────────────────────
+
+    @Provides
+    @Singleton
+    @Named("CharaVault")
+    fun provideCharaVaultOkHttpClient(
+        loggingInterceptor: HttpLoggingInterceptor,
+        settingsDataStore: SettingsDataStore
+    ): OkHttpClient {
+        val charavaultAuthInterceptor = Interceptor { chain ->
+            val mode = runBlocking { settingsDataStore.getCharaVaultMode() }
+            val session = if (mode == "charavault") {
+                runBlocking { settingsDataStore.getCharaVaultSession() }
+            } else null
+            val request = if (session != null) {
+                chain.request().newBuilder()
+                    .addHeader("Authorization", "Bearer ${session.token}")
+                    .build()
+            } else chain.request()
+            chain.proceed(request)
+        }
+        return OkHttpClient.Builder()
+            .addInterceptor(charavaultAuthInterceptor)
+            .addInterceptor(loggingInterceptor)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
+
+    @Provides
+    fun provideCharaVaultApi(
+        @Named("CharaVault") okHttpClient: OkHttpClient,
+        settingsDataStore: SettingsDataStore
+    ): CharaVaultApi {
+        val mode = runBlocking { settingsDataStore.getCharaVaultMode() }
+        val baseUrl = if (mode == "charavault") {
+            CHARAVAULT_NET_URL
+        } else {
+            val url = runBlocking { settingsDataStore.getCharaVaultUrl() }
+            url.ifBlank { "http://localhost" }
+        }
+        return createRetrofit(okHttpClient, "$baseUrl/").create(CharaVaultApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideCharaVaultRepository(
+        charaVaultApiProvider: javax.inject.Provider<CharaVaultApi>,
+        characterStorage: CharacterStorage,
+        loreBookStorage: LoreBookStorage
+    ): CharaVaultRepository = CharaVaultRepository(charaVaultApiProvider, characterStorage, loreBookStorage)
+
     // ── GitHub ────────────────────────────────────────────────────────────────
 
     @Provides
@@ -162,7 +219,23 @@ object NetworkModule {
         @ApplicationContext context: Context,
         settingsDataStore: SettingsDataStore
     ): ImageLoader {
+        // Add CharaVault.net Bearer token for avatar image requests
+        val charavaultImageAuthInterceptor = Interceptor { chain ->
+            val request = chain.request()
+            if (request.url.host == "charavault.net") {
+                val mode = runBlocking { settingsDataStore.getCharaVaultMode() }
+                val session = if (mode == "charavault") runBlocking { settingsDataStore.getCharaVaultSession() } else null
+                if (session != null) {
+                    return@Interceptor chain.proceed(
+                        request.newBuilder().addHeader("Authorization", "Bearer ${session.token}").build()
+                    )
+                }
+            }
+            chain.proceed(request)
+        }
+
         val imageHttpClient = OkHttpClient.Builder()
+            .addInterceptor(charavaultImageAuthInterceptor)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .build()

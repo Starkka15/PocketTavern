@@ -46,6 +46,7 @@ class SettingsDataStore @Inject constructor(
         // Service account key file. It contains an RSA private key granting access to the
         // user's GCP project, so it belongs in encrypted storage, never in DataStore.
         const val SECURE_VERTEX_SERVICE_ACCOUNT = "vertex_service_account_json"
+        const val SECURE_CHARAVAULT_TOKEN = "charavault_token"
         const val SECURE_TTS_OPENAI_KEY = "tts_openai_key"
     }
 
@@ -73,6 +74,14 @@ class SettingsDataStore @Inject constructor(
         val SELECTED_INSTRUCT_PRESET = stringPreferencesKey("selected_instruct_preset")
         val SELECTED_SYSPROMPT_PRESET = stringPreferencesKey("selected_sysprompt_preset")
         val SELECTED_CONTEXT_PRESET = stringPreferencesKey("selected_context_preset")
+
+        // CharaVault server
+        val CHARAVAULT_URL = stringPreferencesKey("cardvault_url")
+
+        // CharaVault.net session
+        val CHARAVAULT_TOKEN = stringPreferencesKey("charavault_token") // kept for migration reads only
+        val CHARAVAULT_EMAIL = stringPreferencesKey("charavault_email")
+        val CHARAVAULT_MODE = stringPreferencesKey("charavault_mode")
 
         // Auto-continue
         val AUTO_CONTINUE_ENABLED = booleanPreferencesKey("auto_continue_enabled")
@@ -241,6 +250,51 @@ class SettingsDataStore @Inject constructor(
     suspend fun saveForgeUrl(url: String) {
         context.dataStore.edit { prefs -> prefs[Keys.FORGE_URL] = url.trimEnd('/') }
     }
+
+    // ── CharaVault / CharaVault.net ───────────────────────────────────────────
+
+    val charaVaultUrlFlow: Flow<String> = context.dataStore.data.map { it[Keys.CHARAVAULT_URL] ?: "" }
+
+    suspend fun getCharaVaultUrl(): String = charaVaultUrlFlow.first()
+
+    suspend fun saveCharaVaultUrl(url: String) {
+        context.dataStore.edit { prefs -> prefs[Keys.CHARAVAULT_URL] = url.trimEnd('/') }
+    }
+
+    val charavaultSessionFlow: Flow<CharaVaultSession?> = context.dataStore.data.map { prefs ->
+        val token = encryptedPrefs.getString(SECURE_CHARAVAULT_TOKEN, null)
+            ?: prefs[Keys.CHARAVAULT_TOKEN]
+        val email = prefs[Keys.CHARAVAULT_EMAIL]
+        if (token != null && email != null) CharaVaultSession(token = token, email = email) else null
+    }
+
+    val charavaultModeFlow: Flow<String> = context.dataStore.data.map { it[Keys.CHARAVAULT_MODE] ?: "local" }
+
+    suspend fun saveCharaVaultSession(token: String, email: String) {
+        encryptedPrefs.edit().putString(SECURE_CHARAVAULT_TOKEN, token).apply()
+        context.dataStore.edit { prefs ->
+            prefs[Keys.CHARAVAULT_EMAIL] = email
+            prefs.remove(Keys.CHARAVAULT_TOKEN)
+            prefs[Keys.SECURE_REFRESH] = (prefs[Keys.SECURE_REFRESH] ?: 0) + 1
+        }
+    }
+
+    suspend fun clearCharaVaultSession() {
+        encryptedPrefs.edit().remove(SECURE_CHARAVAULT_TOKEN).apply()
+        context.dataStore.edit { prefs ->
+            prefs.remove(Keys.CHARAVAULT_TOKEN)
+            prefs.remove(Keys.CHARAVAULT_EMAIL)
+            prefs[Keys.SECURE_REFRESH] = (prefs[Keys.SECURE_REFRESH] ?: 0) + 1
+        }
+    }
+
+    suspend fun getCharaVaultSession(): CharaVaultSession? = charavaultSessionFlow.first()
+
+    suspend fun saveCharaVaultMode(mode: String) {
+        context.dataStore.edit { prefs -> prefs[Keys.CHARAVAULT_MODE] = mode }
+    }
+
+    suspend fun getCharaVaultMode(): String = charavaultModeFlow.first()
 
     // ── User Persona ─────────────────────────────────────────────────────────
 
@@ -448,3 +502,8 @@ class SettingsDataStore @Inject constructor(
         context.dataStore.edit { prefs -> prefs[Keys.MEMORY_ENABLED] = enabled }
     }
 }
+
+data class CharaVaultSession(
+    val token: String,
+    val email: String
+)

@@ -187,7 +187,7 @@ class LoreBookStorage @Inject constructor(
         File(worldsDir, "$name.json").delete()
     }
 
-    /** Save raw JSON bytes as a lorebook file (used by lorebook importers). */
+    /** Save raw JSON bytes as a lorebook file (used by CharaVault importer). */
     suspend fun saveRawLorebook(name: String, bytes: ByteArray) = withContext(Dispatchers.IO) {
         File(worldsDir, "$name.json").writeBytes(bytes)
     }

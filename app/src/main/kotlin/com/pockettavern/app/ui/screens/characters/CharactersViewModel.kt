@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pockettavern.app.data.local.SettingsDataStore
+import com.pockettavern.app.data.repository.CharaVaultRepository
 import com.pockettavern.app.data.repository.LlmRepository
 import com.pockettavern.app.data.repository.LocalRepository
 import com.pockettavern.app.domain.model.Character
@@ -32,6 +33,8 @@ data class CharactersUiState(
     val showActionMenu: Boolean = false,
     val actionMenuCharacter: Character? = null,
     val error: String? = null,
+    val isUploading: Boolean = false,
+    val uploadSuccess: String? = null,
     // Local file import + translation
     val isImportingLocal: Boolean = false,
     val showTranslateDialog: Boolean = false,
@@ -53,6 +56,7 @@ data class CharactersUiState(
 @HiltViewModel
 class CharactersViewModel @Inject constructor(
     private val localRepository: LocalRepository,
+    private val charaVaultRepository: CharaVaultRepository,
     private val llmRepository: LlmRepository,
     private val settingsDataStore: SettingsDataStore,
     private val translateCardUseCase: TranslateCardUseCase
@@ -158,6 +162,10 @@ class CharactersViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    fun clearUploadSuccess() {
+        _uiState.update { it.copy(uploadSuccess = null) }
     }
 
     // ===== Groups (stubbed — local group storage not yet implemented) =====
@@ -360,4 +368,57 @@ class CharactersViewModel @Inject constructor(
         return fieldMap.filterValues { translateCardUseCase.needsTranslation(it) }.keys
     }
 
+    fun uploadToCharaVault(character: Character) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(isUploading = true, showActionMenu = false, actionMenuCharacter = null)
+            }
+
+            try {
+                val avatarKey = character.avatar ?: "${character.name}.png"
+                Log.d(TAG, "Exporting character card for upload: $avatarKey")
+
+                when (val exportResult = localRepository.exportCharacterCard(avatarKey)) {
+                    is Result.Success -> {
+                        val imageBytes = exportResult.data
+                        val filename = "${character.name.replace(Regex("[^a-zA-Z0-9._-]"), "_")}.png"
+                        Log.d(TAG, "Uploading to CharaVault: $filename (${imageBytes.size} bytes)")
+
+                        when (val uploadResult = charaVaultRepository.uploadCard(imageBytes, filename)) {
+                            is Result.Success -> {
+                                Log.d(TAG, "Upload successful: ${uploadResult.data}")
+                                _uiState.update {
+                                    it.copy(
+                                        isUploading = false,
+                                        uploadSuccess = "Uploaded \"${character.name}\" to CharaVault"
+                                    )
+                                }
+                            }
+                            is Result.Error -> {
+                                Log.e(TAG, "Upload failed", uploadResult.exception)
+                                _uiState.update {
+                                    it.copy(
+                                        isUploading = false,
+                                        error = "Upload failed: ${uploadResult.exception.message}"
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    is Result.Error -> {
+                        Log.e(TAG, "Failed to export character card", exportResult.exception)
+                        _uiState.update {
+                            it.copy(
+                                isUploading = false,
+                                error = "Failed to export character: ${exportResult.exception.message}"
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Upload error", e)
+                _uiState.update { it.copy(isUploading = false, error = "Upload error: ${e.message}") }
+            }
+        }
+    }
 }
