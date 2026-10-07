@@ -4,6 +4,25 @@ All notable changes to PocketTavern are documented here.
 
 ---
 
+## [2.3.7] — 2026-10-07
+
+### Added
+- **CharaVault is back** — hosted again and restored as the default card source, alongside Chub, RisuRealm and BotBooru. The PocketTavern-hosted on-device models return with it
+- **Long-term memory editor** — new entry in the chat overflow menu to read, correct or clear the running summary the AI is given as context
+- **Group chats in backups** — Backup & Restore now includes groups and their chats
+- **Scene Painter: "Send this scene in chat"** — puts the character into the current setting
+- **img2img for Stability and nano-gpt** image backends
+- `PT.getImageBackendCapabilities()` for JS extensions, so they can tell whether the active backend supports img2img
+
+### Fixed
+- **Restoring a backup could open the wrong chat** — chat file times were lost in backup/restore, so an old abandoned chat could be picked as the current one and a long RP looked like it had vanished. Times are now preserved, and backups made by older versions are repaired on restore from the message dates inside each chat
+- **Scene Painter images missing established detail** — the hidden prompt request now sees the world book, long-term memory and persona, no longer truncates the character card, and multi-line prompts are no longer cut down to their last line
+- **Scene Painter portrait img2img never used the avatar** — the current character file was never set for JS extensions, so `PT.getCharacterAvatar()`, `PT.getCharacterFace()` and per-character extension settings all returned nothing
+- Avatars are no longer sent to image backends that silently ignore them; Scene Painter says when likeness will be prompt-only
+- **Hidden generation returned nothing on reasoning models** (DeepSeek R1 and similar) — the thinking tokens used up the whole budget. Scene Painter now also says so on screen when that happens
+
+---
+
 ## [2.1.5.1] — 2026-05-17
 
 ### Fixed
