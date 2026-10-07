@@ -465,7 +465,7 @@
     <string name="add_preset_2">Add preset</string>
     <string name="edit_preset">Edit preset</string>
     <string name="delete_preset">Delete preset</string>
-    <string name="backup_includes_characters_chats_lorebooks_ba">Backup includes characters, chats, lorebooks, backgrounds, and extensions.</string>
+    <string name="backup_includes_characters_chats_lorebooks_ba">Backup includes characters, chats, groups, lorebooks, backgrounds, and extensions.</string>
     <string name="save_all_your_data_as_a_zip_file">Save all your data as a ZIP file.</string>
     <string name="restore_from_a_previously_exported_zip_existi">Restore from a previously exported ZIP. Existing data will be overwritten.</string>
     <string name="backup_restore">Backup &amp; Restore</string>

@@ -466,7 +466,7 @@
 <string name="add_preset_2">添加预设</string>
 <string name="edit_preset">编辑预设</string>
 <string name="delete_preset">删除预设</string>
-<string name="backup_includes_characters_chats_lorebooks_ba">备份包含角色、聊天、知识库、背景和扩展。</string>
+<string name="backup_includes_characters_chats_lorebooks_ba">备份包含角色、聊天、群组、知识库、背景和扩展。</string>
 <string name="save_all_your_data_as_a_zip_file">将你的所有数据保存为 ZIP 文件。</string>
 <string name="restore_from_a_previously_exported_zip_existi">从先前导出的 ZIP 恢复。现有数据将被覆盖。</string>
 <string name="backup_restore">备份与恢复</string>

@@ -104,6 +104,19 @@ class ChatStorage @Inject constructor(
         }
     }
 
+    /** Epoch millis of the newest message with a readable send_date, or null if there is none. */
+    fun lastMessageTime(file: File): Long? {
+        return try {
+            file.readLines().drop(1).asReversed().firstNotNullOfOrNull { line ->
+                if (line.isBlank()) return@firstNotNullOfOrNull null
+                try { parseDate(json.decodeFromString<ChatLine>(line).send_date)?.toEpochMilli() }
+                catch (e: Exception) { null }
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     /** Load a full chat from a JSONL file. Memory fields loaded from Room. */
     suspend fun loadChat(characterName: String, fileName: String): Chat? = withContext(Dispatchers.IO) {
         val file = File(characterDir(characterName), fileName)
