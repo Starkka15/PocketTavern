@@ -25,6 +25,7 @@ fun MessageInput(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     placeholder: String = "Type a message...",
+    enterSends: Boolean = true,
     onVoiceInput: (() -> Unit)? = null
 ) {
     Surface(
@@ -69,7 +70,9 @@ fun MessageInput(
                     unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                 ),
                 shape = RoundedCornerShape(24.dp),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardOptions = KeyboardOptions(
+                    imeAction = if (enterSends) ImeAction.Send else ImeAction.Default
+                ),
                 keyboardActions = KeyboardActions(
                     onSend = { if (value.isNotBlank() && enabled) onSend() }
                 ),

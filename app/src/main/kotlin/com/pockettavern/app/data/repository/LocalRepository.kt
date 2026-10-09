@@ -490,6 +490,11 @@ class LocalRepository @Inject constructor(
 
     suspend fun getMemoryEnabled(): Boolean = settingsDataStore.getMemoryEnabled()
     suspend fun saveMemoryEnabled(enabled: Boolean) = settingsDataStore.saveMemoryEnabled(enabled)
+
+    val enterSendsFlow: kotlinx.coroutines.flow.Flow<Boolean> =
+        settingsDataStore.enterSendsFlow
+
+    suspend fun saveEnterSends(enabled: Boolean) = settingsDataStore.saveEnterSends(enabled)
     suspend fun updateChatMemoryBlock(characterName: String, fileName: String, block: String, count: Int) =
         chatStorage.updateMemoryBlock(characterName, fileName, block, count)
 

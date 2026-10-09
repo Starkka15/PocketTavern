@@ -125,6 +125,9 @@ class SettingsDataStore @Inject constructor(
         // Long-Term Memory
         val MEMORY_ENABLED = booleanPreferencesKey("memory_enabled")
 
+        // Chat input: keyboard Enter sends the message instead of inserting a newline
+        val ENTER_SENDS = booleanPreferencesKey("enter_sends")
+
         // Show reasoning/thinking tokens (R1, QwQ, etc.)
         val SHOW_THOUGHTS = booleanPreferencesKey("show_thoughts")
 
@@ -500,6 +503,16 @@ class SettingsDataStore @Inject constructor(
 
     suspend fun saveMemoryEnabled(enabled: Boolean) {
         context.dataStore.edit { prefs -> prefs[Keys.MEMORY_ENABLED] = enabled }
+    }
+
+    // ── Chat Input ───────────────────────────────────────────────────────────
+
+    val enterSendsFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[Keys.ENTER_SENDS] ?: true
+    }
+
+    suspend fun saveEnterSends(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[Keys.ENTER_SENDS] = enabled }
     }
 }
 

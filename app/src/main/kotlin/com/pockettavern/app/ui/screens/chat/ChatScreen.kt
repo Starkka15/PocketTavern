@@ -551,6 +551,7 @@ fun ChatScreen(
                     onValueChange = { viewModel.updateInput(it) },
                     onSend = { viewModel.sendMessage() },
                     enabled = !uiState.isGenerating && !uiState.isLoading && uiState.editingMessageIndex == null,
+                    enterSends = uiState.enterSends,
                     onVoiceInput = { launchStt() }
                 )
             }

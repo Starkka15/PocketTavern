@@ -110,6 +110,14 @@ fun ContextSettingsScreen(
                     onNoSpeakForUserChange = viewModel::updateNoSpeakForUser
                 )
 
+                HorizontalDivider()
+
+                // Chat Input Section
+                ChatInputSection(
+                    enterSends = uiState.enterSends,
+                    onEnterSendsChange = viewModel::updateEnterSends
+                )
+
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Save Button
@@ -459,6 +467,38 @@ private fun RoleplayBehaviorSection(
             }
             Spacer(modifier = Modifier.width(16.dp))
             Switch(checked = noSpeakForUser, onCheckedChange = onNoSpeakForUserChange)
+        }
+    }
+}
+
+@Composable
+private fun ChatInputSection(
+    enterSends: Boolean,
+    onEnterSendsChange: (Boolean) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(text = stringResource(R.string.chat_input),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = stringResource(R.string.enter_key_sends),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(text = stringResource(R.string.enter_key_sends_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Switch(checked = enterSends, onCheckedChange = onEnterSendsChange)
         }
     }
 }

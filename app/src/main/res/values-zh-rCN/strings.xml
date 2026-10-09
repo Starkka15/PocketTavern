@@ -252,6 +252,9 @@
 <string name="roleplay_behavior">角色扮演行为</string>
 <string name="don_t_speak_or_act_for_user">不要替用户说话或行动</string>
 <string name="instructs_the_ai_to_never_write_dialogue_or_a">指示 AI 永远不要替你的角色写对话或行动。</string>
+<string name="chat_input">聊天输入</string>
+<string name="enter_key_sends">回车键发送消息</string>
+<string name="enter_key_sends_hint">关闭后，键盘的回车键将改为换行，请使用发送按钮发送消息。</string>
 <string name="context_settings">上下文设置</string>
 <string name="author_s_note_2">作者注</string>
 <string name="position">位置</string>

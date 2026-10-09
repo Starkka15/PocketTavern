@@ -38,6 +38,9 @@ data class ContextSettingsUiState(
     // Roleplay behavior
     val noSpeakForUser: Boolean = false,
 
+    // Chat input
+    val enterSends: Boolean = true,
+
     // UI state
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
@@ -63,6 +66,11 @@ class ContextSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             localRepository.memoryEnabledFlow.collect { enabled ->
                 _uiState.update { it.copy(memoryEnabled = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            localRepository.enterSendsFlow.collect { enabled ->
+                _uiState.update { it.copy(enterSends = enabled) }
             }
         }
     }
@@ -156,6 +164,11 @@ class ContextSettingsViewModel @Inject constructor(
         _uiState.update { it.copy(noSpeakForUser = value) }
     }
 
+    // Chat input
+    fun updateEnterSends(value: Boolean) {
+        _uiState.update { it.copy(enterSends = value) }
+    }
+
     fun updateAutoContinueMinLength(length: Int) {
         _uiState.update { it.copy(autoContinueMinLength = length) }
     }
@@ -177,6 +190,7 @@ class ContextSettingsViewModel @Inject constructor(
                 localRepository.saveUserPersona(persona)
                 localRepository.saveAutoContinueConfig(state.autoContinueEnabled, state.autoContinueMinLength)
                 localRepository.saveMemoryEnabled(state.memoryEnabled)
+                localRepository.saveEnterSends(state.enterSends)
                 localRepository.saveGlobalAuthorsNote(AuthorsNote(
                     content = state.authorsNoteContent,
                     interval = state.authorsNoteInterval,

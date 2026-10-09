@@ -66,6 +66,7 @@ data class ChatUiState(
     val streamingThinking: String = "",
     val showReasoningBubbles: Boolean = true,
     val apiShowThoughtsEnabled: Boolean = false,
+    val enterSends: Boolean = true,
     val currentChatFileName: String? = null,
     val availableChats: List<ChatInfo> = emptyList(),
     val showChatSelector: Boolean = false,
@@ -292,6 +293,12 @@ class ChatViewModel @Inject constructor(
         // Observe long-term memory setting
         viewModelScope.launch {
             localRepository.memoryEnabledFlow.collect { enabled -> memoryEnabled = enabled }
+        }
+        // Observe whether keyboard Enter sends or inserts a newline
+        viewModelScope.launch {
+            localRepository.enterSendsFlow.collect { enabled ->
+                _uiState.update { it.copy(enterSends = enabled) }
+            }
         }
         // Collect quick reply auto-triggers
         viewModelScope.launch {

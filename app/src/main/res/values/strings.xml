@@ -251,6 +251,9 @@
     <string name="roleplay_behavior">Roleplay Behavior</string>
     <string name="don_t_speak_or_act_for_user">Don\'t speak or act for user</string>
     <string name="instructs_the_ai_to_never_write_dialogue_or_a">Instructs the AI to never write dialogue or actions on behalf of your character.</string>
+    <string name="chat_input">Chat Input</string>
+    <string name="enter_key_sends">Enter key sends message</string>
+    <string name="enter_key_sends_hint">Turn off to have the keyboard\'s Enter key start a new line instead. Use the send button to send.</string>
     <string name="context_settings">Context Settings</string>
     <string name="author_s_note_2">Author\'s Note</string>
     <string name="position">Position</string>

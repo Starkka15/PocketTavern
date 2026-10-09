@@ -4,6 +4,13 @@ All notable changes to PocketTavern are documented here.
 
 ---
 
+## [2.3.8] — 2026-10-08
+
+### Added
+- **Enter key option** — new "Enter key sends message" switch under Context Settings → Chat Input. Turn it off to have the keyboard's Enter key start a new line, for multi-paragraph replies
+
+---
+
 ## [2.3.7] — 2026-10-07
 
 ### Added
