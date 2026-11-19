@@ -12,6 +12,18 @@ enum class ImageGenBackendType {
     NANO_GPT,
     LOCAL_SD_MNN;
 
+    val templateLabel: String
+        get() = when (this) {
+            COMFYUI -> "Workflow"
+            SD_WEBUI -> "JSON Request Template"
+            DALLE -> "Image Generation Request"
+            STABILITY -> "JSON Request Template"
+            HUGGINGFACE -> "Inference Request Template"
+            NANO_GPT -> "Image Generation Request"
+            POLLINATIONS -> "URL Template"
+            LOCAL_SD_MNN -> "Custom Template"
+        }
+
     val displayName: String
         get() = when (this) {
             SD_WEBUI -> "SD WebUI / Forge"
@@ -38,6 +50,7 @@ data class ImageGenCapabilities(
     val supportsVae: Boolean = false,
     val supportsResolutionPresets: Boolean = true,
     val supportsProgress: Boolean = false,
+    val supportsCustomWorkflow: Boolean = false,
     val requiresApiKey: Boolean = false,
     val requiresUrl: Boolean = false,
     // Whether interrupt() actually stops in-flight generation, vs. only detaching the listener
@@ -46,6 +59,12 @@ data class ImageGenCapabilities(
     // diffusion engine has no cancellation primitive, so a started generation always runs to
     // completion natively no matter what the UI does.
     val supportsCancel: Boolean = true
+)
+
+@Serializable
+data class CustomImageWorkflowDefinition(
+    val name: String = "",
+    val template: String = ""
 )
 
 @Serializable
@@ -76,7 +95,9 @@ data class ImageGenConfig(
     val negativePrompt: String = "blurry, low quality, distorted, deformed, bad anatomy",
     val clipSkip: Int = 1,
     val width: Int = 512,
-    val height: Int = 768
+    val height: Int = 768,
+    val workflowModes: Map<String, String> = emptyMap(),
+    val customWorkflows: Map<String, CustomImageWorkflowDefinition> = emptyMap()
 ) {
     val activeBackendType: ImageGenBackendType
         get() = try {
@@ -84,6 +105,18 @@ data class ImageGenConfig(
         } catch (_: Exception) {
             ImageGenBackendType.SD_WEBUI
         }
+
+    fun workflowModeFor(backend: ImageGenBackendType): String =
+        workflowModes[backend.name] ?: "STANDARD"
+
+    fun customWorkflowFor(backend: ImageGenBackendType): CustomImageWorkflowDefinition? =
+        customWorkflows[backend.name]
+
+    val activeWorkflowMode: String
+        get() = workflowModeFor(activeBackendType)
+
+    val activeCustomWorkflow: CustomImageWorkflowDefinition?
+        get() = customWorkflowFor(activeBackendType)
 
     /**
      * Whether the currently active backend has its required connection info filled in --

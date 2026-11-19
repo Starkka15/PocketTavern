@@ -1,7 +1,8 @@
 package com.pockettavern.app.data.remote.imagegen
 
-import android.util.Base64
+import java.util.Base64
 import com.pockettavern.app.data.local.SettingsDataStore
+import com.pockettavern.app.domain.model.ImageGenConfig
 import com.pockettavern.app.domain.model.ForgeGenerationParams
 import com.pockettavern.app.domain.model.GenerationState
 import com.pockettavern.app.domain.model.ImageGenBackendType
@@ -10,16 +11,21 @@ import com.pockettavern.app.domain.model.Result
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URLEncoder
 
-class PollinationsBackend(
+class PollinationsBackend private constructor(
     private val httpClient: OkHttpClient,
-    private val settingsDataStore: SettingsDataStore
+    private val configProvider: suspend () -> ImageGenConfig
 ) : ImageGenBackend {
+
+    constructor(httpClient: OkHttpClient, settingsDataStore: SettingsDataStore) :
+        this(httpClient, { settingsDataStore.getImageGenConfig() })
+
+    internal constructor(httpClient: OkHttpClient, config: ImageGenConfig) :
+        this(httpClient, { config })
 
     companion object {
         private const val BASE_URL = "https://gen.pollinations.ai/image"
@@ -32,10 +38,11 @@ class PollinationsBackend(
         supportsNegativePrompt = true,
         supportsSeed = true,
         supportsModels = true,
+        supportsCustomWorkflow = true,
         requiresApiKey = true
     )
 
-    private fun getConfig() = runBlocking { settingsDataStore.getImageGenConfig() }
+    private suspend fun getConfig() = configProvider()
 
     override suspend fun testConnection(): Result<Boolean> {
         return try {
@@ -70,44 +77,60 @@ class PollinationsBackend(
         emit(GenerationState.Starting)
         try {
             val config = getConfig()
-            val encodedPrompt = withContext(Dispatchers.IO) {
-                URLEncoder.encode(params.prompt, "UTF-8")
-            }
-            val urlBuilder = StringBuilder("$BASE_URL/$encodedPrompt")
-            urlBuilder.append("?width=${params.width}")
-            urlBuilder.append("&height=${params.height}")
-            urlBuilder.append("&nologo=true")
-
             val model = config.pollinationsModel.ifBlank { "flux" }
-            urlBuilder.append("&model=$model")
+            val customTemplate = CustomImageTemplate.checkedSelected(config, params, type)
 
-            if (params.seed != -1) {
-                urlBuilder.append("&seed=${params.seed}")
-            }
-            if (params.negativePrompt.isNotBlank()) {
-                val encodedNeg = withContext(Dispatchers.IO) {
-                    URLEncoder.encode(params.negativePrompt, "UTF-8")
+            val requestUrl = if (customTemplate != null) {
+                val rendered = CustomImageTemplate.renderUrl(customTemplate, params, model)
+                if (!rendered.startsWith("http://") && !rendered.startsWith("https://")) {
+                    throw IllegalArgumentException(
+                        "Pollinations custom workflow must be a full http(s) URL template"
+                    )
                 }
-                urlBuilder.append("&negative=$encodedNeg")
-            }
-            if (config.pollinationsApiKey.isNotBlank()) {
-                urlBuilder.append("&key=${config.pollinationsApiKey}")
+                rendered
+            } else {
+                val encodedPrompt = withContext(Dispatchers.IO) {
+                    URLEncoder.encode(params.prompt, "UTF-8")
+                }
+                val urlBuilder = StringBuilder("$BASE_URL/$encodedPrompt")
+                urlBuilder.append("?width=${params.width}")
+                urlBuilder.append("&height=${params.height}")
+                urlBuilder.append("&nologo=true")
+                urlBuilder.append("&model=$model")
+
+                if (params.seed != -1) {
+                    urlBuilder.append("&seed=${params.seed}")
+                }
+                if (params.negativePrompt.isNotBlank()) {
+                    val encodedNeg = withContext(Dispatchers.IO) {
+                        URLEncoder.encode(params.negativePrompt, "UTF-8")
+                    }
+                    urlBuilder.append("&negative=$encodedNeg")
+                }
+                if (config.pollinationsApiKey.isNotBlank()) {
+                    urlBuilder.append("&key=${config.pollinationsApiKey}")
+                }
+                urlBuilder.toString()
             }
 
             emit(GenerationState.InProgress(progress = 0f, eta = 0f))
 
             val request = Request.Builder()
-                .url(urlBuilder.toString())
+                .url(requestUrl)
                 .header("User-Agent", "PocketTavern")
                 .get()
                 .build()
             val imageBytes = withContext(Dispatchers.IO) {
                 httpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) throw Exception("HTTP ${response.code}: ${response.message}")
-                    response.body?.bytes() ?: throw Exception("Empty response")
+                    val responseBody = response.body ?: throw Exception("Empty response")
+                    if (responseBody.contentType()?.subtype?.contains("json", ignoreCase = true) == true) {
+                        throw Exception("Expected image data but received JSON")
+                    }
+                    responseBody.bytes().takeIf { it.isNotEmpty() } ?: throw Exception("Empty image response")
                 }
             }
-            val base64 = Base64.encodeToString(imageBytes, Base64.NO_WRAP)
+            val base64 = Base64.getEncoder().encodeToString(imageBytes)
             emit(GenerationState.Complete(imageBase64 = base64))
         } catch (e: Exception) {
             emit(GenerationState.Error(e.message ?: "Generation failed"))

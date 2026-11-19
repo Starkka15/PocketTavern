@@ -3,6 +3,7 @@ package com.pockettavern.app.ui.screens.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pockettavern.app.data.local.SettingsDataStore
+import com.pockettavern.app.data.remote.imagegen.WorkflowImportValidator
 import com.pockettavern.app.data.local.inference.SdxlModelManager
 import com.pockettavern.app.data.repository.ImageGenRepository
 import com.pockettavern.app.domain.model.AvailableModel
@@ -30,6 +31,7 @@ data class ImageGenSettingsUiState(
     val isLoading: Boolean = true,
     val isTesting: Boolean = false,
     val testResult: String? = null,
+    val workflowImportError: String? = null,
     val isLoadingSamplers: Boolean = false,
     val isLoadingModels: Boolean = false,
     // On-device SDXL (MNN) model sets
@@ -45,6 +47,9 @@ class ImageGenSettingsViewModel @Inject constructor(
     private val imageGenRepository: ImageGenRepository,
     private val sdxlModelManager: SdxlModelManager,
 ) : ViewModel() {
+
+    // Last imported or attempted template; used to re-check on every backend switch.
+    private var lastAttemptedWorkflow: String? = null
 
     private val _uiState = MutableStateFlow(ImageGenSettingsUiState())
     val uiState: StateFlow<ImageGenSettingsUiState> = _uiState.asStateFlow()
@@ -123,7 +128,8 @@ class ImageGenSettingsViewModel @Inject constructor(
             it.copy(
                 capabilities = backend?.capabilities ?: ImageGenCapabilities(),
                 samplers = emptyList(),
-                models = emptyList()
+                models = emptyList(),
+                workflowImportError = lastAttemptedWorkflow?.let { WorkflowImportValidator.validate(it, type) }
             )
         }
     }
@@ -202,6 +208,54 @@ class ImageGenSettingsViewModel @Inject constructor(
 
     fun updateResolution(width: Int, height: Int) {
         updateConfig { it.copy(width = width, height = height) }
+    }
+
+    fun updateWorkflowMode(mode: String) {
+        updateConfig { config ->
+            config.copy(
+                workflowModes = config.workflowModes + (config.activeBackend to mode)
+            )
+        }
+    }
+
+    fun reportWorkflowImportReadError() {
+        lastAttemptedWorkflow = null
+        _uiState.update { state ->
+            state.copy(
+                workflowImportError = "Could not read the selected ${state.config.activeBackendType.templateLabel} file. Please choose another file."
+            )
+        }
+    }
+
+    fun updateCustomWorkflow(template: String, fileName: String) {
+        val backend = _uiState.value.config.activeBackendType
+        lastAttemptedWorkflow = template
+        val error = WorkflowImportValidator.validate(template, backend)
+        if (error != null) {
+            _uiState.update { it.copy(workflowImportError = error) }
+            return
+        }
+        _uiState.update { it.copy(workflowImportError = null) }
+        updateConfig { config ->
+            config.copy(
+                customWorkflows = config.customWorkflows + (
+                    config.activeBackend to com.pockettavern.app.domain.model.CustomImageWorkflowDefinition(
+                        name = fileName,
+                        template = template
+                    )
+                )
+            )
+        }
+    }
+
+    fun clearCustomWorkflow() {
+        lastAttemptedWorkflow = null
+        _uiState.update { it.copy(workflowImportError = null) }
+        updateConfig { config ->
+            config.copy(
+                customWorkflows = config.customWorkflows - config.activeBackend
+            )
+        }
     }
 
     fun testConnection() {

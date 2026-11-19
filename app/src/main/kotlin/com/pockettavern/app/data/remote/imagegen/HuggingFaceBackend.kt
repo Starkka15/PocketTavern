@@ -1,7 +1,8 @@
 package com.pockettavern.app.data.remote.imagegen
 
-import android.util.Base64
+import java.util.Base64
 import com.pockettavern.app.data.local.SettingsDataStore
+import com.pockettavern.app.domain.model.ImageGenConfig
 import com.pockettavern.app.domain.model.ForgeGenerationParams
 import com.pockettavern.app.domain.model.GenerationState
 import com.pockettavern.app.domain.model.ImageGenBackendType
@@ -34,10 +35,16 @@ private data class HfParameters(
     val seed: Int? = null
 )
 
-class HuggingFaceBackend(
+class HuggingFaceBackend private constructor(
     private val httpClient: OkHttpClient,
-    private val settingsDataStore: SettingsDataStore
+    private val configProvider: suspend () -> ImageGenConfig
 ) : ImageGenBackend {
+
+    constructor(httpClient: OkHttpClient, settingsDataStore: SettingsDataStore) :
+        this(httpClient, { settingsDataStore.getImageGenConfig() })
+
+    internal constructor(httpClient: OkHttpClient, config: ImageGenConfig) :
+        this(httpClient, { config })
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = false; explicitNulls = false }
 
@@ -49,11 +56,12 @@ class HuggingFaceBackend(
         supportsSeed = true,
         supportsNegativePrompt = true,
         supportsResolutionPresets = true,
+        supportsCustomWorkflow = true,
         requiresApiKey = true
     )
 
     override suspend fun testConnection(): Result<Boolean> {
-        val config = settingsDataStore.getImageGenConfig()
+        val config = configProvider()
         if (config.huggingfaceApiKey.isBlank()) {
             return Result.Error(Exception("No API key configured"))
         }
@@ -88,7 +96,7 @@ class HuggingFaceBackend(
     override fun generate(params: ForgeGenerationParams): Flow<GenerationState> = flow {
         emit(GenerationState.Starting)
         try {
-            val config = settingsDataStore.getImageGenConfig()
+            val config = configProvider()
             if (config.huggingfaceApiKey.isBlank()) {
                 emit(GenerationState.Error("No HuggingFace API key configured"))
                 return@flow
@@ -103,12 +111,16 @@ class HuggingFaceBackend(
                 seed = if (params.seed == -1) null else params.seed
             )
 
-            val body = json.encodeToString(HfRequest.serializer(), HfRequest(
-                inputs = params.prompt,
-                parameters = hfParams
-            ))
-
             val modelId = config.huggingfaceModel.ifBlank { "stabilityai/stable-diffusion-xl-base-1.0" }
+            val customTemplate = CustomImageTemplate.checkedSelected(config, params, type)
+            val body = if (customTemplate != null) {
+                CustomImageTemplate.renderJson(customTemplate, params, modelId)
+            } else {
+                json.encodeToString(HfRequest.serializer(), HfRequest(
+                    inputs = params.prompt,
+                    parameters = hfParams
+                ))
+            }
             val request = Request.Builder()
                 .url("https://api-inference.huggingface.co/models/$modelId")
                 .addHeader("Authorization", "Bearer ${config.huggingfaceApiKey}")
@@ -122,11 +134,15 @@ class HuggingFaceBackend(
                         val error = response.body?.string() ?: "HTTP ${response.code}"
                         throw Exception(error)
                     }
-                    response.body?.bytes() ?: throw Exception("Empty response")
+                    val responseBody = response.body ?: throw Exception("Empty response")
+                    if (responseBody.contentType()?.subtype?.contains("json", ignoreCase = true) == true) {
+                        throw Exception("Expected image data but received JSON")
+                    }
+                    responseBody.bytes().takeIf { it.isNotEmpty() } ?: throw Exception("Empty image response")
                 }
             }
 
-            val base64 = Base64.encodeToString(imageBytes, Base64.NO_WRAP)
+            val base64 = Base64.getEncoder().encodeToString(imageBytes)
             emit(GenerationState.Complete(imageBase64 = base64))
         } catch (e: Exception) {
             emit(GenerationState.Error(e.message ?: "Generation failed"))
