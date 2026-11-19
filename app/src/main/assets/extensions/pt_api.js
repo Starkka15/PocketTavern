@@ -530,6 +530,17 @@
             }
         },
 
+        /**
+         * Show the native chat error dialog instead of leaving a status spinner
+         * visible after a failed extension operation.
+         * @param {string} message
+         */
+        showError: function (message) {
+            if (window.PtBridge && message) {
+                PtBridge.showToast('error', String(message));
+            }
+        },
+
         // ── Per-character extension state ────────────────────────────────────
 
         /**
@@ -561,8 +572,7 @@
          * Capability flags for the *currently configured* image backend.
          *
          * Check this before sending options the backend cannot honour. In particular,
-         * only SD WebUI and Forge implement img2img -- ComfyUI, DALL-E, HuggingFace,
-         * Stability, NanoGPT, Pollinations and the on-device MNN backend ignore
+         * img2img support depends on the active backend. Other backends ignore
          * sourceImageBase64 entirely, so an avatar sent to them is silently discarded.
          *
          * @returns {{supportsImg2Img:boolean, supportsNegativePrompt:boolean,
