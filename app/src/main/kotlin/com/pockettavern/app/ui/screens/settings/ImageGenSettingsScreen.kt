@@ -1,7 +1,10 @@
 package com.pockettavern.app.ui.screens.settings
 
 import com.pockettavern.app.R
+import android.provider.OpenableColumns
 import androidx.compose.ui.res.stringResource
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,6 +19,7 @@ import androidx.compose.material3.MenuAnchorType
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -44,6 +48,34 @@ fun ImageGenSettingsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val config = uiState.config
     val caps = uiState.capabilities
+    val context = LocalContext.current
+
+    val workflowPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            WorkflowFileImport.read(
+                readContent = {
+                    context.contentResolver.openInputStream(uri)
+                        ?.bufferedReader()
+                        ?.use { it.readText() }
+                },
+                readDisplayName = {
+                    context.contentResolver.query(
+                        uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+                    )?.use { cursor ->
+                        val column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        if (column >= 0 && cursor.moveToFirst()) cursor.getString(column) else null
+                    }
+                }
+            ).onSuccess { selected ->
+                // Empty content is intentionally passed to the validator for a useful error.
+                viewModel.updateCustomWorkflow(selected.content, selected.name)
+            }.onFailure {
+                viewModel.reportWorkflowImportReadError()
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -405,6 +437,113 @@ fun ImageGenSettingsScreen(
                         }
                     }
                 }
+            }
+
+            // ── Workflow ────────────────────────────────────────────
+            if (caps.supportsCustomWorkflow) {
+                item {
+                ImageGenSectionCard {
+                    Text(
+                        config.activeBackendType.templateLabel,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    var workflowExpanded by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = workflowExpanded,
+                        onExpandedChange = { workflowExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = if (config.activeWorkflowMode == "CUSTOM") "Custom" else "Standard",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text(config.activeBackendType.templateLabel) },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(workflowExpanded) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                            colors = imageGenTextFieldColors()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = workflowExpanded,
+                            onDismissRequest = { workflowExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Standard") },
+                                onClick = {
+                                    viewModel.updateWorkflowMode("STANDARD")
+                                    workflowExpanded = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Custom") },
+                                onClick = {
+                                    viewModel.updateWorkflowMode("CUSTOM")
+                                    workflowExpanded = false
+                                }
+                            )
+                        }
+                    }
+
+                        uiState.workflowImportError?.let { error ->
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = error,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+
+                    if (config.activeWorkflowMode == "CUSTOM") {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = {
+                                workflowPicker.launch(
+                                    arrayOf(
+                                        "application/json",
+                                        "text/plain",
+                                        "application/octet-stream"
+                                    )
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                if (config.activeCustomWorkflow?.name.orEmpty().isBlank())
+                                    "Import ${config.activeBackendType.templateLabel}"
+                                else
+                                    "Replace ${config.activeBackendType.templateLabel}"
+                            )
+                        }
+
+                        if (config.activeCustomWorkflow?.name.orEmpty().isNotBlank()) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                "Imported: ${config.activeCustomWorkflow?.name.orEmpty()}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                "For: ${config.activeBackendType.displayName}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            TextButton(onClick = { viewModel.clearCustomWorkflow() }) {
+                                Text("Remove imported ${config.activeBackendType.templateLabel}")
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                "Import a ${config.activeBackendType.templateLabel} for ${config.activeBackendType.displayName}.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
             }
 
             // ── Sampler / Model (if supported) ──────────────────────
