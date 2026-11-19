@@ -30,6 +30,9 @@
         negativePrompt:    'blurry, low quality, deformed, bad anatomy, text, watermark',
         promptPrefix:      '',     // prepended to every prompt (e.g. Pony XL quality tags)
         artStyleByChar:    {},
+        // Read-only legacy fields retained for non-destructive native migration.
+        workflowByChar:    {},
+        customWorkflowByChar: {},
         portraitImg2Img:   true,   // use character avatar as img2img source for portraits
         sceneImg2Img:      true,   // ...and for character-in-scene shots
         denoisingStrength: 0.55,   // 0.0 = identical, 1.0 = ignore source image
@@ -46,6 +49,8 @@
         if (s.negativePrompt      === undefined) s.negativePrompt      = DEFAULT_SETTINGS.negativePrompt;
         if (s.promptPrefix        === undefined) s.promptPrefix        = DEFAULT_SETTINGS.promptPrefix;
         if (!s.artStyleByChar)                   s.artStyleByChar      = {};
+        if (!s.workflowByChar)                   s.workflowByChar = {};
+        if (!s.customWorkflowByChar)             s.customWorkflowByChar = {};
         if (s.portraitImg2Img     === undefined) s.portraitImg2Img     = DEFAULT_SETTINGS.portraitImg2Img;
         if (s.sceneImg2Img        === undefined) s.sceneImg2Img        = DEFAULT_SETTINGS.sceneImg2Img;
         if (s.denoisingStrength   === undefined) s.denoisingStrength   = DEFAULT_SETTINGS.denoisingStrength;
@@ -64,6 +69,12 @@
         var s = getSettings();
         var charName = getCurrentCharName();
         return s.artStyleByChar[charName] || s.defaultArtStyle;
+    }
+
+    function reportError(message) {
+        PT.log('[ScenePainter] ' + message);
+        PT.setStatus('');
+        if (PT.showError) PT.showError(message);
     }
 
     // ── State ─────────────────────────────────────────────────────────────────
@@ -124,7 +135,7 @@
             }
         }
         if (!messageText) {
-            PT.log('[ScenePainter] No message text found for index ' + messageIndex);
+            reportError('Scene Painter could not find text in the selected message.');
             return;
         }
 
@@ -181,15 +192,11 @@
 
         PT.generateHidden(analysisPrompt).then(function (sdPrompt) {
             if (!sdPrompt || !sdPrompt.trim()) {
-                // Usually a reasoning model that spent its whole token budget thinking and
-                // returned no content. Say so rather than failing silently -- previously this
-                // just stopped and the user saw nothing happen at all.
-                PT.log('[ScenePainter] Empty prompt from analysis (model returned no content)');
-                PT.setStatus('Image prompt came back empty - try again or use a non-reasoning model');
-                setTimeout(function () { PT.setStatus(''); }, 6000);
                 _isGenerating = false;
+                reportError('Scene Painter could not compose an image prompt. Check your LLM connection and try again.');
                 return;
             }
+
 
             // LLM may output reasoning steps — take the last non-empty line as the actual prompt
             // The model may prepend reasoning. This previously took only the LAST non-empty
@@ -266,13 +273,13 @@
                 PT.insertMessage('', { type: 'image', imageBase64: base64 });
             }).catch(function(e) {
                 PT.log('[ScenePainter] generateImage error: ' + e);
-                PT.setStatus('');
                 _isGenerating = false;
+                reportError('Scene Painter image generation failed. Check your backend and try again.');
             });
         }).catch(function(e) {
             PT.log('[ScenePainter] generateHidden error: ' + e);
-            PT.setStatus('');
             _isGenerating = false;
+            reportError('Scene Painter could not compose an image prompt. Check your LLM connection and try again.');
         });
     }
 
