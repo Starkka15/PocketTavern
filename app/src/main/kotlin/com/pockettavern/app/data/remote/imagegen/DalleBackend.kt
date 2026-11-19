@@ -2,6 +2,7 @@ package com.pockettavern.app.data.remote.imagegen
 
 import android.util.Base64
 import com.pockettavern.app.data.local.SettingsDataStore
+import com.pockettavern.app.domain.model.ImageGenConfig
 import com.pockettavern.app.domain.model.ForgeGenerationParams
 import com.pockettavern.app.domain.model.GenerationState
 import com.pockettavern.app.domain.model.ImageGenBackendType
@@ -47,10 +48,16 @@ private data class DalleError(
     val message: String? = null
 )
 
-class DalleBackend(
+class DalleBackend private constructor(
     private val httpClient: OkHttpClient,
-    private val settingsDataStore: SettingsDataStore
+    private val configProvider: suspend () -> ImageGenConfig
 ) : ImageGenBackend {
+
+    constructor(httpClient: OkHttpClient, settingsDataStore: SettingsDataStore) :
+        this(httpClient, { settingsDataStore.getImageGenConfig() })
+
+    internal constructor(httpClient: OkHttpClient, config: ImageGenConfig) :
+        this(httpClient, { config })
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
@@ -58,11 +65,12 @@ class DalleBackend(
 
     override val capabilities = ImageGenCapabilities(
         supportsResolutionPresets = true,
+        supportsCustomWorkflow = true,
         requiresApiKey = true
     )
 
     override suspend fun testConnection(): Result<Boolean> {
-        val config = settingsDataStore.getImageGenConfig()
+        val config = configProvider()
         if (config.dalleApiKey.isBlank()) {
             return Result.Error(Exception("No API key configured"))
         }
@@ -92,7 +100,7 @@ class DalleBackend(
     override fun generate(params: ForgeGenerationParams): Flow<GenerationState> = flow {
         emit(GenerationState.Starting)
         try {
-            val config = settingsDataStore.getImageGenConfig()
+            val config = configProvider()
             if (config.dalleApiKey.isBlank()) {
                 emit(GenerationState.Error("No OpenAI API key configured"))
                 return@flow
@@ -101,12 +109,17 @@ class DalleBackend(
             // DALL-E supports specific sizes
             val size = pickDalleSize(config.dalleModel, params.width, params.height)
 
-            val body = json.encodeToString(DalleRequest.serializer(), DalleRequest(
-                model = config.dalleModel,
-                prompt = params.prompt,
-                size = size,
-                responseFormat = "b64_json"
-            ))
+            val customTemplate = CustomImageTemplate.checkedSelected(config, params, type)
+            val body = if (customTemplate != null) {
+                CustomImageTemplate.renderJson(customTemplate, params, config.dalleModel)
+            } else {
+                json.encodeToString(DalleRequest.serializer(), DalleRequest(
+                    model = config.dalleModel,
+                    prompt = params.prompt,
+                    size = size,
+                    responseFormat = "b64_json"
+                ))
+            }
 
             val request = Request.Builder()
                 .url("https://api.openai.com/v1/images/generations")
@@ -117,7 +130,9 @@ class DalleBackend(
 
             val responseBody = withContext(Dispatchers.IO) {
                 httpClient.newCall(request).execute().use { response ->
-                    response.body?.string() ?: throw Exception("Empty response")
+                    val text = response.body?.string() ?: throw Exception("Empty response")
+                    if (!response.isSuccessful) throw Exception("HTTP ${response.code}: $text")
+                    text
                 }
             }
 

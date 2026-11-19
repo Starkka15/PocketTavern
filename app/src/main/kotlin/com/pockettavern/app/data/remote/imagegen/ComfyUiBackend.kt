@@ -1,7 +1,8 @@
 package com.pockettavern.app.data.remote.imagegen
 
-import android.util.Base64
+import java.util.Base64
 import com.pockettavern.app.data.local.SettingsDataStore
+import com.pockettavern.app.domain.model.ImageGenConfig
 import com.pockettavern.app.domain.model.ForgeGenerationParams
 import com.pockettavern.app.domain.model.GenerationState
 import com.pockettavern.app.domain.model.ImageGenBackendType
@@ -14,15 +15,22 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
-class ComfyUiBackend(
+class ComfyUiBackend private constructor(
     private val httpClient: OkHttpClient,
-    private val settingsDataStore: SettingsDataStore
+    private val configProvider: suspend () -> ImageGenConfig
 ) : ImageGenBackend {
+
+    constructor(httpClient: OkHttpClient, settingsDataStore: SettingsDataStore) :
+        this(httpClient, { settingsDataStore.getImageGenConfig() })
+
+    internal constructor(httpClient: OkHttpClient, config: ImageGenConfig) :
+        this(httpClient, { config })
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
@@ -36,11 +44,12 @@ class ComfyUiBackend(
         supportsNegativePrompt = true,
         supportsResolutionPresets = true,
         supportsProgress = true,
+        supportsCustomWorkflow = true,
         requiresUrl = true
     )
 
     private suspend fun getBaseUrl(): String {
-        val config = settingsDataStore.getImageGenConfig()
+        val config = configProvider()
         return config.comfyuiUrl.trimEnd('/')
     }
 
@@ -135,20 +144,37 @@ class ComfyUiBackend(
                 return@flow
             }
 
-            val config = settingsDataStore.getImageGenConfig()
+            val config = configProvider()
             val seed = if (params.seed == -1) (0..Int.MAX_VALUE).random().toLong() else params.seed.toLong()
 
-            // Build a simple txt2img workflow
-            val workflow = buildDefaultWorkflow(
-                prompt = params.prompt,
-                negativePrompt = params.negativePrompt,
-                width = params.width,
-                height = params.height,
-                steps = params.steps,
-                cfgScale = params.cfgScale,
-                sampler = config.sampler.lowercase().replace(" ", "_"),
-                seed = seed
-            )
+            val customWorkflow = CustomImageTemplate.checkedSelected(config, params, type)
+
+            val workflow = if (customWorkflow != null) {
+                applyPocketTavernInputsToCustomWorkflow(
+                    workflowJson = customWorkflow,
+                    prompt = params.prompt,
+                    negativePrompt = params.negativePrompt,
+                    width = params.width,
+                    height = params.height,
+                    steps = params.steps,
+                    cfgScale = params.cfgScale,
+                    sampler = config.sampler,
+                    seed = seed,
+                    // Own character graphs may intentionally use distinct checkpoints.
+                    modelName = if (params.preserveCustomWorkflowModel) "" else config.sdModel
+                )
+            } else {
+                buildDefaultWorkflow(
+                    prompt = params.prompt,
+                    negativePrompt = params.negativePrompt,
+                    width = params.width,
+                    height = params.height,
+                    steps = params.steps,
+                    cfgScale = params.cfgScale,
+                    sampler = normalizeSamplerName(config.sampler),
+                    seed = seed
+                )
+            }
 
             val promptPayload = buildJsonObject {
                 put("prompt", json.parseToJsonElement(workflow))
@@ -182,6 +208,7 @@ class ComfyUiBackend(
 
                 val historyBody = withContext(Dispatchers.IO) {
                     httpClient.newCall(historyReq).execute().use { response ->
+                        if (!response.isSuccessful) throw Exception("ComfyUI history HTTP ${response.code}")
                         response.body?.string()
                     }
                 } ?: continue
@@ -190,10 +217,11 @@ class ComfyUiBackend(
                 val promptHistory = historyRoot[promptId]?.jsonObject
                 if (promptHistory != null) {
                     val outputs = promptHistory["outputs"]?.jsonObject
-                    // Find the SaveImage node output (node "9" in our workflow)
-                    val saveNode = outputs?.get("9")?.jsonObject
-                    val images = saveNode?.get("images")?.jsonArray
-                    val firstImage = images?.firstOrNull()?.jsonObject
+                    val firstImage = outputs
+                        ?.values
+                        ?.asSequence()
+                        ?.mapNotNull { it.jsonObject["images"]?.jsonArray?.firstOrNull()?.jsonObject }
+                        ?.firstOrNull()
 
                     if (firstImage != null) {
                         val filename = firstImage["filename"]?.jsonPrimitive?.contentOrNull
@@ -202,14 +230,23 @@ class ComfyUiBackend(
 
                         if (filename != null) {
                             // Fetch the image
-                            val imgUrl = "$baseUrl/view?filename=$filename&subfolder=$subfolder&type=$imageType"
+                            val imgUrl = "$baseUrl/view".toHttpUrl().newBuilder()
+                                .addQueryParameter("filename", filename)
+                                .addQueryParameter("subfolder", subfolder)
+                                .addQueryParameter("type", imageType)
+                                .build()
                             val imgReq = Request.Builder().url(imgUrl).get().build()
                             val imageBytes = withContext(Dispatchers.IO) {
                                 httpClient.newCall(imgReq).execute().use { resp ->
-                                    resp.body?.bytes() ?: throw Exception("Failed to download image")
+                                    if (!resp.isSuccessful) throw Exception("ComfyUI image HTTP ${resp.code}")
+                                    val body = resp.body ?: throw Exception("Failed to download image")
+                                    if (body.contentType()?.subtype?.contains("json", ignoreCase = true) == true) {
+                                        throw Exception("ComfyUI returned JSON instead of an image")
+                                    }
+                                    body.bytes().takeIf { it.isNotEmpty() } ?: throw Exception("Empty image response")
                                 }
                             }
-                            val base64 = Base64.encodeToString(imageBytes, Base64.NO_WRAP)
+                            val base64 = Base64.getEncoder().encodeToString(imageBytes)
                             emit(GenerationState.Complete(imageBase64 = base64))
                             completed = true
                         }
@@ -235,6 +272,105 @@ class ComfyUiBackend(
         } catch (e: Exception) {
             Result.Error(Exception("Failed to interrupt: ${e.message}", e))
         }
+    }
+
+    private fun normalizeSamplerName(name: String): String {
+        return when (name.trim().lowercase()) {
+            "euler" -> "euler"
+            "euler a", "euler_a" -> "euler_ancestral"
+            "dpm++ 2m karras", "dpmpp_2m_karras" -> "dpmpp_2m"
+            "dpm++ sde karras", "dpmpp_sde_karras" -> "dpmpp_sde"
+            "ddim" -> "ddim"
+            "unipc", "uni_pc" -> "uni_pc"
+            else -> name.trim().lowercase().replace(" ", "_")
+        }
+    }
+
+    private fun applyPocketTavernInputsToCustomWorkflow(
+        workflowJson: String,
+        prompt: String,
+        negativePrompt: String,
+        width: Int,
+        height: Int,
+        steps: Int,
+        cfgScale: Float,
+        sampler: String,
+        seed: Long,
+        modelName: String
+    ): String {
+        val root = json.parseToJsonElement(workflowJson).jsonObject
+        val nodes = root.toMutableMap()
+
+        fun nodeObject(id: String?): JsonObject? =
+            id?.let { nodes[it]?.jsonObject }
+
+        fun replaceNodeInputs(id: String, newInputs: Map<String, JsonElement>) {
+            val oldNode = nodes[id]?.jsonObject ?: return
+            val updated = buildJsonObject {
+                oldNode.forEach { (k, v) ->
+                    if (k == "inputs") put(k, JsonObject(newInputs))
+                    else put(k, v)
+                }
+            }
+            nodes[id] = updated
+        }
+
+        val samplerEntry = nodes.entries.firstOrNull { (_, value) ->
+            value.jsonObject["class_type"]?.jsonPrimitive?.contentOrNull == "KSampler"
+        } ?: throw IllegalArgumentException(
+            "Custom ComfyUI workflow contains no KSampler node. Export an API workflow with a KSampler."
+        )
+
+        val samplerId = samplerEntry.key
+        val samplerNode = samplerEntry.value.jsonObject
+        val inputs = samplerNode["inputs"]?.jsonObject?.toMutableMap()
+            ?: throw IllegalArgumentException("KSampler has no inputs")
+
+        val positiveId = inputs["positive"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull
+        val negativeId = inputs["negative"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull
+        val latentId = inputs["latent_image"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull
+        val modelId = inputs["model"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull
+
+        inputs["seed"] = JsonPrimitive(seed)
+        inputs["steps"] = JsonPrimitive(steps)
+        inputs["cfg"] = JsonPrimitive(cfgScale)
+        inputs["sampler_name"] = JsonPrimitive(normalizeSamplerName(sampler))
+        replaceNodeInputs(samplerId, inputs)
+
+        if (positiveId != null) {
+            val pInputs = nodeObject(positiveId)?.get("inputs")?.jsonObject?.toMutableMap()
+            if (pInputs != null && pInputs.containsKey("text")) {
+                pInputs["text"] = JsonPrimitive(prompt)
+                replaceNodeInputs(positiveId, pInputs)
+            }
+        }
+
+        if (negativeId != null) {
+            val nInputs = nodeObject(negativeId)?.get("inputs")?.jsonObject?.toMutableMap()
+            if (nInputs != null && nInputs.containsKey("text")) {
+                nInputs["text"] = JsonPrimitive(negativePrompt)
+                replaceNodeInputs(negativeId, nInputs)
+            }
+        }
+
+        if (latentId != null) {
+            val lInputs = nodeObject(latentId)?.get("inputs")?.jsonObject?.toMutableMap()
+            if (lInputs != null) {
+                if (lInputs.containsKey("width")) lInputs["width"] = JsonPrimitive(width)
+                if (lInputs.containsKey("height")) lInputs["height"] = JsonPrimitive(height)
+                replaceNodeInputs(latentId, lInputs)
+            }
+        }
+
+        if (modelName.isNotBlank() && modelId != null) {
+            val mInputs = nodeObject(modelId)?.get("inputs")?.jsonObject?.toMutableMap()
+            if (mInputs != null && mInputs.containsKey("ckpt_name")) {
+                mInputs["ckpt_name"] = JsonPrimitive(modelName)
+                replaceNodeInputs(modelId, mInputs)
+            }
+        }
+
+        return JsonObject(nodes).toString()
     }
 
     private fun buildDefaultWorkflow(

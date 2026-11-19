@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Stop
@@ -50,6 +51,7 @@ import com.pockettavern.app.extensions.JsExtensionHost
 import com.pockettavern.app.ui.components.*
 import com.pockettavern.app.domain.model.QuickReplyButton
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import android.app.Activity
 import android.content.Intent
@@ -78,6 +80,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
@@ -104,6 +108,12 @@ fun ChatScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let { viewModel.uploadBackgroundFromUri(it) }
+    }
+
+    val characterWorkflowPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.importCharacterImageWorkflow(it) }
     }
 
     val exportChatLauncher = rememberLauncherForActivityResult(
@@ -901,6 +911,10 @@ fun ChatScreen(
                 isTtsEnabled = uiState.isTtsEnabled,
                 isTtsSpeaking = uiState.isTtsSpeaking,
                 extensionActions = uiState.messageActions,
+                onCharacterImageWorkflowSettings = {
+                    viewModel.dismissMessageActions()
+                    viewModel.openCharacterImageWorkflowDialog()
+                },
                 onExtensionAction = { action, label ->
                     viewModel.onHeaderActionClicked(action, label)
                     viewModel.dismissMessageActions()
@@ -908,6 +922,29 @@ fun ChatScreen(
                 onDismiss = { viewModel.dismissMessageActions() }
             )
         }
+    }
+
+    if (uiState.showCharacterImageWorkflowDialog) {
+        CharacterImageWorkflowDialog(
+            characterName = uiState.character?.name ?: "Character",
+            backend = uiState.characterImageWorkflowBackend,
+            mode = uiState.characterImageWorkflowMode,
+            globalMode = uiState.globalImageWorkflowMode,
+            characterFile = uiState.characterImageWorkflowFileName,
+            globalFile = uiState.globalImageWorkflowFileName,
+            supportsCustom = uiState.characterWorkflowSupportsCustom,
+            error = uiState.characterImageWorkflowError,
+            success = uiState.characterImageWorkflowSuccess,
+            migrationNotice = uiState.characterImageWorkflowMigrationNotice,
+            onModeChange = viewModel::setCharacterImageWorkflowMode,
+            onImport = {
+                characterWorkflowPicker.launch(arrayOf(
+                    "application/json", "text/plain", "application/octet-stream"
+                ))
+            },
+            onRemove = viewModel::removeCharacterImageWorkflow,
+            onDismiss = viewModel::dismissCharacterImageWorkflowDialog
+        )
     }
 
     // Message edit dialog
@@ -1160,6 +1197,7 @@ private fun MessageActionsDialog(
     isTtsEnabled: Boolean = false,
     isTtsSpeaking: Boolean = false,
     extensionActions: List<com.pockettavern.app.extensions.JsExtensionHost.HeaderAction> = emptyList(),
+    onCharacterImageWorkflowSettings: () -> Unit = {},
     onExtensionAction: (String, String) -> Unit = { _, _ -> },
     onDismiss: () -> Unit
 ) {
@@ -1167,9 +1205,14 @@ private fun MessageActionsDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (isImageMessage) "Image Actions" else "Message Actions") },
         text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
+            val actionsScrollState = rememberScrollState()
+            Box(modifier = Modifier.fillMaxWidth()) {
+                // Let AlertDialog use the available screen height instead of artificially
+                // clipping the actions to 440dp. Keep scrolling on smaller displays.
+                Column(
+                    modifier = Modifier.fillMaxWidth().verticalScroll(actionsScrollState),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                 if (isImageMessage) {
                     // Save Image to gallery
                     TextButton(
@@ -1338,12 +1381,188 @@ private fun MessageActionsDialog(
                     }
                 }
                 } // end else (non-image messages)
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                )
+                TextButton(
+                    onClick = onCharacterImageWorkflowSettings,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Image generation settings...")
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+                }
+
+                // Visible only while more actions remain below the viewport.
+                // The fade and chevron make the otherwise hidden scrolling discoverable.
+                if (actionsScrollState.canScrollForward) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(36.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color.Transparent, MaterialTheme.colorScheme.surfaceContainerHigh)
+                                )
+                            ),
+                        contentAlignment = Alignment.BottomCenter
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Scroll down for more actions",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.cancel))
             }
+        }
+    )
+}
+
+
+/**
+ * Native entry point from the long-pressed message's action dialog.
+ * The backend connection stays global; only the selected backend's workflow
+ * mode/template can be overridden for the current character file.
+ */
+@Composable
+private fun CharacterImageWorkflowDialog(
+    characterName: String,
+    backend: com.pockettavern.app.domain.model.ImageGenBackendType,
+    mode: String,
+    globalMode: String,
+    characterFile: String?,
+    globalFile: String?,
+    supportsCustom: Boolean,
+    error: String?,
+    success: String?,
+    migrationNotice: String?,
+    onModeChange: (String) -> Unit,
+    onImport: () -> Unit,
+    onRemove: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Image Generation — $characterName") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .heightIn(max = 400.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Backend: ${backend.displayName}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    text = "The server and API credentials remain in Global Image Generation settings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                val effective = com.pockettavern.app.domain.model.CharacterImageWorkflowPresentation.describe(
+                    backend = backend,
+                    characterMode = mode,
+                    globalMode = globalMode,
+                    characterTemplateName = characterFile,
+                    globalTemplateName = globalFile
+                )
+                Text(
+                    text = "Effective workflow: ${effective.summary}",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (effective.hasMissingTemplate) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.primary
+                )
+                if (effective.hasMissingTemplate) {
+                    Text(
+                        text = "Choose Standard or import a compatible ${backend.templateLabel} to generate images.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                val options = listOf(
+                    "GLOBAL" to "Use Global (currently ${if (globalMode == "CUSTOM") "Custom" else "Standard"})",
+                    "STANDARD" to "Standard",
+                    "CUSTOM" to "Custom"
+                )
+                options.forEach { (value, label) ->
+                    val available = value != "CUSTOM" || supportsCustom
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable(enabled = available) {
+                            onModeChange(value)
+                        },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = mode == value,
+                            onClick = { onModeChange(value) },
+                            enabled = available
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = label,
+                            color = if (available) MaterialTheme.colorScheme.onSurface
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                if (supportsCustom && (mode == "CUSTOM" || characterFile != null)) {
+                    HorizontalDivider()
+                    val chosenFile = characterFile?.takeIf { it.isNotBlank() }
+                    Text(
+                        text = if (chosenFile != null) "Character ${backend.templateLabel}: $chosenFile"
+                            else if (!globalFile.isNullOrBlank()) "Using global custom template: $globalFile"
+                            else "No custom template configured. Import one to generate images in Custom mode.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    TextButton(onClick = onImport) {
+                        Text(if (chosenFile == null) "Import ${backend.templateLabel}"
+                            else "Replace ${backend.templateLabel}")
+                    }
+                    if (chosenFile != null) {
+                        TextButton(onClick = onRemove) {
+                            Text("Remove character template")
+                        }
+                    }
+                }
+                if (success != null) {
+                    Text(
+                        text = success,
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                if (migrationNotice != null) {
+                    Text(
+                        text = migrationNotice,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                if (error != null) {
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Done") }
         }
     )
 }
@@ -1691,6 +1910,24 @@ private fun ExtensionEditDialog(
         }
     }
     val expandedDropdown = remember { mutableStateMapOf<String, Boolean>() }
+    val context = LocalContext.current
+    var pendingFileFieldKey by remember { mutableStateOf<String?>(null) }
+    val filePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        val key = pendingFileFieldKey
+        pendingFileFieldKey = null
+        if (uri != null && key != null) {
+            runCatching {
+                context.contentResolver.openInputStream(uri)
+                    ?.bufferedReader()
+                    ?.use { it.readText() }
+                    .orEmpty()
+            }.getOrNull()?.takeIf { it.isNotBlank() }?.let { fileText ->
+                fieldValues[key] = fileText
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1698,7 +1935,53 @@ private fun ExtensionEditDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 fields.forEach { field ->
-                    if (field.type == "select" && field.options.isNotEmpty()) {
+                    if (field.type == "file") {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = field.label,
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                            OutlinedButton(
+                                onClick = {
+                                    pendingFileFieldKey = field.key
+                                    filePicker.launch(
+                                        arrayOf(
+                                            "application/json",
+                                            "text/plain",
+                                            "application/octet-stream"
+                                        )
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    if ((fieldValues[field.key] ?: "").isBlank())
+                                        "Import file"
+                                    else
+                                        "Replace file"
+                                )
+                            }
+                            if ((fieldValues[field.key] ?: "").isNotBlank()) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        "Workflow loaded",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    TextButton(onClick = { fieldValues[field.key] = "" }) {
+                                        Text("Clear")
+                                    }
+                                }
+                            }
+                        }
+                    } else if (field.type == "select" && field.options.isNotEmpty()) {
                         val isExpanded = expandedDropdown[field.key] ?: false
                         ExposedDropdownMenuBox(
                             expanded = isExpanded,
