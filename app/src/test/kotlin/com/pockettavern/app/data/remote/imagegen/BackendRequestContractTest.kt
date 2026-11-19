@@ -2,6 +2,9 @@ package com.pockettavern.app.data.remote.imagegen
 
 import com.pockettavern.app.domain.model.ForgeGenerationParams
 import com.pockettavern.app.domain.model.ImageGenBackendType
+import com.pockettavern.app.domain.model.GenerationState
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonArray
@@ -77,4 +80,46 @@ class BackendRequestContractTest {
             assertTrue(error!!.contains(backend.displayName))
         }
     }
+
+
+    @Test fun nanoGptDefaultImageReferenceUsesDataUrl() = runBlocking {
+        val backend = ImageGenBackendType.NANO_GPT
+        val server = FakeImageHttp { request -> simulatedImageSuccess(request) }
+        val generator = simulatedBackend(backend, server.client, integrationConfig(backend, custom = false))
+        val states = generator.generate(ForgeGenerationParams(
+            prompt = "Test reference", sourceImageBase64 = "AQIDBA=="
+        )).toList()
+        assertTrue(states.last() is GenerationState.Complete)
+        val request = Json.parseToJsonElement(server.requests.single().jsonBodyText()).jsonObject
+        val references = request.getValue("input_references").jsonArray
+        assertEquals("data:image/png;base64,AQIDBA==",
+            references.first().jsonObject.getValue("image_url").jsonObject.getValue("url").jsonPrimitive.content)
+        assertTrue(generator.capabilities.supportsImg2Img)
+    }
+
+    @Test fun nanoGptCustomImageRequestStillRendersAfterImg2ImgMerge() = runBlocking {
+        val backend = ImageGenBackendType.NANO_GPT
+        val server = FakeImageHttp { request -> simulatedImageSuccess(request) }
+        val generator = simulatedBackend(backend, server.client, integrationConfig(backend))
+        val states = generator.generate(ForgeGenerationParams(prompt = "Custom image")).toList()
+        assertTrue(states.last() is GenerationState.Complete)
+        val body = Json.parseToJsonElement(server.requests.single().jsonBodyText()).jsonObject
+        assertEquals("test-custom", body.getValue("custom_marker").jsonPrimitive.content)
+        assertTrue(generator.capabilities.supportsCustomWorkflow)
+    }
+
+    @Test fun stabilityKeepsCustomTxt2ImgAndAdvertisesNativeImg2Img() = runBlocking {
+        val backend = ImageGenBackendType.STABILITY
+        val server = FakeImageHttp { request -> simulatedImageSuccess(request) }
+        val generator = simulatedBackend(backend, server.client, integrationConfig(backend))
+        val states = generator.generate(ForgeGenerationParams(prompt = "Custom SDXL image")).toList()
+        assertTrue(states.last() is GenerationState.Complete)
+        assertTrue(generator.capabilities.supportsImg2Img)
+        assertTrue(generator.capabilities.supportsCustomWorkflow)
+        val request = server.requests.single()
+        assertTrue(request.url.encodedPath.endsWith("/text-to-image"))
+        val body = Json.parseToJsonElement(request.jsonBodyText()).jsonObject
+        assertEquals("test-custom", body.getValue("custom_marker").jsonPrimitive.content)
+    }
+}
 }
