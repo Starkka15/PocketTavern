@@ -1,6 +1,7 @@
 package com.pockettavern.app.data.remote.imagegen
 
 import com.pockettavern.app.data.local.SettingsDataStore
+import com.pockettavern.app.domain.model.ImageGenConfig
 import com.pockettavern.app.util.DebugLogger
 import com.pockettavern.app.domain.model.ForgeGenerationParams
 import com.pockettavern.app.domain.model.GenerationState
@@ -27,7 +28,6 @@ private const val BASE_URL = "https://nano-gpt.com"
 private data class NanoGptGenerateRequest(
     val prompt: String,
     val model: String,
-    // Image-to-image. Omitted entirely for txt2img so the request shape is unchanged there.
     @SerialName("input_references")
     val inputReferences: List<NanoGptInputReference>? = null
 )
@@ -56,10 +56,16 @@ private data class NanoGptImage(
     val b64Json: String? = null
 )
 
-class NanoGptBackend(
+class NanoGptBackend private constructor(
     private val httpClient: OkHttpClient,
-    private val settingsDataStore: SettingsDataStore
+    private val configProvider: suspend () -> ImageGenConfig
 ) : ImageGenBackend {
+
+    constructor(httpClient: OkHttpClient, settingsDataStore: SettingsDataStore) :
+        this(httpClient, { settingsDataStore.getImageGenConfig() })
+
+    internal constructor(httpClient: OkHttpClient, config: ImageGenConfig) :
+        this(httpClient, { config })
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
@@ -67,12 +73,13 @@ class NanoGptBackend(
 
     override val capabilities = ImageGenCapabilities(
         supportsResolutionPresets = false,
+        supportsCustomWorkflow = true,
         supportsImg2Img = true,
         requiresApiKey = true
     )
 
     override suspend fun testConnection(): Result<Boolean> {
-        val config = settingsDataStore.getImageGenConfig()
+        val config = configProvider()
         if (config.nanoGptApiKey.isBlank()) {
             return Result.Error(Exception("No API key configured"))
         }
@@ -97,7 +104,7 @@ class NanoGptBackend(
     override suspend fun getSchedulers(): Result<List<String>> = Result.Success(emptyList())
 
     override suspend fun getModels(): Result<List<String>> {
-        val config = settingsDataStore.getImageGenConfig()
+        val config = configProvider()
         if (config.nanoGptApiKey.isBlank()) {
             return Result.Error(Exception("No API key configured"))
         }
@@ -127,7 +134,7 @@ class NanoGptBackend(
         DebugLogger.logSection("NanoGpt Generate")
         emit(GenerationState.Starting)
         try {
-            val config = settingsDataStore.getImageGenConfig()
+            val config = configProvider()
             if (config.nanoGptApiKey.isBlank()) {
                 emit(GenerationState.Error("No nano-gpt API key configured"))
                 return@flow
@@ -135,33 +142,25 @@ class NanoGptBackend(
             val model = config.nanoGptModel.ifBlank { "chroma" }
 
             DebugLogger.logKeyValue("model", model)
-            DebugLogger.logKeyValue("apiKeyPrefix", config.nanoGptApiKey.take(12) + "...")
-            DebugLogger.logKeyValue("prompt", params.prompt.take(80))
-
-            // img2img: nano-gpt takes reference images as input_references[].image_url.url.
-            // The documented example uses a public https URL; we only ever have local bytes,
-            // so we send a data: URL. If a model rejects that, the call fails loudly with the
-            // API's own error rather than silently producing an unrelated txt2img result.
-            val references = params.sourceImageBase64?.let { b64 ->
-                listOf(
-                    NanoGptInputReference(
-                        imageUrl = NanoGptImageUrl("data:image/png;base64,$b64")
+            // The standard nano-gpt endpoint accepts local image bytes as a data URL.
+            // Custom JSON templates remain user-controlled and may provide their own references.
+            val references = params.sourceImageBase64?.let { image ->
+                listOf(NanoGptInputReference(imageUrl = NanoGptImageUrl("data:image/png;base64,$image")))
+            }
+            val customTemplate = CustomImageTemplate.checkedSelected(config, params, type)
+            val reqBody = if (customTemplate != null) {
+                CustomImageTemplate.renderJson(customTemplate, params, model)
+            } else {
+                json.encodeToString(
+                    NanoGptGenerateRequest.serializer(),
+                    NanoGptGenerateRequest(
+                        prompt = params.prompt,
+                        model = model,
+                        inputReferences = references
                     )
                 )
             }
-            if (references != null) {
-                DebugLogger.logKeyValue("img2img", "1 reference image (data URL)")
-            }
-
-            val reqBody = json.encodeToString(
-                NanoGptGenerateRequest.serializer(),
-                NanoGptGenerateRequest(
-                    prompt = params.prompt,
-                    model = model,
-                    inputReferences = references
-                )
-            )
-            // Truncated: a data URL reference would otherwise dump ~1MB of base64 into the log.
+            // Never log the full request: img2img can contain megabytes of base64.
             DebugLogger.logKeyValue("requestBody", reqBody.take(500))
 
             val request = Request.Builder()
@@ -175,8 +174,7 @@ class NanoGptBackend(
                 httpClient.newCall(request).execute().use { response ->
                     val text = response.body?.string() ?: throw Exception("Empty response")
                     DebugLogger.logKeyValue("responseCode", response.code)
-                    DebugLogger.logKeyValue("responseBody", text.take(300))
-                    if (!response.isSuccessful) throw Exception("HTTP ${response.code}: $text")
+                    if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
                     text
                 }
             }
