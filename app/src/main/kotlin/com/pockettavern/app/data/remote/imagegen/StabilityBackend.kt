@@ -2,6 +2,7 @@ package com.pockettavern.app.data.remote.imagegen
 
 import android.util.Base64
 import com.pockettavern.app.data.local.SettingsDataStore
+import com.pockettavern.app.domain.model.ImageGenConfig
 import com.pockettavern.app.domain.model.ForgeGenerationParams
 import com.pockettavern.app.domain.model.GenerationState
 import com.pockettavern.app.domain.model.ImageGenBackendType
@@ -52,10 +53,16 @@ private data class StabilityArtifact(
     val finishReason: String? = null
 )
 
-class StabilityBackend(
+class StabilityBackend private constructor(
     private val httpClient: OkHttpClient,
-    private val settingsDataStore: SettingsDataStore
+    private val configProvider: suspend () -> ImageGenConfig
 ) : ImageGenBackend {
+
+    constructor(httpClient: OkHttpClient, settingsDataStore: SettingsDataStore) :
+        this(httpClient, { settingsDataStore.getImageGenConfig() })
+
+    internal constructor(httpClient: OkHttpClient, config: ImageGenConfig) :
+        this(httpClient, { config })
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
@@ -66,13 +73,14 @@ class StabilityBackend(
         supportsCfgScale = true,
         supportsSeed = true,
         supportsNegativePrompt = true,
-        supportsImg2Img = true,
         supportsResolutionPresets = true,
+        supportsCustomWorkflow = true,
+        supportsImg2Img = true,
         requiresApiKey = true
     )
 
     override suspend fun testConnection(): Result<Boolean> {
-        val config = settingsDataStore.getImageGenConfig()
+        val config = configProvider()
         if (config.stabilityApiKey.isBlank()) {
             return Result.Error(Exception("No API key configured"))
         }
@@ -105,7 +113,7 @@ class StabilityBackend(
     override fun generate(params: ForgeGenerationParams): Flow<GenerationState> = flow {
         emit(GenerationState.Starting)
         try {
-            val config = settingsDataStore.getImageGenConfig()
+            val config = configProvider()
             if (config.stabilityApiKey.isBlank()) {
                 emit(GenerationState.Error("No Stability AI API key configured"))
                 return@flow
@@ -158,15 +166,20 @@ class StabilityBackend(
                     .post(multipart)
                     .build()
             } else {
-                val body = json.encodeToString(StabilityRequest.serializer(), StabilityRequest(
-                    textPrompts = prompts,
+                val customTemplate = CustomImageTemplate.checkedSelected(config, params, type)
+                val body = if (customTemplate != null) {
+                    CustomImageTemplate.renderJson(customTemplate, params, engineId)
+                } else {
+                    json.encodeToString(StabilityRequest.serializer(), StabilityRequest(
+                        textPrompts = prompts,
                     width = width.coerceIn(512, 1024),
                     height = height.coerceIn(512, 1024),
                     steps = params.steps,
                     cfgScale = params.cfgScale,
                     seed = if (params.seed == -1) 0 else params.seed.toLong(),
-                    samples = 1
-                ))
+                        samples = 1
+                    ))
+                }
 
                 Request.Builder()
                     .url("https://api.stability.ai/v1/generation/$engineId/text-to-image")
