@@ -34,6 +34,10 @@ import com.pockettavern.app.domain.model.Result
 import com.pockettavern.app.domain.model.StreamEvent
 import com.pockettavern.app.data.local.GroupStorage
 import com.pockettavern.app.data.local.SettingsDataStore
+import com.pockettavern.app.data.local.CharacterImageWorkflowStorage
+import com.pockettavern.app.data.remote.imagegen.WorkflowImportValidator
+import com.pockettavern.app.domain.model.ImageGenBackendType
+import com.pockettavern.app.domain.model.ImageGenCapabilities
 import com.pockettavern.app.domain.prompt.PromptBuilder
 import com.pockettavern.app.domain.usecase.SummarizeHistoryUseCase
 import com.pockettavern.app.ui.audio.TtsManager
@@ -122,6 +126,17 @@ data class ChatUiState(
     // Transient status line set by extensions via PT.setStatus(), e.g. while composing
     // an image prompt before real generation progress is available
     val extensionStatusMessage: String? = null,
+    // Native per-character image workflow dialog (opened from message long-press).
+    val showCharacterImageWorkflowDialog: Boolean = false,
+    val characterImageWorkflowBackend: ImageGenBackendType = ImageGenBackendType.SD_WEBUI,
+    val characterImageWorkflowMode: String = "GLOBAL",
+    val characterImageWorkflowFileName: String? = null,
+    val globalImageWorkflowMode: String = "STANDARD",
+    val globalImageWorkflowFileName: String? = null,
+    val characterWorkflowSupportsCustom: Boolean = false,
+    val characterImageWorkflowError: String? = null,
+    val characterImageWorkflowSuccess: String? = null,
+    val characterImageWorkflowMigrationNotice: String? = null,
     // Message search
     val isSearching: Boolean = false,
     val searchQuery: String = "",
@@ -172,6 +187,7 @@ class ChatViewModel @Inject constructor(
     private val extensionManager: ExtensionManager,
     private val ttsManager: TtsManager,
     private val settingsDataStore: SettingsDataStore,
+    private val characterImageWorkflowStorage: CharacterImageWorkflowStorage,
     private val characterDao: com.pockettavern.app.data.local.db.dao.CharacterDao,
     private val spriteStorage: com.pockettavern.app.data.local.SpriteStorage,
     private val summarizeHistoryUseCase: SummarizeHistoryUseCase,
@@ -262,9 +278,13 @@ class ChatViewModel @Inject constructor(
         extensionManager.jsHost.setCurrentModelCallback = { modelName, callbackId ->
             viewModelScope.launch { doExtensionSetModel(modelName, callbackId) }
         }
-        // Publish the active image backend's capabilities to JS extensions so they can tell
-        // whether img2img options are honoured before bothering to send an avatar.
-        viewModelScope.launch { refreshImageCaps() }
+        // Always publish capabilities of the currently selected backend to JS.
+        // Collect config changes: users may switch backend while a chat is open.
+        viewModelScope.launch {
+            settingsDataStore.imageGenConfigFlow.collect { imageConfig ->
+                publishImageBackendCaps(imageConfig.activeBackendType)
+            }
+        }
         // Wire hidden generate callback so PT.generateHidden() works
         extensionManager.jsHost.hiddenGenerateCallback = { prompt, callbackId ->
             viewModelScope.launch { doHiddenGenerate(prompt, callbackId) }
@@ -280,6 +300,12 @@ class ChatViewModel @Inject constructor(
         // Wire status line callback so PT.setStatus() works
         extensionManager.jsHost.setStatusCallback = { message ->
             _uiState.update { it.copy(extensionStatusMessage = message.ifBlank { null }) }
+        }
+        // Surface extension errors using the existing native ErrorDialog.
+        extensionManager.jsHost.showToastCallback = { type, message ->
+            if (type == "error" && message.isNotBlank()) {
+                _uiState.update { it.copy(error = message) }
+            }
         }
         // Observe token counter enabled state
         _uiState.update { it.copy(showTokenCount = extensionManager.tokenCounter.enabled) }
@@ -416,7 +442,9 @@ class ChatViewModel @Inject constructor(
 
     fun loadCharacter(avatarUrl: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update {
+                it.copy(isLoading = true, showCharacterImageWorkflowDialog = false)
+            }
             // Set persona name early so extensions see it before first generation
             val personaName = settingsDataStore.getUserPersonaName()
             if (personaName.isNotBlank()) _currentUserName = personaName
@@ -435,6 +463,28 @@ class ChatViewModel @Inject constructor(
                             characterAvatarUrl = avatarUri,
                             backgroundPath = bgPath
                         )
+                    }
+                    // Upgrade old Scene Painter preferences by filename, never by an
+                    // ambiguous display name. Migration cannot override new choices.
+                    val migrationNotice = try {
+                        val imageConfig = settingsDataStore.getImageGenConfig()
+                        val duplicates = characterDao.getAll().count { it.name == character.name }
+                        withContext(Dispatchers.IO) {
+                            characterImageWorkflowStorage.migrateLegacyScenePainter(
+                                characterFile = avatarUrl,
+                                displayName = character.name,
+                                backend = imageConfig.activeBackendType,
+                                matchingCharacterCount = duplicates,
+                                hasGlobalCustomTemplate = !imageConfig
+                                    .customWorkflowFor(imageConfig.activeBackendType)
+                                    ?.template.isNullOrBlank()
+                            )
+                        }
+                    } catch (e: Exception) {
+                        "Could not migrate older Scene Painter workflow settings: ${e.message}"
+                    }
+                    _uiState.update {
+                        it.copy(characterImageWorkflowMigrationNotice = migrationNotice)
                     }
                     // Update per-character extension filter
                     extensionManager.updateCharacterFilter(avatarUrl)
@@ -1708,7 +1758,11 @@ No preamble, no explanation. Just the numbered list."""
                     append(_currentUserName).append(" (user): ")
                         .append(_currentPersonaDescription).append("\n\n")
                 }
-                // Include recent messages for context (up to 20, 2000 chars each)
+                if (_currentPersonaDescription.isNotBlank()) {
+                    append(_currentUserName).append(" (user): ")
+                        .append(_currentPersonaDescription).append("\n\n")
+                }
+                // Match upstream context window: the 20 latest chat messages.
                 val recent = if (messages.size > 20) messages.takeLast(20) else messages
                 if (recent.isNotEmpty()) {
                     append("Recent conversation:\n")
@@ -1780,6 +1834,166 @@ No preamble, no explanation. Just the numbered list."""
         }
     }
 
+
+    // ── Character-specific image generation ─────────────────────────────────
+
+    fun openCharacterImageWorkflowDialog() {
+        val characterFile = currentAvatarUrl.takeIf { it.isNotBlank() } ?: return
+        viewModelScope.launch {
+            try {
+                val config = settingsDataStore.getImageGenConfig()
+                val backend = config.activeBackendType
+                val displayName = _uiState.value.character?.name.orEmpty()
+                val matchingCount = characterDao.getAll().count { it.name == displayName }
+                val notice = withContext(Dispatchers.IO) {
+                    characterImageWorkflowStorage.migrateLegacyScenePainter(
+                        characterFile = characterFile,
+                        displayName = displayName,
+                        backend = backend,
+                        matchingCharacterCount = matchingCount,
+                        hasGlobalCustomTemplate = !config.customWorkflowFor(backend)
+                            ?.template.isNullOrBlank()
+                    )
+                }
+                val prefs = withContext(Dispatchers.IO) { characterImageWorkflowStorage.get(characterFile) }
+                _uiState.update {
+                    it.copy(
+                        showCharacterImageWorkflowDialog = true,
+                        characterImageWorkflowBackend = backend,
+                        characterImageWorkflowMode = prefs.modeFor(backend),
+                        characterImageWorkflowFileName = prefs.templateFor(backend)
+                            ?.takeIf { entry -> entry.template.isNotBlank() }
+                            ?.name?.ifBlank { "Unnamed character template" },
+                        globalImageWorkflowMode = config.workflowModeFor(backend),
+                        globalImageWorkflowFileName = config.customWorkflowFor(backend)
+                            ?.takeIf { entry -> entry.template.isNotBlank() }
+                            ?.name?.ifBlank { "Unnamed global template" },
+                        characterWorkflowSupportsCustom =
+                            imageGenRepository.getBackend(backend)?.capabilities?.supportsCustomWorkflow == true,
+                        characterImageWorkflowError = null,
+                        characterImageWorkflowSuccess = null,
+                        characterImageWorkflowMigrationNotice = notice
+                            ?: it.characterImageWorkflowMigrationNotice
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Failed to load character image settings: ${e.message}") }
+            }
+        }
+    }
+
+    fun dismissCharacterImageWorkflowDialog() {
+        _uiState.update {
+            it.copy(showCharacterImageWorkflowDialog = false,
+                characterImageWorkflowError = null, characterImageWorkflowSuccess = null)
+        }
+    }
+
+    fun setCharacterImageWorkflowMode(mode: String) {
+        val fileName = currentAvatarUrl.takeIf { it.isNotBlank() } ?: return
+        val backend = _uiState.value.characterImageWorkflowBackend
+        if (mode !in setOf("GLOBAL", "STANDARD", "CUSTOM")) return
+        if (mode == "CUSTOM" && !_uiState.value.characterWorkflowSupportsCustom) {
+            _uiState.update {
+                it.copy(characterImageWorkflowError = "${backend.displayName} does not support custom templates.",
+                    characterImageWorkflowSuccess = null)
+            }
+            return
+        }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { characterImageWorkflowStorage.setMode(fileName, backend, mode) }
+                _uiState.update {
+                    it.copy(characterImageWorkflowMode = mode, characterImageWorkflowError = null,
+                        characterImageWorkflowSuccess = null)
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(characterImageWorkflowError = "Could not save workflow mode: ${e.message}",
+                    characterImageWorkflowSuccess = null) }
+            }
+        }
+    }
+
+    fun importCharacterImageWorkflow(uri: android.net.Uri) {
+        val fileName = currentAvatarUrl.takeIf { it.isNotBlank() } ?: return
+        val backend = _uiState.value.characterImageWorkflowBackend
+        if (!_uiState.value.characterWorkflowSupportsCustom) return
+
+        viewModelScope.launch {
+            try {
+                val content = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                        ?: throw IllegalStateException("Cannot open the selected file.")
+                }
+                val validationError = WorkflowImportValidator.validate(content, backend)
+                if (validationError != null) {
+                    _uiState.update { it.copy(characterImageWorkflowError = validationError, characterImageWorkflowSuccess = null) }
+                    return@launch
+                }
+                val name = withContext(Dispatchers.IO) {
+                    context.contentResolver.query(
+                        uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                        null, null, null
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    }
+                }?.take(100)?.takeIf { it.isNotBlank() }
+                    ?: uri.lastPathSegment?.substringAfterLast('/')?.take(100)
+                    ?: "workflow.json"
+                withContext(Dispatchers.IO) {
+                    characterImageWorkflowStorage.setWorkflow(fileName, backend, name, content)
+                }
+                _uiState.update {
+                    it.copy(
+                        characterImageWorkflowFileName = name,
+                        characterImageWorkflowError = null,
+                        characterImageWorkflowSuccess = if (it.characterImageWorkflowMode == "CUSTOM")
+                            "Imported \"$name\" successfully. This character will use it for ${backend.displayName}."
+                        else "Imported \"$name\" successfully. Select Custom to use it."
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(characterImageWorkflowError = "Could not import workflow: ${e.message}",
+                        characterImageWorkflowSuccess = null)
+                }
+            }
+        }
+    }
+
+    fun removeCharacterImageWorkflow() {
+        val fileName = currentAvatarUrl.takeIf { it.isNotBlank() } ?: return
+        val backend = _uiState.value.characterImageWorkflowBackend
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { characterImageWorkflowStorage.clearWorkflow(fileName, backend) }
+                _uiState.update {
+                    it.copy(characterImageWorkflowFileName = null, characterImageWorkflowError = null,
+                        characterImageWorkflowSuccess = "Character template removed. Custom will use the global template if configured.")
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(characterImageWorkflowError = "Could not remove workflow: ${e.message}",
+                        characterImageWorkflowSuccess = null)
+                }
+            }
+        }
+    }
+
+    /** Keep the Scene Painter JS capability flags consistent with global backend changes. */
+    private fun publishImageBackendCaps(backend: ImageGenBackendType) {
+        val caps = imageGenRepository.getBackend(backend)?.capabilities ?: ImageGenCapabilities()
+        val flags = org.json.JSONObject()
+            .put("supportsImg2Img", caps.supportsImg2Img)
+            .put("supportsNegativePrompt", caps.supportsNegativePrompt)
+            .put("supportsSeed", caps.supportsSeed)
+            .put("supportsSteps", caps.supportsSteps)
+            .put("supportsCfgScale", caps.supportsCfgScale)
+            .put("supportsResolutionPresets", caps.supportsResolutionPresets)
+            .toString()
+        extensionManager.jsHost.updateImageCaps(flags)
+    }
+
     // ── Image generation (JS extension) ──────────────────────────────────
 
     /** Push the active image backend's capability flags to the JS sandbox. */
@@ -1810,16 +2024,18 @@ No preamble, no explanation. Just the numbered list."""
             val height = options.optInt("height", imageGenConfig.height)
             val negativePrompt = options.optString("negativePrompt", imageGenConfig.negativePrompt)
             val seed = options.optInt("seed", imageGenConfig.seed)
-            // Only SD WebUI/Forge implement img2img. Every other backend ignores init images
-            // entirely, which used to fail silently and look like "img2img did nothing".
             val requestedSource = options.optString("sourceImageBase64").ifEmpty { null }
-            val backendSupportsImg2Img = imageGenRepository.getCapabilities().supportsImg2Img
-            if (requestedSource != null && !backendSupportsImg2Img) {
-                com.pockettavern.app.util.DebugLogger.log("[ImageGen] img2img requested but ${imageGenConfig.activeBackend} " +
-                    "does not support it -- falling back to txt2img")
+            val supportsImg2Img = imageGenRepository.getBackend(imageGenConfig.activeBackendType)
+                ?.capabilities?.supportsImg2Img == true
+            if (requestedSource != null && !supportsImg2Img) {
+                com.pockettavern.app.util.DebugLogger.log(
+                    "[ImageGen] Avatar reference not supported by ${imageGenConfig.activeBackend}; using text prompt"
+                )
             }
-            val sourceImageBase64 = if (backendSupportsImg2Img) requestedSource else null
+            val sourceImageBase64 = if (supportsImg2Img) requestedSource else null
             val denoisingStrength = options.optDouble("denoisingStrength", 0.55).toFloat()
+            val workflowModeOverride = options.optString("workflowMode").ifEmpty { null }
+            val customWorkflowOverride = options.optString("customWorkflow").ifEmpty { null }
 
             val params = ForgeGenerationParams(
                 prompt = prompt,
@@ -1832,7 +2048,10 @@ No preamble, no explanation. Just the numbered list."""
                 seed = seed,
                 sourceImageBase64 = sourceImageBase64,
                 denoisingStrength = denoisingStrength,
-                clipSkip = imageGenConfig.clipSkip
+                clipSkip = imageGenConfig.clipSkip,
+                workflowModeOverride = workflowModeOverride,
+                customWorkflowOverride = customWorkflowOverride,
+                characterFileName = currentAvatarUrl.takeIf { it.isNotBlank() }
             )
 
             var resultBase64 = ""
