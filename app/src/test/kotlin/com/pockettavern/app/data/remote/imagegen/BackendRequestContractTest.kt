@@ -122,4 +122,3 @@ class BackendRequestContractTest {
         assertEquals("test-custom", body.getValue("custom_marker").jsonPrimitive.content)
     }
 }
-}
