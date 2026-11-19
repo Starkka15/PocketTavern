@@ -119,7 +119,7 @@ class JsExtensionHost @Inject constructor(
         val key: String,
         val label: String,
         val value: String,
-        val type: String = "text",
+        val type: String = "text", // "text", "select", "file"
         val options: List<String> = emptyList()
     )
     private val _editDialogRequest = MutableStateFlow<EditDialogRequest?>(null)
