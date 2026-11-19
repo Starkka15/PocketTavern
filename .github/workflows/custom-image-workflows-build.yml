@@ -1,9 +1,6 @@
 name: Custom Image Workflows – Comprehensive Test Suite
 
 on:
-  push:
-    branches:
-      - feature/custom-image-workflows-testing
   workflow_dispatch:
     inputs:
       test_focus:
